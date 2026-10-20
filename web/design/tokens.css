@@ -1,0 +1,233 @@
+/*
+ * Deep Studio · design tokens
+ * Ricostruito il 20 ott 2026. Stile "hardware": moduli scuri come un rack o una
+ * groovebox, pad gommosi, LED. Le pagine usano SOLO queste variabili e classi.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* superfici: dal case (piu' scuro) al pannello del modulo */
+  --ds-bg: #0d0e10;
+  --ds-surface: #17191c;
+  --ds-surface-raised: #1f2226;
+  --ds-surface-inset: #0a0b0c;
+  --ds-border: #2c3035;
+  --ds-border-strong: #3c4148;
+
+  /* testo */
+  --ds-text: #e8e6e1;
+  --ds-text-muted: #9a9890;
+  --ds-text-faint: #63625d;
+
+  /* accento: arancio da display/LED, piu' teal per "fatto" */
+  --ds-accent: #ff8a2b;
+  --ds-accent-strong: #ffa557;
+  --ds-accent-contrast: #1a0f05;
+  --ds-ok: #3fd6a4;
+  --ds-warn: #ffc94a;
+  --ds-error: #ff5a52;
+
+  /* LED */
+  --ds-led-off: #2a2c2f;
+  --ds-led-on: var(--ds-accent);
+  --ds-led-ok: var(--ds-ok);
+  --ds-led-error: var(--ds-error);
+  --ds-led-glow: 0 0 6px 1px;
+
+  /* tipografia */
+  --ds-font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ds-font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --ds-text-xs: 0.75rem;
+  --ds-text-sm: 0.875rem;
+  --ds-text-md: 1rem;
+  --ds-text-lg: 1.25rem;
+  --ds-text-xl: 1.75rem;
+  --ds-tracking-label: 0.12em;
+
+  /* spazi (griglia da 4 px) */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 24px;
+  --ds-space-6: 32px;
+  --ds-space-7: 48px;
+
+  /* forme e profondita' */
+  --ds-radius-sm: 4px;
+  --ds-radius-md: 8px;
+  --ds-radius-lg: 14px;
+  --ds-shadow-module: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
+  --ds-shadow-pad: 0 2px 0 rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  --ds-shadow-pad-pressed: 0 0 0 rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.6) inset;
+  --ds-focus-ring: 0 0 0 2px var(--ds-bg), 0 0 0 4px var(--ds-accent);
+
+  --ds-duration: 120ms;
+  --ds-max-width: 960px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Componenti base
+ * ------------------------------------------------------------------------- */
+
+/* Modulo: un pannello del rack, con le "viti" negli angoli in alto */
+.ds-module {
+  position: relative;
+  background: linear-gradient(180deg, var(--ds-surface-raised), var(--ds-surface));
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-lg);
+  box-shadow: var(--ds-shadow-module);
+  padding: var(--ds-space-6) var(--ds-space-5) var(--ds-space-5);
+  color: var(--ds-text);
+}
+.ds-module::before,
+.ds-module::after {
+  content: "";
+  position: absolute;
+  top: var(--ds-space-3);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ds-border-strong);
+}
+.ds-module::before { left: var(--ds-space-3); }
+.ds-module::after { right: var(--ds-space-3); }
+
+/* Titolo serigrafato del modulo */
+.ds-module-title {
+  margin: 0 0 var(--ds-space-4);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-sm);
+  font-weight: 600;
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+  color: var(--ds-text-muted);
+}
+
+/* Etichetta piccola sopra controlli e campi */
+.ds-label {
+  display: block;
+  margin-bottom: var(--ds-space-2);
+  font-family: var(--ds-font-mono);
+  font-size: var(--ds-text-xs);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+  color: var(--ds-text-faint);
+}
+
+/* Pad: il pulsante principale, gommoso come un pad di drum machine */
+.ds-pad {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-2);
+  min-height: 48px;
+  padding: var(--ds-space-3) var(--ds-space-5);
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-raised);
+  box-shadow: var(--ds-shadow-pad);
+  color: var(--ds-text);
+  font: 600 var(--ds-text-sm) var(--ds-font-mono);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--ds-duration), box-shadow var(--ds-duration), background var(--ds-duration);
+}
+.ds-pad:hover { background: var(--ds-border); }
+.ds-pad:active { transform: translateY(2px); box-shadow: var(--ds-shadow-pad-pressed); }
+.ds-pad:focus-visible { outline: none; box-shadow: var(--ds-shadow-pad), var(--ds-focus-ring); }
+.ds-pad:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* Pad acceso: l'azione principale della schermata */
+.ds-pad--primary {
+  background: var(--ds-accent);
+  border-color: var(--ds-accent-strong);
+  color: var(--ds-accent-contrast);
+}
+.ds-pad--primary:hover { background: var(--ds-accent-strong); }
+
+/* Selettore a pulsanti (sottogenere, stadio, export): un gruppo di pad piccoli */
+.ds-segmented { display: flex; flex-wrap: wrap; gap: var(--ds-space-2); }
+.ds-segmented .ds-pad { min-height: 40px; padding: var(--ds-space-2) var(--ds-space-4); }
+.ds-segmented .ds-pad[aria-pressed="true"] {
+  border-color: var(--ds-accent);
+  color: var(--ds-accent-strong);
+  box-shadow: var(--ds-shadow-pad-pressed);
+}
+
+/* Campo di testo: un display incassato */
+.ds-input {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+  color: var(--ds-text);
+  font: var(--ds-text-md) var(--ds-font-sans);
+}
+.ds-input:focus-visible { outline: none; box-shadow: var(--ds-focus-ring); }
+
+/* Zona di trascinamento dei file */
+.ds-dropzone {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  padding: var(--ds-space-5);
+  border: 1px dashed var(--ds-border-strong);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-inset);
+  color: var(--ds-text-muted);
+  text-align: center;
+}
+.ds-dropzone[data-active="true"] { border-color: var(--ds-accent); color: var(--ds-text); }
+
+/* LED: data-state = off | on | ok | error; data-blink per lo stato in corso */
+.ds-led {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ds-led-off);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5) inset;
+}
+.ds-led[data-state="on"] { background: var(--ds-led-on); box-shadow: var(--ds-led-glow) var(--ds-led-on); }
+.ds-led[data-state="ok"] { background: var(--ds-led-ok); box-shadow: var(--ds-led-glow) var(--ds-led-ok); }
+.ds-led[data-state="error"] { background: var(--ds-led-error); box-shadow: var(--ds-led-glow) var(--ds-led-error); }
+.ds-led[data-blink="true"] { animation: ds-blink 1s steps(2, start) infinite; }
+
+/* Fila di LED con etichetta sotto ciascuno (stato dell'analisi) */
+.ds-led-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--ds-space-2); }
+.ds-led-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--ds-space-2);
+  text-align: center;
+  font: var(--ds-text-xs) var(--ds-font-mono);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+  color: var(--ds-text-faint);
+}
+.ds-led-step[aria-current="step"] { color: var(--ds-text); }
+
+/* Messaggio sotto i LED o dopo un'azione */
+.ds-message { margin: var(--ds-space-4) 0 0; color: var(--ds-text-muted); font-size: var(--ds-text-sm); }
+.ds-message[data-tone="error"] { color: var(--ds-error); }
+.ds-message[data-tone="ok"] { color: var(--ds-ok); }
+
+/* Telefono: i LED in colonna, come una lista di passi */
+@media (max-width: 560px) {
+  .ds-led-row { grid-template-columns: 1fr; gap: var(--ds-space-3); }
+  .ds-led-step { flex-direction: row; gap: var(--ds-space-3); text-align: left; }
+}
+
+@keyframes ds-blink { to { opacity: 0.25; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-led[data-blink="true"] { animation: none; }
+  .ds-pad { transition: none; }
+}

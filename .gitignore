@@ -1,0 +1,21 @@
+# audio: non esce mai dal PC
+*.wav
+*.WAV
+*.mp3
+*.flac
+*.aif
+*.aiff
+# segreti
+.env
+.env.*
+!.env.example
+# riferimenti (solo uso interno)
+riferimenti_*.json
+# risultati e build
+_analisi/
+_demucs/
+risposte_api/
+__pycache__/
+.venv/
+node_modules/
+.next/

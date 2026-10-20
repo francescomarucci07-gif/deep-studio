@@ -1,0 +1,203 @@
+@import "../design/tokens.css";
+
+/* Base e impaginazione. Solo variabili di tokens.css: niente colori o misure a mano. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--ds-bg);
+  color: var(--ds-text);
+  font-family: var(--ds-font-sans);
+  font-size: var(--ds-text-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--ds-accent-strong);
+}
+
+.ds-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.ds-header,
+.ds-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-4);
+  width: 100%;
+  max-width: var(--ds-max-width);
+  margin: 0 auto;
+  padding: var(--ds-space-4);
+}
+
+.ds-brand {
+  font-family: var(--ds-font-mono);
+  font-weight: 700;
+  letter-spacing: var(--ds-tracking-label);
+  color: var(--ds-text);
+  text-decoration: none;
+}
+
+.ds-footer {
+  margin-top: auto;
+  color: var(--ds-text-faint);
+  font-size: var(--ds-text-xs);
+}
+.ds-footer a {
+  color: var(--ds-text-muted);
+}
+
+.ds-main {
+  width: 100%;
+  max-width: var(--ds-max-width);
+  margin: 0 auto;
+  padding: var(--ds-space-5) var(--ds-space-4) var(--ds-space-7);
+}
+
+.ds-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-5);
+}
+
+.ds-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-3);
+}
+.ds-row--between {
+  justify-content: space-between;
+}
+
+.ds-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.ds-hint {
+  margin: var(--ds-space-2) 0 0;
+  color: var(--ds-text-faint);
+  font-size: var(--ds-text-xs);
+}
+
+.ds-heading {
+  margin: 0;
+  font-size: var(--ds-text-xl);
+  line-height: 1.2;
+}
+
+.ds-lead {
+  margin: 0;
+  color: var(--ds-text-muted);
+}
+
+.ds-prose {
+  max-width: 65ch;
+}
+.ds-prose h2 {
+  margin: var(--ds-space-5) 0 var(--ds-space-2);
+  font-size: var(--ds-text-md);
+  color: var(--ds-text);
+}
+.ds-prose p {
+  margin: 0;
+  color: var(--ds-text-muted);
+}
+
+/* elenco di tracce e di stem */
+.ds-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ds-border);
+}
+.ds-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-3) 0;
+  border-bottom: 1px solid var(--ds-border);
+}
+.ds-list .ds-meta {
+  color: var(--ds-text-faint);
+  font: var(--ds-text-xs) var(--ds-font-mono);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+}
+
+.ds-select {
+  min-height: 40px;
+  padding: var(--ds-space-1) var(--ds-space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+  color: var(--ds-text);
+  font: var(--ds-text-sm) var(--ds-font-mono);
+}
+
+.ds-icon-button {
+  min-width: 40px;
+  min-height: 40px;
+  border: 0;
+  border-radius: var(--ds-radius-sm);
+  background: transparent;
+  color: var(--ds-text-faint);
+  font-size: var(--ds-text-lg);
+  cursor: pointer;
+}
+.ds-icon-button:hover {
+  color: var(--ds-error);
+}
+
+.ds-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+  overflow: hidden;
+}
+.ds-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--ds-accent);
+  transition: width var(--ds-duration);
+}
+
+.ds-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+ol.ds-led-row {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ds-dropzone {
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+}

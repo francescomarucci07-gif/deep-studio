@@ -20,11 +20,11 @@ JSON 1.0, `role_of()`, `--sottogenere`, `--stadio`, `--crea-riferimenti`, `analy
 | `docs/MOCKUP-P5.md` | wireframe di "Nuova analisi" e "Analisi in corso" |
 | `docs/PROMPT-M1.md`, `passi.py` | i prompt della M1, consultabili dal terminale |
 | `analysis/deep-studio-analysis-1.0.schema.json` | schema del JSON 1.0 |
-| `analysis/tests/` | 13 test su segnali sintetici (passano in ~8 s) |
+| `analysis/tests/` | 17 test su segnali sintetici e sul worker (passano in ~10 s) |
 | `db/migrations/0001_init.sql` | tabelle P6, RLS, bucket privato `audio`, realtime sui job |
 | `web/design/tokens.css` | colori, spazi e classi `.ds-*` (modulo, pad, LED) |
 
-Verificato qui: i 13 test passano; la migrazione è SQL valido per il parser di Postgres,
+Verificato qui: i 17 test passano; la migrazione è SQL valido per il parser di Postgres,
 ma va provata davvero con `supabase db reset` (Passo 3).
 
 Restano solo su Drive: *P2 · Note gold*, *P2 · Come parla il coach*, *P6 · Modello dei costi*,

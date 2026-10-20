@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ledStates, messageFor, type JobStatus as Status } from "@/lib/jobs";
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 type Job = { id: string; status: Status; error_message: string | null };
 
 export function JobStatus({ initial, hasStems }: { initial: Job; hasStems: boolean }) {
+  const router = useRouter();
   const [job, setJob] = useState(initial);
   // ultimo stato prima dell'errore, per colorare di rosso il LED giusto
   const [lastStep, setLastStep] = useState<Status>(initial.status === "errore" ? "in_coda" : initial.status);
@@ -26,13 +28,15 @@ export function JobStatus({ initial, hasStems }: { initial: Job; hasStems: boole
           const next = payload.new as Job;
           setJob(next);
           if (next.status !== "errore") setLastStep(next.status);
+          // pronta: la pagina (server) rilegge e mostra i risultati sotto i LED
+          if (next.status === "pronta") router.refresh();
         },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [initial.id]);
+  }, [initial.id, router]);
 
   async function riprova() {
     setRetrying(true);

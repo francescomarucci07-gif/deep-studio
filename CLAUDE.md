@@ -59,9 +59,12 @@ docs/       USER-STORIES-FASE1.md, MOCKUP-P5.md, P6 architettura, LEGGIMI analis
 # analisi (dalla radice del progetto)
 python -m venv analysis/.venv
 # Windows: analysis\.venv\Scripts\activate   ·   Mac/Linux: source analysis/.venv/bin/activate
-pip install numpy scipy jsonschema pytest
-python -m pytest analysis/tests -q          # 13 test, pochi secondi
+pip install numpy scipy soundfile jsonschema pytest
+python -m pytest analysis/tests -q          # 17 test, pochi secondi
 python analysis/deep_studio_analyze.py <cartella-wav> --sottogenere deep --stadio finita
+
+# worker locale (prototipo M2): prende i job in coda da Supabase e salva le analisi
+python analysis/worker_locale.py            # legge URL e service role key da web/.env.local
 
 # database locale (serve Docker acceso)
 supabase init
@@ -94,4 +97,6 @@ cd web && npm run dev
 - **M1 · Scheletro** (ora): login, upload mix e stem, stato del job in tempo reale, pagina privacy.
   Prompt passo per passo in `docs/PROMPT-M1.md`.
 - **M2 · Analisi**: worker Modal + JSON 1.0 in `analyses` (serve la conferma dello stack da Spencer).
+  Intanto c'è `analysis/worker_locale.py`: stesso lavoro, ma gira sul PC (niente Demucs, niente coach),
+  e la pagina del job mostra i risultati (`web/components/AnalysisResults.tsx`) quando è "pronta".
 - **M3 · Coach**, **M4 · Note e memoria**: vedi `docs/USER-STORIES-FASE1.md`.

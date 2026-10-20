@@ -32,10 +32,10 @@ Atteso: elenco di cosa c'è e cosa manca; primo commit sul branch `m1-scheletro`
 ## Passo 1 · I test dell'analisi
 
 ```
-Installa numpy, scipy, jsonschema e pytest in un ambiente virtuale in analysis/.venv e lancia python -m pytest analysis/tests -q. Spiegami cosa verificano i test e cosa vuol dire il risultato.
+Installa numpy, scipy, soundfile, jsonschema e pytest in un ambiente virtuale in analysis/.venv e lancia python -m pytest analysis/tests -q. Spiegami cosa verificano i test e cosa vuol dire il risultato.
 ```
 
-Atteso: 13 test passati in pochi secondi.
+Atteso: 17 test passati in pochi secondi.
 
 ## Passo 2 · L'app Next.js vuota con lo stile Deep Studio
 

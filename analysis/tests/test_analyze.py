@@ -1,12 +1,13 @@
 """Test dell'analisi su segnali sintetici di cui conosciamo la risposta giusta.
 
-Ricostruiti il 20 ott 2026 (gli originali non erano su Drive). 13 test.
+Ricostruiti il 20 ott 2026 (gli originali non erano su Drive), piu' il test del FLAC.
 """
 import json
 from pathlib import Path
 
 import jsonschema
 import numpy as np
+import pytest
 from scipy.io import wavfile
 
 import deep_studio_analyze as ds
@@ -32,6 +33,15 @@ def test_wav_24bit_letto_come_float(tmp_path):
     x = stereo(sine(1000, 5, amp=0.1), np.zeros(5 * SR))
     p = tmp_path / "t24.wav"
     wavfile.write(str(p), SR, (x * 2**31).astype(np.int32))
+    y, sr = ds.load_wav(p)
+    assert sr == SR and abs(ds.loudness_block(y, sr)["integrated_lufs"] - (-23.0)) < 0.1
+
+
+def test_flac_letto_come_il_wav(tmp_path):
+    sf = pytest.importorskip("soundfile")
+    x = stereo(sine(1000, 5, amp=0.1), np.zeros(5 * SR))
+    p = tmp_path / "t.flac"
+    sf.write(str(p), x, SR, subtype="PCM_24")
     y, sr = ds.load_wav(p)
     assert sr == SR and abs(ds.loudness_block(y, sr)["integrated_lufs"] - (-23.0)) < 0.1
 

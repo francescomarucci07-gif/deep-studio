@@ -30,6 +30,22 @@ Serve solo collegarla. Prima in locale, poi online.
    ```
    I LED cambiano senza ricaricare; con "Riprova" il job torna in coda.
 
+## A2 · Far partire davvero le analisi (worker locale)
+
+Finché la M2 su Modal non c'è, le analisi le fa il tuo PC. Con il progetto Supabase online
+funziona anche per l'app su Vercel: chi carica da lì vede i LED avanzare mentre il tuo PC lavora.
+
+1. In `web/.env.local` metti URL e **service role key** del progetto (online o locale).
+2. Dalla radice `deep-studio`, con l'ambiente virtuale attivo (`pip install numpy scipy soundfile`):
+   ```
+   python analysis/worker_locale.py
+   ```
+3. Carica una traccia dall'app: il worker scrive `-> job …` e poi `pronta`; nella pagina del job i
+   LED arrivano a "Pronta" e sotto compaiono le misure (loudness, bande, sezioni, stem, controlli).
+
+Il worker cancella l'audio scaricato appena finisce. Se lo spegni, i job restano "in coda" e
+ripartono quando lo riaccendi.
+
 ## B · Online: Supabase
 
 1. supabase.com → New project, regione **EU (Frankfurt)**, piano Free per ora.

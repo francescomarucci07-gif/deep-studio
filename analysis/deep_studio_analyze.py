@@ -119,7 +119,15 @@ THRESHOLDS = {
 # ---------------------------------------------------------------------------
 
 def load_wav(path: Path) -> tuple[np.ndarray, int]:
-    """Legge un WAV e restituisce (audio float in [-1, 1] con forma (n, 2), sample rate)."""
+    """Legge un WAV (o un FLAC) e restituisce (audio float in [-1, 1] con forma (n, 2), sample rate)."""
+    if Path(path).suffix.lower() == ".flac":
+        # FLAC: serve soundfile (licenza BSD), facoltativo per chi usa solo WAV
+        try:
+            import soundfile
+        except ImportError as e:
+            raise RuntimeError("Per i FLAC serve soundfile: pip install soundfile") from e
+        data, sr = soundfile.read(str(path), dtype="float64", always_2d=True)
+        return (np.repeat(data, 2, axis=1) if data.shape[1] == 1 else data[:, :2]), sr
     sr, data = wavfile.read(str(path))
     if data.dtype == np.int16:
         x = data.astype(np.float64) / 32768.0
@@ -615,11 +623,14 @@ def build_reference(results: list[dict], subgenre: str) -> dict:
 
 def analyze_file(path: Path, stems: dict | None = None, bpm_override: float | None = None,
                  subgenre: str | None = None, stage: str | None = None,
-                 reference: dict | None = None, stems_source: str = "upload") -> dict:
+                 reference: dict | None = None, stems_source: str = "upload",
+                 roles: dict | None = None) -> dict:
     """Analizza un mix (e gli stem, {nome_file: percorso}) e restituisce il JSON 1.0.
 
-    E' il punto d'ingresso che usera' anche il worker della M2."""
+    roles ({nome: ruolo}) sostituisce role_of(): serve quando il producer ha corretto
+    il ruolo a mano nella dashboard. E' il punto d'ingresso del worker."""
     stems = stems or {}
+    roles = roles or {}
     x, sr = load_wav(path)
     tid, _, kind = classify(path)
     mono = x.mean(axis=1)
@@ -672,7 +683,7 @@ def analyze_file(path: Path, stems: dict | None = None, bpm_override: float | No
             if ssr != sr:
                 print(f"   ! {p.name}: sample rate {ssr} diverso dal mix ({sr}), stem saltato")
                 continue
-            role = role_of(name)
+            role = roles.get(name) or role_of(name)
             loaded[name] = (role, sx)
             lufs = stem_level_db(sx, sr)
             r["stems"]["items"][name] = {

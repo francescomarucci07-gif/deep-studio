@@ -190,6 +190,115 @@ a {
   white-space: nowrap;
 }
 
+/* risultati: riquadri con un numero ciascuno */
+.ds-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--ds-space-3);
+}
+.ds-tile {
+  display: flex;
+  flex-direction: column;
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-inset);
+}
+.ds-tile .ds-label {
+  margin-bottom: var(--ds-space-1);
+}
+.ds-tile-value {
+  font: 600 var(--ds-text-lg) var(--ds-font-mono);
+  color: var(--ds-text);
+}
+.ds-tile-value small {
+  font-size: var(--ds-text-xs);
+  color: var(--ds-text-muted);
+}
+
+/* bilancio tonale: barre orizzontali, una sola serie */
+.ds-bars {
+  width: 100%;
+  border-collapse: collapse;
+}
+.ds-bars th,
+.ds-bars td {
+  padding: var(--ds-space-2) 0;
+  text-align: left;
+  font-weight: 400;
+  white-space: nowrap;
+}
+.ds-bars th {
+  padding-right: var(--ds-space-3);
+  width: 1%;
+}
+.ds-bars .ds-meta {
+  display: block;
+  color: var(--ds-text-faint);
+  font: var(--ds-text-xs) var(--ds-font-mono);
+}
+.ds-bars-head th {
+  color: var(--ds-text-faint);
+  font: var(--ds-text-xs) var(--ds-font-mono);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+}
+.ds-bar-cell {
+  width: 100%;
+}
+.ds-bar {
+  display: block;
+  height: 12px;
+  border-radius: 0 var(--ds-radius-sm) var(--ds-radius-sm) 0;
+  background: var(--ds-accent);
+}
+.ds-bars tr:hover .ds-bar {
+  background: var(--ds-accent-strong);
+}
+.ds-bar-value {
+  padding-left: var(--ds-space-3) !important;
+  text-align: right !important;
+  color: var(--ds-text-muted);
+  font: var(--ds-text-sm) var(--ds-font-mono);
+}
+
+/* telefono: ogni banda su due righe, nome sopra e barra a tutta larghezza sotto */
+@media (max-width: 560px) {
+  .ds-bars tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    padding: var(--ds-space-2) 0;
+  }
+  .ds-bars th,
+  .ds-bars td {
+    padding: 0;
+  }
+  .ds-bars th[scope="row"] {
+    grid-column: 1 / -1;
+    width: auto;
+    margin-bottom: var(--ds-space-1);
+  }
+  .ds-bars-head th:first-child {
+    display: none;
+  }
+}
+
+/* energia di una sezione: piccolo misuratore */
+.ds-energy {
+  display: block;
+  width: 120px;
+  height: 6px;
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+  overflow: hidden;
+}
+.ds-energy > span {
+  display: block;
+  height: 100%;
+  background: var(--ds-text-muted);
+}
+
 ol.ds-led-row {
   margin: 0;
   padding: 0;

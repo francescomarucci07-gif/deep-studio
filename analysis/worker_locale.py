@@ -47,7 +47,7 @@ def load_env() -> tuple[str, str]:
     env = {}
     f = ROOT / "web" / ".env.local"
     if f.is_file():
-        for line in f.read_text(encoding="utf-8").splitlines():
+        for line in f.read_text(encoding="utf-8-sig").splitlines():
             if "=" in line and not line.lstrip().startswith("#"):
                 k, v = line.split("=", 1)
                 env[k.strip()] = v.strip().strip('"').strip("'")

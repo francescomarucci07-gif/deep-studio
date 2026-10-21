@@ -1,14 +1,32 @@
 // Le misure del JSON 1.0 (analysis/deep-studio-analysis-1.0.schema.json), in chiaro.
 // Le note del coach arriveranno con la M3: qui ci sono solo numeri e controlli automatici.
 
+import { roleLabel } from "@/lib/roles";
+
 type Bands = Record<"sub" | "low" | "low_mid" | "mid" | "high_mid" | "high", number>;
+type Vocal = {
+  pitch: {
+    voiced_share: number;
+    f0_median_hz?: number;
+    median_abs_cents?: number;
+    share_off_25_cents?: number;
+    mean_offset_cents?: number;
+  };
+  sibilance_db: number;
+  low_mud_db: number;
+  crest_factor_db: number;
+};
 export type Analysis = {
   loudness: { integrated_lufs: number | null; true_peak_dbtp: number | null; lra_lu: number | null; clipped_samples: number };
   tonal_balance: { bands_db: Bands };
   dynamics: { crest_factor_db: number | null };
   stereo: { correlation: number; mono_fold_loss_above_120hz_db: number; side_ratio_by_band: { low: number } };
   sections: { start_s: number; end_s: number; bars: number; label_guess: string; energy: number }[];
-  stems: { provided: boolean; items: Record<string, { file: string; role: string; rel_to_mix_lu: number | null }>; note?: string };
+  stems: {
+    provided: boolean;
+    items: Record<string, { file: string; role: string; rel_to_mix_lu: number | null; vocal?: Vocal }>;
+    note?: string;
+  };
   clashes: { type: string; severity: number; bass_vs_kick_on_hits_db?: number; sidechain_depth_db?: number }[];
   tempo_bpm: number | null;
   reference: { name: string; lufs_diff: number; bands_diff_db: Partial<Bands> } | null;
@@ -148,12 +166,38 @@ export function AnalysisResults({ data }: { data: Analysis }) {
               <li key={key}>
                 <span>{s.file}</span>
                 <span className="ds-meta">
-                  {s.role} · {s.rel_to_mix_lu === null ? "muto" : `${signed(s.rel_to_mix_lu)} LU dal mix`}
+                  {roleLabel(s.role)} · {s.rel_to_mix_lu === null ? "muto" : `${signed(s.rel_to_mix_lu)} LU dal mix`}
                 </span>
               </li>
             ))}
           </ul>
         )}
+        {stems
+          .filter(([, s]) => s.vocal)
+          .map(([key, s]) => {
+            const v = s.vocal as Vocal;
+            const p = v.pitch;
+            return (
+              <div key={`voce-${key}`} className="ds-stack" style={{ marginTop: "var(--ds-space-5)" }}>
+                <span className="ds-label">Voce · {s.file}</span>
+                <div className="ds-tiles">
+                  <Tile
+                    label="Note fuori di 25+ cent"
+                    value={p.share_off_25_cents === undefined ? "—" : `${Math.round(p.share_off_25_cents * 100)}%`}
+                  />
+                  <Tile label="Scarto tipico" value={fmt(p.median_abs_cents)} unit="cent" />
+                  <Tile label="Tendenza" value={p.mean_offset_cents === undefined ? "—" : signed(p.mean_offset_cents)} unit="cent" />
+                  <Tile label="Sibilanti" value={fmt(v.sibilance_db)} unit="dB" />
+                  <Tile label="Fango < 150 Hz" value={fmt(v.low_mud_db)} unit="dB" />
+                  <Tile label="Dinamica" value={fmt(v.crest_factor_db)} unit="dB" />
+                </div>
+                <p className="ds-hint">
+                  100 cent = un semitono. Sopra il 35% di note oltre i 25 cent l’intonazione si sente: chiedi al coach come
+                  usare Pitcher in FL. Tendenza negativa = voce calante, positiva = crescente.
+                </p>
+              </div>
+            );
+          })}
         {data.clashes
           .filter((c) => c.type === "kick_bass")
           .map((c, i) => (
@@ -178,7 +222,7 @@ export function AnalysisResults({ data }: { data: Analysis }) {
             ))}
           </ul>
         )}
-        <p className="ds-hint">Soglie provvisorie. Le note vere del coach arrivano con la M3.</p>
+        <p className="ds-hint">Soglie provvisorie: sono indizi. Chiedi al coach cosa significano per la tua traccia.</p>
       </section>
     </div>
   );

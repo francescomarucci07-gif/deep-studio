@@ -47,7 +47,7 @@ scrive 3–5 note prioritarie con passi concreti in FL Studio.
 
 ```
 analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script di prova P3/P4
-db/         migrations/0001_init.sql (tabelle, RLS, bucket audio, realtime)
+db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili. Collegamento a Supabase e Vercel: docs/DEPLOY.md
 docs/       USER-STORIES-FASE1.md, MOCKUP-P5.md, P6 architettura, LEGGIMI analisi, PROMPT-M1.md
@@ -80,9 +80,16 @@ cd web && npm run dev
 
 ## Cose da sapere
 
-- **Ruolo degli stem**: `role_of()` in `analysis/deep_studio_analyze.py` usa l'ultima parola del
-  nome file (`Sunset_Kick.wav` → kick). La dashboard deve usare **la stessa tabella** (`ROLE_WORDS`);
-  i ruoli validi sono anche l'enum `stem_role` nel database.
+- **Ruolo degli stem** (28 strumenti, voci comprese): tabella unica `analysis/stem_roles.json`, copia
+  identica in `web/lib/stem-roles.json` (un test controlla che coincidano). `role_of()` (Python) e
+  `roleOf()` (TS) usano le ultime due parole, poi l'ultima (`Backing Vocals` → backing_vox). I ruoli
+  sono anche l'enum `stem_role` nel database: un ruolo nuovo = JSON (tutte e due) + `alter type`.
+- **Voce**: per gli stem vox/backing_vox/vocal_chop/choir l'analisi aggiunge `vocal` (intonazione in
+  cent con YIN, sibilanti, fango sotto 150 Hz, dinamica) e i controlli `intonazione`, `sibilanti`, `fango_voce`.
+- **Coach (chat)**: `web/app/api/coach/route.ts` (Claude API, streaming, solo server; modello da
+  `COACH_MODEL`, default `claude-sonnet-5-5` come da P6), istruzioni in `web/lib/coach/prompt.ts`
+  (versionate), contesto = analisi compatta + versione precedente. Messaggi e costi in `coach_messages`.
+  Serve `ANTHROPIC_API_KEY` tra le variabili di Vercel. Voce in/out con la Web Speech API del browser.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
   `retry_job(id)`; tutti gli altri cambi di stato li fa il worker.

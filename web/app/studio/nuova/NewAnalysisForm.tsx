@@ -15,7 +15,7 @@ import {
   type Stage,
   type Subgenre,
 } from "@/lib/options";
-import { ROLES, roleOf, type StemRole } from "@/lib/roles";
+import { ROLE_GROUPS, roleOf, type StemRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/client";
 
 type ExistingTrack = { id: string; title: string; subgenre: Subgenre };
@@ -290,10 +290,14 @@ export function NewAnalysisForm({ tracks }: { tracks: ExistingTrack[] }) {
                       )
                     }
                   >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
+                    {ROLE_GROUPS.map((g) => (
+                      <optgroup key={g.group} label={g.label}>
+                        {g.roles.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                   {!started && (
@@ -313,6 +317,7 @@ export function NewAnalysisForm({ tracks }: { tracks: ExistingTrack[] }) {
         )}
         <p className="ds-hint">
           Senza stem va bene lo stesso, ma con kick e bassline separati l’analisi del low end è molto più precisa.
+          Con lo stem della voce misuro anche intonazione (serve l’autotune?) e sibilanti.
         </p>
       </div>
 

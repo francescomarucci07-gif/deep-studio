@@ -60,36 +60,28 @@ SCRIPT_VERSION = "0.3-house"
 SUBGENRES = ("deep", "tech", "progressive")
 STAGES = ("idea grezza", "mix a meta'", "finita")
 
-# Parola finale del nome file -> ruolo dello stem. La stessa tabella va usata
-# nella dashboard (upload degli stem), cosi' il ruolo proposto e' identico.
-ROLE_WORDS = {
-    "kick": "kick", "kik": "kick", "bd": "kick", "cassa": "kick",
-    "bass": "bass", "bassline": "bass", "sub": "bass", "basso": "bass", "808": "bass",
-    "drums": "drums", "drum": "drums", "batteria": "drums", "loop": "drums",
-    "perc": "perc", "percs": "perc", "percussion": "perc", "percussioni": "perc",
-    "hats": "perc", "hat": "perc", "hihat": "perc", "shaker": "perc",
-    "clap": "clap", "claps": "clap", "snare": "clap", "rim": "clap",
-    "lead": "lead", "synth": "lead", "melody": "lead", "melodia": "lead",
-    "arp": "lead", "pluck": "lead", "keys": "lead", "chords": "lead", "stab": "lead",
-    "pad": "pad", "pads": "pad", "atmo": "pad", "atmosfera": "pad", "atmosfere": "pad",
-    "strings": "pad",
-    "fx": "fx", "sfx": "fx", "riser": "fx", "noise": "fx", "impact": "fx", "sweep": "fx",
-    "vox": "vox", "vocal": "vox", "vocals": "vox", "voce": "vox", "chop": "vox",
-}
-ROLES = ("kick", "bass", "drums", "perc", "clap", "lead", "pad", "fx", "vox", "other")
+# Parola finale del nome file -> ruolo dello stem. Tabella unica in stem_roles.json,
+# copiata identica in web/lib/stem-roles.json: dashboard e analisi propongono lo stesso ruolo.
+_ROLE_TABLE = json.loads((Path(__file__).with_name("stem_roles.json")).read_text(encoding="utf-8"))
+ROLE_WORDS: dict[str, str] = _ROLE_TABLE["words"]
+ROLES = tuple(r["id"] for r in _ROLE_TABLE["roles"])
+VOCAL_ROLES = ("vox", "backing_vox", "vocal_chop", "choir")
 
 
 def role_of(name: str) -> str:
-    """Ruolo di uno stem dall'ultima parola del nome ("Sunset_Kick.wav" -> "kick")."""
+    """Ruolo di uno stem dall'ultima parola del nome ("Sunset_Kick.wav" -> "kick").
+
+    Prima prova le ultime due parole insieme ("Backing Vocals" -> backing_vocals)."""
     stem = Path(name).stem if "." in name else name
     words = [w for w in re.split(r"[\s_\-\.]+", stem.lower()) if w]
-    for w in reversed(words):
-        if w in ROLE_WORDS:
-            return ROLE_WORDS[w]
-        if w.isdigit():  # "Pad 2.wav": il numero non dice il ruolo
-            continue
-        return ROLE_WORDS.get(w.rstrip("s"), "other")
-    return "other"
+    while words and words[-1].isdigit() and words[-1] not in ROLE_WORDS:  # "Pad 2.wav" sì, "808" no
+        words.pop()
+    if not words:
+        return "other"
+    if len(words) >= 2 and f"{words[-2]}_{words[-1]}" in ROLE_WORDS:
+        return ROLE_WORDS[f"{words[-2]}_{words[-1]}"]
+    w = words[-1]
+    return ROLE_WORDS.get(w, ROLE_WORDS.get(w.rstrip("s"), "other"))
 
 # Bande del bilancio tonale (Hz), come nella skill audio-analysis-engine
 BANDS = {
@@ -456,6 +448,84 @@ def sections_block(x: np.ndarray, sr: int, bpm: float, phase_s: float) -> list[d
 # Stem: bilanciamento, kick contro bassline e sidechain
 # ---------------------------------------------------------------------------
 
+def pitch_track(mono: np.ndarray, sr: int, fmin: float = 70.0, fmax: float = 1000.0,
+                frame_s: float = 0.04, hop_s: float = 0.02, threshold: float = 0.15):
+    """f0 per finestra con il metodo YIN (de Cheveigne & Kawahara 2002), solo numpy.
+
+    Restituisce (tempi_s, f0_hz) con NaN dove la finestra non e' intonata (silenzio, rumore)."""
+    n, hop = int(frame_s * sr), int(hop_s * sr)
+    tau_min, tau_max = max(2, int(sr / fmax)), int(sr / fmin)
+    if len(mono) < n + tau_max:
+        return np.array([]), np.array([])
+    rms_all = np.sqrt(np.mean(mono ** 2)) + 1e-12
+    times, f0s = [], []
+    size = 1 << int(np.ceil(np.log2(2 * (n + tau_max))))
+    for start in range(0, len(mono) - n - tau_max, hop):
+        seg = mono[start:start + n + tau_max]
+        frame = seg[:n]
+        times.append(start / sr)
+        if np.sqrt(np.mean(frame ** 2)) < rms_all * 0.1:  # troppo piano: pausa tra le frasi
+            f0s.append(np.nan)
+            continue
+        # funzione differenza d(tau) via autocorrelazione con FFT
+        spec = np.fft.rfft(seg, size)
+        acf = np.fft.irfft(spec * np.conj(np.fft.rfft(frame, size)), size)[: tau_max + 1]
+        energy = np.cumsum(np.concatenate([[0.0], seg ** 2]))
+        e0 = energy[n]
+        e_tau = energy[np.arange(tau_max + 1) + n] - energy[np.arange(tau_max + 1)]
+        d = e0 + e_tau - 2 * acf
+        d[0] = 0
+        cmnd = d[1:] * np.arange(1, tau_max + 1) / (np.cumsum(d[1:]) + 1e-12)
+        cmnd = np.concatenate([[1.0], cmnd])
+        below = np.where(cmnd[tau_min:] < threshold)[0]
+        if len(below) == 0:
+            f0s.append(np.nan)
+            continue
+        tau = below[0] + tau_min
+        while tau + 1 <= tau_max and cmnd[tau + 1] < cmnd[tau]:  # scendi fino al minimo locale
+            tau += 1
+        if 1 <= tau < tau_max:  # interpolazione parabolica
+            a, b, c = cmnd[tau - 1], cmnd[tau], cmnd[tau + 1]
+            den = a - 2 * b + c
+            tau = tau + (0.5 * (a - c) / den if den != 0 else 0)
+        f0s.append(sr / tau)
+    return np.array(times), np.array(f0s)
+
+
+def vocal_block(x: np.ndarray, sr: int) -> dict:
+    """Misure per uno stem di voce: intonazione (serve l'autotune?), sibilanti, fango, dinamica."""
+    mono = x.mean(axis=1)
+    _, f0 = pitch_track(mono, sr)
+    voiced = f0[np.isfinite(f0)]
+    pitch = {"voiced_share": round(float(np.mean(np.isfinite(f0))), 2) if len(f0) else 0.0}
+    if len(voiced) >= 10:
+        midi = 69 + 12 * np.log2(voiced / 440.0)
+        cents = (midi - np.round(midi)) * 100  # scarto dalla nota piu' vicina (accordatura A440)
+        pitch.update({
+            "f0_median_hz": round(float(np.median(voiced)), 1),
+            "median_abs_cents": round(float(np.median(np.abs(cents))), 1),
+            "share_off_25_cents": round(float(np.mean(np.abs(cents) > 25)), 2),
+            "mean_offset_cents": round(float(np.mean(cents)), 1),  # tutto calante (-) o crescente (+)?
+        })
+    f, pxx = signal.welch(mono, fs=sr, nperseg=min(4096, len(mono)))
+
+    def band(lo, hi):
+        return float(pxx[(f >= lo) & (f < hi)].sum()) + 1e-20
+
+    total = band(20, min(20000, sr / 2))
+    return {
+        "pitch": pitch,
+        # sibilanti: 5-9 kHz rispetto alla presenza 1-4 kHz; sopra ~ -6 dB servono de-esser
+        "sibilance_db": round(10 * np.log10(band(5000, 9000) / band(1000, 4000)), 1),
+        # fango: energia sotto 150 Hz (spesso rimbombo del microfono), rispetto al totale
+        "low_mud_db": round(10 * np.log10(band(20, 150) / total), 1),
+        "crest_factor_db": round(float(20 * np.log10((np.max(np.abs(mono)) + 1e-12) /
+                                                     (np.sqrt(np.mean(mono ** 2)) + 1e-12))), 1),
+        "note": "soglie provvisorie; l'intonazione e' misurata rispetto alla scala cromatica A440",
+        "confidence": "medium",
+    }
+
+
 def stem_level_db(x: np.ndarray, sr: int) -> float:
     return round(loudness_block(x, sr)["integrated_lufs"], 1)
 
@@ -553,6 +623,21 @@ def run_checks(r: dict, export_kind: str) -> list[dict]:
     if len(secs) <= 1 and r["track"]["duration_s"] > 20:
         out.append({"category": "arrangiamento/energia", "check": "arrangiamento_piatto",
                     "detail": "nessun cambio di sezione rilevato"})
+    for item in (r.get("stems") or {}).get("items", {}).values():
+        v = item.get("vocal")
+        if not v:
+            continue
+        p = v["pitch"]
+        if p.get("share_off_25_cents", 0) > 0.35:
+            out.append({"category": "voce", "check": "intonazione",
+                        "detail": f"{item['file']}: {round(p['share_off_25_cents'] * 100)}% delle note a piu' di "
+                                  f"25 cent dalla nota giusta (scarto medio {p['median_abs_cents']} cent)"})
+        if v["sibilance_db"] > -6:
+            out.append({"category": "voce", "check": "sibilanti",
+                        "detail": f"{item['file']}: 5-9 kHz a {v['sibilance_db']} dB dalla presenza (1-4 kHz)"})
+        if v["low_mud_db"] > -18:
+            out.append({"category": "voce", "check": "fango_voce",
+                        "detail": f"{item['file']}: {v['low_mud_db']} dB di energia sotto i 150 Hz"})
     for c in r.get("clashes", []):
         if c.get("type") == "kick_bass" and c.get("severity", 0) >= 0.5:
             out.append({"category": "clash di frequenze", "check": "kick_bass",
@@ -693,8 +778,10 @@ def analyze_file(path: Path, stems: dict | None = None, bpm_override: float | No
                 "rel_to_mix_lu": round(lufs - mix_lufs, 1) if np.isfinite(lufs) else None,
                 "confidence": conf,
             }
+            if role in VOCAL_ROLES and np.isfinite(lufs):
+                r["stems"]["items"][name]["vocal"] = vocal_block(sx, sr)
         kick = next((x for role, x in loaded.values() if role == "kick"), None)
-        bass = next((x for role, x in loaded.values() if role == "bass"), None)
+        bass = next((x for role, x in loaded.values() if role in ("bass", "sub")), None)
         if kick is not None and bass is not None:
             kb = kick_bass_block(kick, bass, sr, bpm)
             if kb.get("available"):

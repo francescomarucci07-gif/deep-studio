@@ -299,6 +299,63 @@ a {
   background: var(--ds-text-muted);
 }
 
+/* chat con il coach */
+.ds-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-top: var(--ds-space-4);
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-inset);
+}
+.ds-chat-msg {
+  max-width: 85%;
+  padding: var(--ds-space-3);
+  border-radius: var(--ds-radius-md);
+  background: var(--ds-surface-raised);
+}
+.ds-chat-msg[data-role="user"] {
+  align-self: flex-end;
+  border: 1px solid var(--ds-accent);
+}
+.ds-chat-msg p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ds-chat-msg .ds-label {
+  margin-bottom: var(--ds-space-1);
+}
+.ds-chat-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-3);
+  margin-top: var(--ds-space-4);
+}
+.ds-chat-input textarea {
+  resize: vertical;
+}
+.ds-link-button {
+  margin-top: var(--ds-space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ds-accent-strong);
+  font: var(--ds-text-xs) var(--ds-font-mono);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+@media (max-width: 560px) {
+  .ds-chat-msg {
+    max-width: 100%;
+  }
+}
+
 ol.ds-led-row {
   margin: 0;
   padding: 0;

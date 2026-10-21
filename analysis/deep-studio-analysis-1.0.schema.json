@@ -4,116 +4,439 @@
   "title": "Deep Studio · analisi di una traccia (schema 1.0)",
   "description": "Ricostruito il 20 ott 2026 insieme a deep_studio_analyze.py v0.3. Stesso formato per upload (Fase 1) e plugin (Fase 2).",
   "type": "object",
-  "required": ["schema_version", "source", "analyzer", "track", "loudness", "tonal_balance", "dynamics",
-               "stereo", "sections", "stems", "clashes", "tempo_bpm", "tempo_confidence", "key_guess",
-               "daw_context", "reference", "checks"],
+  "required": [
+    "schema_version",
+    "source",
+    "analyzer",
+    "track",
+    "loudness",
+    "tonal_balance",
+    "dynamics",
+    "stereo",
+    "sections",
+    "stems",
+    "clashes",
+    "tempo_bpm",
+    "tempo_confidence",
+    "key_guess",
+    "daw_context",
+    "reference",
+    "checks"
+  ],
   "$defs": {
-    "confidence": {"enum": ["high", "medium", "low"]},
-    "num_or_null": {"type": ["number", "null"]},
-    "time_value": {"type": "array", "prefixItems": [{"type": "number"}, {"type": "number"}], "items": false},
+    "confidence": {
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "num_or_null": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "time_value": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "items": false
+    },
     "bands": {
       "type": "object",
-      "required": ["sub", "low", "low_mid", "mid", "high_mid", "high"],
-      "additionalProperties": {"type": "number"}
+      "required": [
+        "sub",
+        "low",
+        "low_mid",
+        "mid",
+        "high_mid",
+        "high"
+      ],
+      "additionalProperties": {
+        "type": "number"
+      }
     }
   },
   "properties": {
-    "schema_version": {"const": "1.0"},
-    "source": {"enum": ["upload", "plugin"]},
-    "analyzer": {"type": "string"},
+    "schema_version": {
+      "const": "1.0"
+    },
+    "source": {
+      "enum": [
+        "upload",
+        "plugin"
+      ]
+    },
+    "analyzer": {
+      "type": "string"
+    },
     "track": {
       "type": "object",
-      "required": ["id", "file", "export", "version", "duration_s", "sample_rate", "genre", "subgenre", "stage"],
+      "required": [
+        "id",
+        "file",
+        "export",
+        "version",
+        "duration_s",
+        "sample_rate",
+        "genre",
+        "subgenre",
+        "stage"
+      ],
       "properties": {
-        "id": {"type": "string"},
-        "file": {"type": "string"},
-        "export": {"enum": ["master", "nomaster", "sconosciuto"]},
-        "version": {"type": "integer", "minimum": 1},
-        "duration_s": {"type": "number", "minimum": 0},
-        "sample_rate": {"type": "integer"},
-        "genre": {"type": "string"},
-        "subgenre": {"enum": ["deep", "tech", "progressive", null]},
-        "stage": {"enum": ["idea grezza", "mix a meta'", "finita", null]}
+        "id": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "export": {
+          "enum": [
+            "master",
+            "nomaster",
+            "sconosciuto"
+          ]
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "duration_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sample_rate": {
+          "type": "integer"
+        },
+        "genre": {
+          "type": "string"
+        },
+        "subgenre": {
+          "enum": [
+            "deep",
+            "tech",
+            "progressive",
+            null
+          ]
+        },
+        "stage": {
+          "enum": [
+            "idea grezza",
+            "mix a meta'",
+            "finita",
+            null
+          ]
+        }
       }
     },
     "loudness": {
       "type": "object",
-      "required": ["integrated_lufs", "true_peak_dbtp", "sample_peak_dbfs", "lra_lu", "clipped_samples",
-                   "short_term_curve", "confidence"],
+      "required": [
+        "integrated_lufs",
+        "true_peak_dbtp",
+        "sample_peak_dbfs",
+        "lra_lu",
+        "clipped_samples",
+        "short_term_curve",
+        "confidence"
+      ],
       "properties": {
-        "integrated_lufs": {"type": "number"},
-        "true_peak_dbtp": {"type": "number"},
-        "sample_peak_dbfs": {"type": "number"},
-        "lra_lu": {"$ref": "#/$defs/num_or_null"},
-        "clipped_samples": {"type": "integer", "minimum": 0},
-        "short_term_curve": {"type": "array", "items": {"$ref": "#/$defs/time_value"}},
-        "confidence": {"$ref": "#/$defs/confidence"}
+        "integrated_lufs": {
+          "type": "number"
+        },
+        "true_peak_dbtp": {
+          "type": "number"
+        },
+        "sample_peak_dbfs": {
+          "type": "number"
+        },
+        "lra_lu": {
+          "$ref": "#/$defs/num_or_null"
+        },
+        "clipped_samples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "short_term_curve": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/time_value"
+          }
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
       }
     },
     "tonal_balance": {
       "type": "object",
-      "required": ["bands_db", "confidence"],
-      "properties": {"bands_db": {"$ref": "#/$defs/bands"}, "confidence": {"$ref": "#/$defs/confidence"}}
+      "required": [
+        "bands_db",
+        "confidence"
+      ],
+      "properties": {
+        "bands_db": {
+          "$ref": "#/$defs/bands"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
+      }
     },
     "dynamics": {
       "type": "object",
-      "required": ["crest_factor_db", "per_window", "confidence"],
+      "required": [
+        "crest_factor_db",
+        "per_window",
+        "confidence"
+      ],
       "properties": {
-        "crest_factor_db": {"type": "number"},
-        "per_window": {"type": "array", "items": {"$ref": "#/$defs/time_value"}},
-        "confidence": {"$ref": "#/$defs/confidence"}
+        "crest_factor_db": {
+          "type": "number"
+        },
+        "per_window": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/time_value"
+          }
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
       }
     },
     "stereo": {
       "type": "object",
-      "required": ["correlation", "correlation_full_band", "correlation_per_window", "side_ratio_by_band",
-                   "mono_fold_loss_db", "mono_fold_loss_above_120hz_db", "confidence"],
+      "required": [
+        "correlation",
+        "correlation_full_band",
+        "correlation_per_window",
+        "side_ratio_by_band",
+        "mono_fold_loss_db",
+        "mono_fold_loss_above_120hz_db",
+        "confidence"
+      ],
       "properties": {
-        "correlation": {"type": "number", "minimum": -1, "maximum": 1},
-        "correlation_full_band": {"type": "number", "minimum": -1, "maximum": 1},
-        "correlation_per_window": {"type": "array", "items": {"$ref": "#/$defs/time_value"}},
-        "side_ratio_by_band": {
-          "type": "object", "required": ["low", "high"],
-          "properties": {"low": {"type": "number"}, "high": {"type": "number"}}
+        "correlation": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
         },
-        "mono_fold_loss_db": {"type": "number"},
-        "mono_fold_loss_above_120hz_db": {"type": "number"},
-        "confidence": {"$ref": "#/$defs/confidence"}
+        "correlation_full_band": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "correlation_per_window": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/time_value"
+          }
+        },
+        "side_ratio_by_band": {
+          "type": "object",
+          "required": [
+            "low",
+            "high"
+          ],
+          "properties": {
+            "low": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            }
+          }
+        },
+        "mono_fold_loss_db": {
+          "type": "number"
+        },
+        "mono_fold_loss_above_120hz_db": {
+          "type": "number"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        }
       }
     },
     "sections": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["start_s", "end_s", "bars", "label_guess", "energy", "energy_rel_db", "confidence"],
+        "required": [
+          "start_s",
+          "end_s",
+          "bars",
+          "label_guess",
+          "energy",
+          "energy_rel_db",
+          "confidence"
+        ],
         "properties": {
-          "start_s": {"type": "number"},
-          "end_s": {"type": "number"},
-          "bars": {"type": "integer"},
-          "label_guess": {"enum": ["intro", "build", "drop", "break", "outro"]},
-          "energy": {"type": "number", "minimum": 0, "maximum": 1},
-          "energy_rel_db": {"type": "number", "maximum": 0},
-          "confidence": {"$ref": "#/$defs/confidence"}
+          "start_s": {
+            "type": "number"
+          },
+          "end_s": {
+            "type": "number"
+          },
+          "bars": {
+            "type": "integer"
+          },
+          "label_guess": {
+            "enum": [
+              "intro",
+              "build",
+              "drop",
+              "break",
+              "outro"
+            ]
+          },
+          "energy": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "energy_rel_db": {
+            "type": "number",
+            "maximum": 0
+          },
+          "confidence": {
+            "$ref": "#/$defs/confidence"
+          }
         }
       }
     },
     "stems": {
       "type": "object",
-      "required": ["provided", "source", "items"],
+      "required": [
+        "provided",
+        "source",
+        "items"
+      ],
       "properties": {
-        "provided": {"type": "boolean"},
-        "source": {"enum": ["upload", "demucs", null]},
+        "provided": {
+          "type": "boolean"
+        },
+        "source": {
+          "enum": [
+            "upload",
+            "demucs",
+            null
+          ]
+        },
         "items": {
           "type": "object",
           "additionalProperties": {
             "type": "object",
-            "required": ["file", "role", "loudness_lufs", "rel_to_mix_lu", "confidence"],
+            "required": [
+              "file",
+              "role",
+              "loudness_lufs",
+              "rel_to_mix_lu",
+              "confidence"
+            ],
             "properties": {
-              "file": {"type": "string"},
-              "role": {"enum": ["kick", "bass", "drums", "perc", "clap", "lead", "pad", "fx", "vox", "other"]},
-              "loudness_lufs": {"$ref": "#/$defs/num_or_null"},
-              "rel_to_mix_lu": {"$ref": "#/$defs/num_or_null"},
-              "confidence": {"$ref": "#/$defs/confidence"}
+              "file": {
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "kick",
+                  "snare",
+                  "clap",
+                  "hats",
+                  "perc",
+                  "toms",
+                  "cymbals",
+                  "drums",
+                  "bass",
+                  "sub",
+                  "lead",
+                  "pluck",
+                  "arp",
+                  "chords",
+                  "pad",
+                  "guitar",
+                  "piano",
+                  "keys",
+                  "organ",
+                  "strings",
+                  "brass",
+                  "woodwinds",
+                  "vox",
+                  "backing_vox",
+                  "vocal_chop",
+                  "choir",
+                  "fx",
+                  "other"
+                ]
+              },
+              "loudness_lufs": {
+                "$ref": "#/$defs/num_or_null"
+              },
+              "rel_to_mix_lu": {
+                "$ref": "#/$defs/num_or_null"
+              },
+              "confidence": {
+                "$ref": "#/$defs/confidence"
+              },
+              "vocal": {
+                "type": "object",
+                "required": [
+                  "pitch",
+                  "sibilance_db",
+                  "low_mud_db",
+                  "crest_factor_db",
+                  "confidence"
+                ],
+                "properties": {
+                  "pitch": {
+                    "type": "object",
+                    "required": [
+                      "voiced_share"
+                    ],
+                    "properties": {
+                      "voiced_share": {
+                        "type": "number"
+                      },
+                      "f0_median_hz": {
+                        "type": "number"
+                      },
+                      "median_abs_cents": {
+                        "type": "number"
+                      },
+                      "share_off_25_cents": {
+                        "type": "number"
+                      },
+                      "mean_offset_cents": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "sibilance_db": {
+                    "type": "number"
+                  },
+                  "low_mud_db": {
+                    "type": "number"
+                  },
+                  "crest_factor_db": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "confidence": {
+                    "$ref": "#/$defs/confidence"
+                  }
+                }
+              }
             }
           }
         }
@@ -123,33 +446,99 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["type", "stems", "band_hz", "time_ranges_s", "severity", "confidence"],
+        "required": [
+          "type",
+          "stems",
+          "band_hz",
+          "time_ranges_s",
+          "severity",
+          "confidence"
+        ],
         "properties": {
-          "type": {"enum": ["kick_bass", "generic"]},
-          "stems": {"type": "array", "items": {"type": "string"}, "minItems": 2},
-          "band_hz": {"$ref": "#/$defs/time_value"},
-          "time_ranges_s": {"type": "array", "items": {"$ref": "#/$defs/time_value"}},
-          "severity": {"type": "number", "minimum": 0, "maximum": 1},
-          "confidence": {"$ref": "#/$defs/confidence"}
+          "type": {
+            "enum": [
+              "kick_bass",
+              "generic"
+            ]
+          },
+          "stems": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 2
+          },
+          "band_hz": {
+            "$ref": "#/$defs/time_value"
+          },
+          "time_ranges_s": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/time_value"
+            }
+          },
+          "severity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "confidence": {
+            "$ref": "#/$defs/confidence"
+          }
         }
       }
     },
-    "tempo_bpm": {"$ref": "#/$defs/num_or_null"},
-    "tempo_confidence": {"$ref": "#/$defs/confidence"},
-    "key_guess": {"type": ["string", "null"]},
-    "daw_context": {"type": ["object", "null"]},
+    "tempo_bpm": {
+      "$ref": "#/$defs/num_or_null"
+    },
+    "tempo_confidence": {
+      "$ref": "#/$defs/confidence"
+    },
+    "key_guess": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "daw_context": {
+      "type": [
+        "object",
+        "null"
+      ]
+    },
     "reference": {
       "oneOf": [
-        {"type": "null"},
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["name", "lufs_diff", "crest_diff_db", "bands_diff_db", "confidence"],
+          "required": [
+            "name",
+            "lufs_diff",
+            "crest_diff_db",
+            "bands_diff_db",
+            "confidence"
+          ],
           "properties": {
-            "name": {"type": "string"},
-            "lufs_diff": {"type": "number"},
-            "crest_diff_db": {"type": "number"},
-            "bands_diff_db": {"type": "object", "additionalProperties": {"type": "number"}},
-            "confidence": {"$ref": "#/$defs/confidence"}
+            "name": {
+              "type": "string"
+            },
+            "lufs_diff": {
+              "type": "number"
+            },
+            "crest_diff_db": {
+              "type": "number"
+            },
+            "bands_diff_db": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            },
+            "confidence": {
+              "$ref": "#/$defs/confidence"
+            }
           }
         }
       ]
@@ -158,8 +547,22 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["category", "check", "detail"],
-        "properties": {"category": {"type": "string"}, "check": {"type": "string"}, "detail": {"type": "string"}}
+        "required": [
+          "category",
+          "check",
+          "detail"
+        ],
+        "properties": {
+          "category": {
+            "type": "string"
+          },
+          "check": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        }
       }
     }
   }

@@ -125,11 +125,48 @@ def test_kick_bassline_clash_e_sidechain():
 def test_role_of_usa_l_ultima_parola():
     casi = {
         "Sunset_Kick.wav": "kick", "T01_sunset_stem-bass.wav": "bass", "Lead Synth.wav": "lead",
-        "Pad 2.wav": "pad", "demucs_perc.wav": "perc", "Atmosfere.wav": "pad", "808.wav": "bass",
-        "Hats.wav": "perc", "Vocal Chop.wav": "vox", "Kick Bass.wav": "bass", "Mistero.wav": "other",
+        "Pad 2.wav": "pad", "demucs_perc.wav": "perc", "Atmosfere.wav": "pad", "808.wav": "sub",
+        "808 3.wav": "sub", "Hats.wav": "hats", "Open Hat.wav": "hats", "Vocal Chop.wav": "vocal_chop",
+        "Kick Bass.wav": "bass", "Sub Bass.wav": "sub", "Backing Vocals.wav": "backing_vox",
+        "Lead Vocal.wav": "vox", "Rhodes.wav": "keys", "Gtr 01.wav": "guitar", "Snare.wav": "snare",
+        "Strings.wav": "strings", "Sax.wav": "woodwinds", "Mistero.wav": "other",
     }
     for nome, ruolo in casi.items():
         assert ds.role_of(nome) == ruolo, nome
+
+
+def test_tabella_ruoli_identica_in_analisi_e_web():
+    web = Path(ds.__file__).parents[1] / "web" / "lib" / "stem-roles.json"
+    ana = Path(ds.__file__).with_name("stem_roles.json")
+    assert json.loads(web.read_text(encoding="utf-8")) == json.loads(ana.read_text(encoding="utf-8"))
+    assert set(ds.ROLE_WORDS.values()) <= set(ds.ROLES)
+
+
+# --- Voce: intonazione e sibilanti -----------------------------------------------------
+
+def test_intonazione_giusta_e_calante():
+    # voce "sintetica" con armonica: 440 Hz e' un La intonato, 452 Hz e' quasi mezzo semitono sopra
+    giusta = ds.vocal_block(stereo(sine(440, 4, 0.5) + sine(880, 4, 0.15)), SR)["pitch"]
+    stonata = ds.vocal_block(stereo(sine(452, 4, 0.5) + sine(904, 4, 0.15)), SR)["pitch"]
+    assert giusta["median_abs_cents"] < 3 and giusta["share_off_25_cents"] == 0
+    assert abs(stonata["mean_offset_cents"] - 46.6) < 2 and stonata["share_off_25_cents"] == 1.0
+
+
+def test_sibilanti_e_controlli_voce(tmp_path):
+    rng = np.random.default_rng(0)
+    from scipy import signal as sg
+    ss = sg.sosfilt(sg.butter(4, 5000, "highpass", fs=SR, output="sos"), rng.standard_normal(6 * SR))
+    gate = (np.arange(6 * SR) % int(0.5 * SR)) < int(0.1 * SR)  # una "s" di 100 ms ogni mezzo secondo
+    voce = stereo(sine(452, 6, 0.3) + ss * gate * 0.8)
+    write_wav(tmp_path / "T02_voce_nomaster.wav", voce)
+    (tmp_path / "T02_stem").mkdir()
+    write_wav(tmp_path / "T02_stem" / "Lead Vocal.wav", voce)
+    assert ds.main([str(tmp_path)]) == 0
+    r = json.loads((tmp_path / "_analisi" / "T02_voce_nomaster.json").read_text(encoding="utf-8"))
+    jsonschema.validate(r, SCHEMA)
+    v = r["stems"]["items"]["lead vocal"]
+    assert v["role"] == "vox" and v["vocal"]["sibilance_db"] > -6
+    assert {"intonazione", "sibilanti"} <= {c["check"] for c in r["checks"]}
 
 
 # --- Dalla cartella al JSON 1.0 ----------------------------------------------------------

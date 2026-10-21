@@ -10,6 +10,7 @@
     "job:avanza": "node --env-file=.env.local scripts/avanza-job.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.0.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "next": "15.5.28",

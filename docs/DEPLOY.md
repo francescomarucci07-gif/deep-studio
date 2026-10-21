@@ -2,7 +2,8 @@
 
 > **Stato al 21 ott 2026:** online su https://deep-studio-azure.vercel.app (progetto Vercel `deep-studio`),
 > database Supabase `rfttvhvvryyhhtwungxf` (UE) con le migrazioni 0001 e 0002 applicate.
-> Resta da fare a mano: Supabase → Authentication → URL Configuration (Site URL e Redirect URLs, passo B.3).
+> Resta da fare a mano: Supabase → Authentication → URL Configuration (Site URL e Redirect URLs, passo B.3)
+> e, per il coach, la variabile `ANTHROPIC_API_KEY` su Vercel (passo C.4). Migrazioni applicate: 0001, 0002, 0003.
 
 L'app in `web/` è pronta: login, studio, "Nuova analisi", "Analisi in corso", privacy.
 Serve solo collegarla. Prima in locale, poi online.
@@ -68,6 +69,8 @@ ripartono quando lo riaccendi.
 3. **Root Directory: `web`** (framework Next.js, il resto lo rileva da solo).
 4. Environment Variables: `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    (Supabase → Project Settings → API). **Non** mettere la service role key su Vercel.
+   Per il coach: `ANTHROPIC_API_KEY` (console.anthropic.com → API Keys), tipo **Sensitive**, solo
+   Production e Preview; poi Redeploy. Facoltativo: `COACH_MODEL` per cambiare modello.
 5. Deploy. Copia l'indirizzo `https://<app>.vercel.app` nel passo B.3 e fai un login di prova.
 
 Piano Hobby di Vercel: gratis solo per uso non commerciale; Pro quando partono i beta (P6).

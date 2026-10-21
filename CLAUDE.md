@@ -64,6 +64,7 @@ python -m pytest analysis/tests -q          # 17 test, pochi secondi
 python analysis/deep_studio_analyze.py <cartella-wav> --sottogenere deep --stadio finita
 
 # worker locale (prototipo M2): prende i job in coda da Supabase e salva le analisi
+# doppio clic su avvia-worker.bat (Windows) o avvia-worker.command (Mac): prepara tutto da solo
 python analysis/worker_locale.py            # legge URL e service role key da web/.env.local
 
 # database locale (serve Docker acceso)

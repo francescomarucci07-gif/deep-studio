@@ -1,5 +1,9 @@
 # Deep Studio · Collegare Supabase (backend) e Vercel (display)
 
+> **Stato al 21 ott 2026:** online su https://deep-studio-azure.vercel.app (progetto Vercel `deep-studio`),
+> database Supabase `rfttvhvvryyhhtwungxf` (UE) con le migrazioni 0001 e 0002 applicate.
+> Resta da fare a mano: Supabase → Authentication → URL Configuration (Site URL e Redirect URLs, passo B.3).
+
 L'app in `web/` è pronta: login, studio, "Nuova analisi", "Analisi in corso", privacy.
 Serve solo collegarla. Prima in locale, poi online.
 

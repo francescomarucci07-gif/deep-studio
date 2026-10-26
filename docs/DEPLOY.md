@@ -1,9 +1,11 @@
 # Deep Studio · Collegare Supabase (backend) e Vercel (display)
 
-> **Stato al 21 ott 2026:** online su https://deep-studio-azure.vercel.app (progetto Vercel `deep-studio`),
-> database Supabase `rfttvhvvryyhhtwungxf` (UE) con le migrazioni 0001 e 0002 applicate.
-> Resta da fare a mano: Supabase → Authentication → URL Configuration (Site URL e Redirect URLs, passo B.3)
-> e, per il coach, la variabile `ANTHROPIC_API_KEY` su Vercel (passo C.4). Migrazioni applicate: 0001, 0002, 0003.
+> **Stato al 26 ott 2026:** online su https://deep-studio-azure.vercel.app (progetto Vercel `deep-studio`),
+> database Supabase `rfttvhvvryyhhtwungxf` (UE) con le migrazioni 0001, 0002 e 0003 applicate.
+> Funziona tutto il percorso: login col link magico, upload, worker locale (`avvia-worker.bat`), analisi "pronta"
+> (prima traccia: "pause", 26 ott). Il coach risponde "La chiave del coach non è valida": Anthropic rifiuta la
+> `ANTHROPIC_API_KEY` attuale. Da fare: credito API in console.anthropic.com → Billing, chiave nuova in
+> console.anthropic.com → API Keys, sostituirla su Vercel (passo C.4) e fare redeploy.
 
 L'app in `web/` è pronta: login, studio, "Nuova analisi", "Analisi in corso", privacy.
 Serve solo collegarla. Prima in locale, poi online.

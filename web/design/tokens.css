@@ -63,6 +63,36 @@
   --ds-shadow-pad-pressed: 0 0 0 rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.6) inset;
   --ds-focus-ring: 0 0 0 2px var(--ds-bg), 0 0 0 4px var(--ds-accent);
 
+  /* console hardware (studio nel browser): metallo, display LCD, tasti TR-808, luci dei pad */
+  --hw-chassis: linear-gradient(180deg, #2a2d31 0%, #1c1e21 100%);
+  --hw-panel: linear-gradient(180deg, #303338 0%, #24272b 55%, #1f2125 100%);
+  --hw-panel-edge: #3d4248;
+  --hw-panel-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 -1px 0 rgba(0, 0, 0, 0.6) inset, 0 14px 30px rgba(0, 0, 0, 0.55);
+  --hw-print: #c9c4b8;
+  --hw-print-faint: #7d7a72;
+  --hw-lcd-bg: #0f1a12;
+  --hw-lcd-text: #9cf5b0;
+  --hw-lcd-dim: #2f5a3a;
+  --hw-lcd-glow: 0 0 8px rgba(156, 245, 176, 0.55);
+  --hw-button: linear-gradient(180deg, #3a3e44 0%, #2a2d32 100%);
+  --hw-button-pressed: linear-gradient(180deg, #24272b 0%, #2c3035 100%);
+  --hw-button-shadow: 0 3px 0 #0b0c0d, 0 4px 8px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
+  --hw-button-shadow-pressed: 0 1px 0 #0b0c0d, 0 1px 3px rgba(0, 0, 0, 0.6) inset;
+  --hw-led-red: #ff3b30;
+  --hw-led-green: #39e07a;
+  --hw-led-amber: #ffb02e;
+  --hw-key-0: #c8402f; /* step 1–4 */
+  --hw-key-1: #e2742a; /* step 5–8 */
+  --hw-key-2: #e8c14a; /* step 9–12 */
+  --hw-key-3: #e9e4d6; /* step 13–16 */
+  --hw-pad: radial-gradient(circle at 50% 35%, #4a4f55 0%, #33373c 60%, #2a2d31 100%);
+  --hw-pad-red: #ff4d3d;
+  --hw-pad-orange: #ff8a2b;
+  --hw-pad-yellow: #ffd23f;
+  --hw-pad-teal: #3fd6c8;
+  --hw-pad-green: #57e389;
+  --hw-knob-cap: radial-gradient(circle at 40% 30%, #5b6068 0%, #2b2e33 70%);
+
   --ds-duration: 120ms;
   --ds-max-width: 960px;
 }

@@ -98,12 +98,18 @@ export class Engine {
       for (const { id } of DRUMS) if (p.drums[id][s]) this.drum(id, t);
       if (p.drums.kick[s] && p.sidechain) this.sidechain(t, stepDur);
       const n = p.bass[s];
-      if (n !== null) this.bassNote(t, n, stepDur * 0.9);
+      if (n !== null) this.bassNote(t, n, stepDur * (p.bassSound.length === "lunga" ? this.stepsToNext(p, s) - 0.05 : 0.9));
       const delay = Math.max(0, (t - this.ctx.currentTime) * 1000);
       setTimeout(() => this.timer && this.onStep(s), delay);
       this.nextTime += stepDur;
       this.step = (s + 1) % STEPS;
     }
+  }
+
+  // quanti step mancano alla prossima nota del basso (ricominciando dall'inizio della battuta)
+  private stepsToNext(p: Project, s: number) {
+    for (let k = 1; k < STEPS; k++) if (p.bass[(s + k) % STEPS] !== null) return k;
+    return STEPS;
   }
 
   private sidechain(t: number, stepDur: number) {

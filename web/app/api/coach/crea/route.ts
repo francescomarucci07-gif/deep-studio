@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COACH_CREA_SYSTEM } from "@/lib/coach/prompt-crea";
 import { streamCoach, trimHistory, type Turn } from "@/lib/coach/stream";
+import { patternFromTool, PATTERN_TOOL } from "@/lib/daw/coach-tool";
 import { describe, normalize } from "@/lib/daw/project";
 import { createClient } from "@/lib/supabase/server";
 
@@ -36,7 +37,8 @@ export async function POST(request: NextRequest) {
   if (!project) return NextResponse.json({ error: "Progetto non trovato." }, { status: 404 });
 
   // Il pattern che il producer sta ascoltando adesso: quello del browser, normalizzato.
-  const state = describe(normalize(body.project ?? project.data), body.title?.slice(0, 120) || project.title);
+  const current = normalize(body.project ?? project.data);
+  const state = describe(current, body.title?.slice(0, 120) || project.title);
 
   const { data: history } = await supabase
     .from("coach_messages")
@@ -55,8 +57,16 @@ export async function POST(request: NextRequest) {
     system: [{ text: COACH_CREA_SYSTEM, cache: true }],
     // lo stato del pattern va nell'ultimo messaggio: cambia a ogni modifica, la storia no
     messages: [...past, { role: "user", content: `${text}\n\n[Stato attuale del progetto]\n${state}` }],
-    maxTokens: 600,
+    maxTokens: 2000,
     effort: "low",
+    // il coach può scrivere il pattern nello studio; il browser lo applica e si può annullare
+    tool: {
+      definition: PATTERN_TOOL,
+      run: (input) => {
+        const { project: next, name } = patternFromTool(input, current);
+        return { data: { pattern: next, name }, note: `Pattern scritto nello studio: ${name}` };
+      },
+    },
     save: (answer, meta) =>
       supabase.from("coach_messages").insert({ project_id: project.id, role: "assistant", content: answer, ...meta }),
   });

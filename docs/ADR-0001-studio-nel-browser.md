@@ -34,3 +34,11 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   effetti (riverbero, delay, filtro), il coach che propone modifiche applicabili con un clic, export WAV.
 - Il piano Supabase Free mette in pausa il progetto dopo una settimana senza uso (successo il 3 nov):
   con utenti veri serve il piano Pro, come già previsto nel P6.
+
+## Aggiornamento 3 nov 2026 (sera)
+
+- Interfaccia da console hardware: display LCD, tasti di trasporto con LED, manopole (`components/hw/Knob.tsx`),
+  drum pad in gomma (tastiera Z X C V B N, registrazione con Rec), step a colori tipo TR-808, mixer con fader.
+- Il coach può **scrivere il pattern** (strumento `scrivi_pattern`, `lib/daw/coach-tool.ts`): spiega come lo
+  costruisce, lo studio lo applica e si può annullare. Prompt `crea-v2`, risponde nella lingua del producer.
+- Basso con note lunghe tipo 808 (`bassSound.length`), per trap e hip hop.

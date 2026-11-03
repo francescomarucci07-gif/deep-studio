@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { plainText } from "@/lib/coach/text";
+import { DATA_MARK, plainText } from "@/lib/coach/text";
 import { speak, stopSpeaking } from "@/lib/voice-client";
 import { DEFAULT_VOICE, VOICES } from "@/lib/voices";
 
@@ -52,6 +52,7 @@ export function CoachChat({
   intro,
   hint,
   compact = false,
+  onData,
 }: {
   endpoint: string;
   payload: () => Record<string, unknown>;
@@ -60,6 +61,8 @@ export function CoachChat({
   intro: string;
   hint?: string;
   compact?: boolean;
+  // dati che il coach manda allo studio (un pattern); restituisce la nota da mostrare in chat
+  onData?: (data: unknown) => string | void;
 }) {
   const [messages, setMessages] = useState<Msg[]>(initial);
   const [input, setInput] = useState("");
@@ -122,16 +125,26 @@ export function CoachChat({
           const { done, value } = await reader.read();
           if (done) break;
           answer += decoder.decode(value, { stream: true });
-          const partial = answer;
+          const partial = answer.split(DATA_MARK)[0];
           setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: partial }]);
         }
       }
     } catch {
       answer = "Connessione interrotta: riprova.";
     }
-    setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: answer }]);
+    const [said, data] = answer.split(DATA_MARK);
+    let shown = said;
+    if (data && onData) {
+      try {
+        const note = onData(JSON.parse(data));
+        if (note) shown = `${said.trim()}\n\n[${note}]`;
+      } catch {
+        shown = `${said.trim()}\n\n[Il pattern è arrivato incompleto: chiedimelo di nuovo.]`;
+      }
+    }
+    setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: shown }]);
     setBusy(false);
-    if (readAloud && answer) void speak(answer, voice);
+    if (readAloud && said.trim()) void speak(said, voice);
   }
 
   function toggleMic() {
@@ -197,7 +210,11 @@ export function CoachChat({
           <div key={i} className="ds-chat-msg" data-role={m.role}>
             <p>{plainText(m.content) || (busy && i === messages.length - 1 ? "…" : "")}</p>
             {m.role === "assistant" && m.content && !(busy && i === messages.length - 1) && (
-              <button type="button" className="ds-link-button" onClick={() => speak(m.content, voice)}>
+              <button
+                type="button"
+                className="ds-link-button"
+                onClick={() => speak(m.content.replace(/\[[^\]]*\]\s*$/, ""), voice)}
+              >
                 Ascolta
               </button>
             )}

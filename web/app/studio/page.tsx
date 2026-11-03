@@ -13,6 +13,7 @@ export const metadata = { title: "Studio · Deep Studio" };
 type Job = { id: string; status: string; created_at: string };
 type Version = { id: string; version_no: number; stage: string; jobs: Job[] };
 type Track = { id: string; title: string; subgenre: string; track_versions: Version[] };
+type Project = { id: string; title: string; bpm: number; updated_at: string };
 
 function statusLabel(status: string) {
   if (status === "errore") return "Errore";
@@ -26,12 +27,16 @@ export default async function Studio() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // La RLS restituisce solo le tracce dell'utente loggato: nessun filtro owner_id qui.
-  const { data, error } = await supabase
-    .from("tracks")
-    .select("id, title, subgenre, track_versions(id, version_no, stage, jobs(id, status, created_at))")
-    .order("created_at", { ascending: false });
+  // La RLS restituisce solo le righe dell'utente loggato: nessun filtro owner_id qui.
+  const [{ data, error }, { data: projectRows }] = await Promise.all([
+    supabase
+      .from("tracks")
+      .select("id, title, subgenre, track_versions(id, version_no, stage, jobs(id, status, created_at))")
+      .order("created_at", { ascending: false }),
+    supabase.from("projects").select("id, title, bpm, updated_at").order("updated_at", { ascending: false }),
+  ]);
   const tracks = (data ?? []) as Track[];
+  const projects = (projectRows ?? []) as Project[];
 
   return (
     <div className="ds-stack">
@@ -41,9 +46,11 @@ export default async function Studio() {
           <p className="ds-lead">{user?.email}</p>
         </div>
         <div className="ds-row">
-          <Link href="/studio/nuova" className="ds-pad ds-pad--primary">
-            Nuova analisi
-          </Link>
+          <form action="/studio/crea/nuovo" method="post">
+            <button type="submit" className="ds-pad ds-pad--primary">
+              Nuovo progetto
+            </button>
+          </form>
           <form action="/auth/esci" method="post">
             <button type="submit" className="ds-pad">
               Esci
@@ -53,14 +60,44 @@ export default async function Studio() {
       </div>
 
       <section className="ds-module">
-        <h2 className="ds-module-title">Tracce</h2>
+        <h2 className="ds-module-title">Progetti</h2>
+        {projects.length === 0 ? (
+          <p className="ds-lead">
+            Crea il primo groove: batteria, bassline e un coach che ti segue mentre produci. Premi “Nuovo progetto”.
+          </p>
+        ) : (
+          <ul className="ds-list">
+            {projects.map((p) => (
+              <li key={p.id}>
+                <div>
+                  <strong>{p.title}</strong>
+                  <div className="ds-meta">
+                    {Number(p.bpm)} BPM · {new Date(p.updated_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
+                  </div>
+                </div>
+                <Link href={`/studio/crea/${p.id}`} className="ds-pad">
+                  Apri
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="ds-module">
+        <div className="ds-row ds-row--between">
+          <h2 className="ds-module-title">Mix da FL Studio</h2>
+          <Link href="/studio/nuova" className="ds-pad ds-pad--small">
+            Analizza un mix
+          </Link>
+        </div>
         {error && (
           <p className="ds-message" data-tone="error">
             Non riesco a leggere le tracce: {error.message}
           </p>
         )}
         {!error && tracks.length === 0 && (
-          <p className="ds-lead">Ancora niente qui. Carica il primo mix con “Nuova analisi”.</p>
+          <p className="ds-lead">Hai un mix fatto in FL Studio? Caricalo con “Analizza un mix”: lo misuro e il coach ti dice cosa sistemare.</p>
         )}
         {tracks.length > 0 && (
           <ul className="ds-list">

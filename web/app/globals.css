@@ -367,3 +367,280 @@ ol.ds-led-row {
   width: 100%;
   font: inherit;
 }
+
+/* ---------------------------------------------------------------------------
+ * Coach: chip di suggerimento e pad piccoli
+ * ------------------------------------------------------------------------- */
+.ds-pad--small {
+  min-height: 36px;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  font-size: var(--ds-text-xs);
+}
+.ds-pad[aria-pressed="true"] {
+  border-color: var(--ds-accent);
+  color: var(--ds-accent-strong);
+}
+.ds-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-3);
+}
+.ds-chip {
+  padding: var(--ds-space-1) var(--ds-space-3);
+  border: 1px solid var(--ds-border-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ds-text-muted);
+  font: var(--ds-text-sm) var(--ds-font-sans);
+  cursor: pointer;
+}
+.ds-chip:hover {
+  border-color: var(--ds-accent);
+  color: var(--ds-text);
+}
+.ds-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ds-chat-msg[data-role="assistant"] p {
+  font-size: var(--ds-text-md);
+  line-height: 1.55;
+}
+.ds-coach[data-compact="true"] .ds-chat {
+  max-height: none;
+  flex: 1;
+  min-height: 240px;
+}
+.ds-coach[data-compact="true"] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------------------------------------------------------------------------
+ * Studio nel browser (mini-DAW)
+ * ------------------------------------------------------------------------- */
+.ds-main:has(.daw),
+.ds-shell:has(.daw) .ds-header,
+.ds-shell:has(.daw) .ds-footer {
+  max-width: 1360px;
+}
+.daw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-4);
+}
+.daw-transport {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--ds-space-4);
+  padding: var(--ds-space-5) var(--ds-space-5) var(--ds-space-4);
+}
+.daw-play {
+  min-width: 120px;
+}
+.daw-field {
+  display: flex;
+  flex-direction: column;
+}
+.daw-field .ds-label {
+  margin-bottom: var(--ds-space-1);
+}
+.daw-title {
+  flex: 1;
+  min-width: 160px;
+}
+.daw-lcd {
+  width: 84px;
+  min-height: 44px;
+  padding: 0 var(--ds-space-2);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+  color: var(--ds-accent-strong);
+  font: 600 var(--ds-text-lg) var(--ds-font-mono);
+  text-align: center;
+}
+.daw-save {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  min-height: 44px;
+  color: var(--ds-text-faint);
+  font: var(--ds-text-xs) var(--ds-font-mono);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+}
+.daw input[type="range"] {
+  accent-color: var(--ds-accent);
+}
+.daw-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: var(--ds-space-4);
+  align-items: stretch;
+}
+@media (max-width: 1080px) {
+  .daw-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* channel rack: nome, mute, volume, 16 step. Su schermi stretti scorre dentro il modulo */
+.daw-rack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ds-space-2);
+  overflow-x: auto;
+  padding-bottom: var(--ds-space-1);
+}
+.daw-row {
+  display: grid;
+  grid-template-columns: 96px 32px 72px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ds-space-2);
+  min-width: max-content;
+}
+.daw-name {
+  height: 34px;
+  padding: 0 var(--ds-space-2);
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-raised);
+  box-shadow: var(--ds-shadow-pad);
+  color: var(--ds-text);
+  font: 600 var(--ds-text-xs) var(--ds-font-mono);
+  letter-spacing: var(--ds-tracking-label);
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+.daw-name:active {
+  box-shadow: var(--ds-shadow-pad-pressed);
+}
+.daw-mute {
+  width: 32px;
+  height: 34px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+  color: var(--ds-text-faint);
+  font: 600 var(--ds-text-xs) var(--ds-font-mono);
+  cursor: pointer;
+}
+.daw-mute[aria-pressed="true"] {
+  border-color: var(--ds-error);
+  color: var(--ds-error);
+}
+.daw-vol {
+  width: 72px;
+}
+.daw-steps {
+  display: grid;
+  grid-template-columns: repeat(16, minmax(30px, 1fr));
+  gap: 4px;
+}
+.daw-step {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface);
+  box-shadow: var(--ds-shadow-pad);
+  color: var(--ds-accent-contrast);
+  font: 600 10px var(--ds-font-mono);
+  cursor: pointer;
+  transition: background var(--ds-duration);
+}
+/* gruppi da 4 step a colori alterni, come le battute nel channel rack di FL */
+.daw-step[data-beat="true"] {
+  background: var(--ds-surface-raised);
+}
+.daw-step[aria-pressed="true"],
+.daw-step--note[data-on="true"] {
+  background: var(--ds-accent);
+  border-color: var(--ds-accent-strong);
+  box-shadow: var(--ds-led-glow) rgba(255, 138, 43, 0.35);
+}
+.daw-step--note {
+  cursor: default;
+}
+.daw-step[data-now="true"] {
+  outline: 2px solid var(--ds-text);
+  outline-offset: 1px;
+}
+
+/* piano roll del basso: tasti a sinistra, 16 colonne */
+.daw-roll {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-x: auto;
+}
+.daw-roll-row {
+  display: grid;
+  grid-template-columns: 96px repeat(16, minmax(30px, 1fr));
+  gap: 4px;
+  min-width: max-content;
+}
+.daw-key {
+  height: 22px;
+  border: 0;
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-text-muted);
+  color: var(--ds-bg);
+  font: 600 10px var(--ds-font-mono);
+  cursor: pointer;
+}
+.daw-roll-row[data-sharp="true"] .daw-key {
+  background: var(--ds-surface-inset);
+  color: var(--ds-text-muted);
+  border: 1px solid var(--ds-border);
+}
+.daw-cell {
+  height: 22px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--ds-surface);
+  cursor: pointer;
+}
+.daw-roll-row[data-sharp="true"] .daw-cell {
+  background: var(--ds-surface-inset);
+}
+.daw-cell[data-beat="true"] {
+  box-shadow: -2px 0 0 var(--ds-border-strong);
+}
+.daw-cell[data-now="true"] {
+  background: var(--ds-border-strong);
+}
+.daw-cell[aria-pressed="true"] {
+  background: var(--ds-ok);
+  box-shadow: 0 0 6px rgba(63, 214, 164, 0.5);
+}
+
+/* telefono: niente slider del volume nel rack, colonne più strette */
+@media (max-width: 560px) {
+  .daw-row {
+    grid-template-columns: 72px 28px minmax(0, 1fr);
+  }
+  .daw-vol {
+    display: none;
+  }
+  .daw-steps {
+    grid-template-columns: repeat(16, 28px);
+  }
+  .daw-roll-row {
+    grid-template-columns: 48px repeat(16, 28px);
+  }
+  .daw-name {
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daw-step {
+    transition: none;
+  }
+}

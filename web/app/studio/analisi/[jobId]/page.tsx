@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { AnalysisResults, type Analysis } from "@/components/AnalysisResults";
-import { CoachChat } from "@/components/CoachChat";
+import { AnalysisCoach } from "./AnalysisCoach";
 import { SupabaseMissing } from "@/components/SupabaseMissing";
 import { VOCAL_ROLES } from "@/lib/roles";
 import type { JobStatus as Status } from "@/lib/jobs";
@@ -83,7 +83,7 @@ export default async function Analisi({ params }: { params: Promise<{ jobId: str
         <JobStatus initial={{ id: job.id, status: job.status, error_message: job.error_message }} hasStems={hasStems} />
       </section>
       {analysis && (
-        <CoachChat versionId={v.id} initial={coachMessages} hasPrevious={hasPrevious} hasVocals={hasVocals} />
+        <AnalysisCoach versionId={v.id} initial={coachMessages} hasPrevious={hasPrevious} hasVocals={hasVocals} />
       )}
       {analysis && <AnalysisResults data={analysis} />}
     </div>

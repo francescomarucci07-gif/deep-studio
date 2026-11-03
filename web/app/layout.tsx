@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Deep Studio",
-  description: "Il coach di mixaggio per producer house in FL Studio.",
+  description: "Crea house nel browser con un coach AI che ti insegna mentre produci.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

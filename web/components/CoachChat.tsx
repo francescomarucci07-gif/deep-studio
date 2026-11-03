@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { plainText } from "@/lib/coach/text";
+import { speak, stopSpeaking } from "@/lib/voice-client";
+import { DEFAULT_VOICE, VOICES } from "@/lib/voices";
 
-// Chat con il coach: si scrive o si parla (microfono), e il coach può leggere le risposte ad alta voce.
-// Voce: Web Speech API del browser (gratis, niente server). Funziona bene in Chrome e Edge; in Safari
-// e Firefox il riconoscimento vocale può mancare: resta la tastiera.
+// Chat con il coach: si scrive o si parla (microfono), e il coach risponde anche a voce (ElevenLabs).
+// La usano sia la pagina dell'analisi sia lo studio: cambiano solo endpoint e dati inviati.
+// Microfono: Web Speech API del browser, bene in Chrome ed Edge; in Safari e Firefox può mancare.
 
-type Msg = { role: "user" | "assistant"; content: string };
+export type Msg = { role: "user" | "assistant"; content: string };
 
-// Tipi minimi della Web Speech API (non sono ancora nelle librerie DOM di TypeScript)
 type Recognition = {
   lang: string;
   interimResults: boolean;
   continuous: boolean;
   start(): void;
   stop(): void;
-  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }> & { isFinal: boolean }> }) => void) | null;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: { error: string }) => void) | null;
 };
@@ -27,99 +29,88 @@ function getRecognition(): RecognitionCtor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-function speak(text: string) {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text.replace(/[*#_`]/g, ""));
-  u.lang = "it-IT";
-  u.rate = 1.03;
-  window.speechSynthesis.speak(u);
+function stored(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function store(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // storage non disponibile: la scelta vale solo per questa visita
+  }
 }
 
 export function CoachChat({
-  versionId,
+  endpoint,
+  payload,
   initial,
-  hasPrevious,
-  hasVocals,
+  suggestions,
+  intro,
+  hint,
+  compact = false,
 }: {
-  versionId: string;
+  endpoint: string;
+  payload: () => Record<string, unknown>;
   initial: Msg[];
-  hasPrevious: boolean;
-  hasVocals: boolean;
+  suggestions: string[];
+  intro: string;
+  hint?: string;
+  compact?: boolean;
 }) {
   const [messages, setMessages] = useState<Msg[]>(initial);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
   const [readAloud, setReadAloud] = useState(false);
+  const [voice, setVoice] = useState<string>(DEFAULT_VOICE);
   const [micSupported, setMicSupported] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const recognition = useRef<Recognition | null>(null);
-  const bottom = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMicSupported(getRecognition() !== null);
-    try {
-      setReadAloud(localStorage.getItem("ds-coach-voce") === "1");
-    } catch {
-      // storage non disponibile: resta spento
-    }
+    setReadAloud(stored("ds-coach-voce") === "1");
+    const v = stored("ds-coach-voce-id");
+    if (v && (v === "browser" || VOICES.some((x) => x.id === v))) setVoice(v);
+    return stopSpeaking;
   }, []);
 
   useEffect(() => {
-    bottom.current?.scrollIntoView({ block: "nearest" });
+    const el = log.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   function toggleReadAloud() {
     const next = !readAloud;
     setReadAloud(next);
-    if (!next && "speechSynthesis" in window) window.speechSynthesis.cancel();
-    try {
-      localStorage.setItem("ds-coach-voce", next ? "1" : "0");
-    } catch {
-      // niente
-    }
+    if (!next) stopSpeaking();
+    store("ds-coach-voce", next ? "1" : "0");
   }
 
-  function toggleMic() {
-    if (listening) {
-      recognition.current?.stop();
-      return;
-    }
-    const Ctor = getRecognition();
-    if (!Ctor) return;
-    const r = new Ctor();
-    r.lang = "it-IT";
-    r.interimResults = true;
-    r.continuous = false;
-    const before = input ? `${input.trim()} ` : "";
-    r.onresult = (e) => {
-      const said = Array.from(e.results)
-        .map((res) => res[0].transcript)
-        .join("");
-      setInput(before + said);
-    };
-    r.onerror = (e) => setMicError(e.error === "not-allowed" ? "Permesso del microfono negato dal browser." : null);
-    r.onend = () => setListening(false);
-    recognition.current = r;
-    setMicError(null);
-    setListening(true);
-    r.start();
+  function chooseVoice(v: string) {
+    setVoice(v);
+    store("ds-coach-voce-id", v);
+    void speak("Ciao, sono il tuo coach. Facciamo musica.", v);
   }
 
   async function send(text: string) {
     const question = text.trim();
     if (!question || busy) return;
-    recognition.current?.stop();
+    stopSpeaking();
     setInput("");
     setBusy(true);
     setMessages((m) => [...m, { role: "user", content: question }, { role: "assistant", content: "" }]);
     let answer = "";
     try {
-      const res = await fetch("/api/coach", {
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ versionId, message: question }),
+        body: JSON.stringify({ ...payload(), message: question }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: "Il coach non risponde." }));
@@ -140,53 +131,83 @@ export function CoachChat({
     }
     setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: answer }]);
     setBusy(false);
-    if (readAloud && answer) speak(answer);
+    if (readAloud && answer) void speak(answer, voice);
   }
 
-  const suggestions = [
-    "Cosa sistemo per primo?",
-    "Spiegami il low end di questa traccia",
-    ...(hasVocals
-      ? ["La voce ha bisogno di autotune? Come lo metto in FL?", "Come rendo la voce più presente e senza S che pungono?"]
-      : ["Come aggiungo una voce e la tratto in FL?"]),
-    ...(hasPrevious ? ["Cosa è migliorato rispetto alla versione precedente, e perché?"] : []),
-  ];
+  function toggleMic() {
+    if (listening) {
+      recognition.current?.stop();
+      return;
+    }
+    const Ctor = getRecognition();
+    if (!Ctor) return;
+    stopSpeaking();
+    const r = new Ctor();
+    r.lang = "it-IT";
+    r.interimResults = true;
+    r.continuous = false;
+    const before = input ? `${input.trim()} ` : "";
+    let said = "";
+    r.onresult = (e) => {
+      said = Array.from(e.results)
+        .map((res) => res[0].transcript)
+        .join("");
+      setInput(before + said);
+    };
+    r.onerror = (e) => setMicError(e.error === "not-allowed" ? "Permesso del microfono negato dal browser." : null);
+    // quando smetti di parlare la domanda parte da sola, come con un assistente vocale
+    r.onend = () => {
+      setListening(false);
+      if (said.trim()) void send(before + said);
+    };
+    recognition.current = r;
+    setMicError(null);
+    setListening(true);
+    r.start();
+  }
 
   return (
-    <section className="ds-module" aria-label="Coach">
+    <section className="ds-module ds-coach" data-compact={compact} aria-label="Coach">
       <div className="ds-row ds-row--between">
         <h2 className="ds-module-title" style={{ margin: 0 }}>
           Coach
         </h2>
-        <button type="button" className="ds-pad" aria-pressed={readAloud} onClick={toggleReadAloud}>
-          {readAloud ? "Voce: accesa" : "Voce: spenta"}
-        </button>
+        <div className="ds-row">
+          <label className="ds-visually-hidden" htmlFor="coach-voce">
+            Voce del coach
+          </label>
+          <select id="coach-voce" className="ds-select" value={voice} onChange={(e) => chooseVoice(e.target.value)}>
+            {VOICES.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name} · {v.hint}
+              </option>
+            ))}
+            <option value="browser">Voce del browser</option>
+          </select>
+          <button type="button" className="ds-pad ds-pad--small" aria-pressed={readAloud} onClick={toggleReadAloud}>
+            <span className="ds-led" data-state={readAloud ? "on" : "off"} aria-hidden="true" />
+            Voce
+          </button>
+        </div>
       </div>
 
-      <div className="ds-chat" aria-live="polite">
-        {messages.length === 0 && (
-          <p className="ds-lead">
-            Chiedimi qualunque cosa su questa traccia: cosa cambiare, come farlo in FL Studio, perché funziona. Puoi
-            scrivere o parlare.
-          </p>
-        )}
+      <div className="ds-chat" ref={log} aria-live="polite">
+        {messages.length === 0 && <p className="ds-lead">{intro}</p>}
         {messages.map((m, i) => (
           <div key={i} className="ds-chat-msg" data-role={m.role}>
-            <span className="ds-label">{m.role === "user" ? "Tu" : "Coach"}</span>
-            <p>{m.content || (busy && i === messages.length - 1 ? "…" : "")}</p>
-            {m.role === "assistant" && m.content && !busy && (
-              <button type="button" className="ds-link-button" onClick={() => speak(m.content)}>
+            <p>{plainText(m.content) || (busy && i === messages.length - 1 ? "…" : "")}</p>
+            {m.role === "assistant" && m.content && !(busy && i === messages.length - 1) && (
+              <button type="button" className="ds-link-button" onClick={() => speak(m.content, voice)}>
                 Ascolta
               </button>
             )}
           </div>
         ))}
-        <div ref={bottom} />
       </div>
 
-      <div className="ds-segmented" style={{ marginTop: "var(--ds-space-4)" }}>
+      <div className="ds-chips">
         {suggestions.map((s) => (
-          <button key={s} type="button" className="ds-pad" disabled={busy} onClick={() => send(s)}>
+          <button key={s} type="button" className="ds-chip" disabled={busy} onClick={() => send(s)}>
             {s}
           </button>
         ))}
@@ -196,7 +217,7 @@ export function CoachChat({
         className="ds-chat-input"
         onSubmit={(e) => {
           e.preventDefault();
-          send(input);
+          void send(input);
         }}
       >
         <label htmlFor="coach-input" className="ds-visually-hidden">
@@ -207,12 +228,12 @@ export function CoachChat({
           className="ds-input"
           rows={2}
           value={input}
-          placeholder={listening ? "Ti ascolto…" : "Scrivi o premi il microfono e parla"}
+          placeholder={listening ? "Ti ascolto…" : "Chiedi al coach, o premi Parla"}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              send(input);
+              void send(input);
             }
           }}
         />
@@ -230,7 +251,7 @@ export function CoachChat({
             </button>
           )}
           <button type="submit" className="ds-pad ds-pad--primary" disabled={busy || !input.trim()}>
-            {busy ? "Il coach scrive…" : "Invia"}
+            {busy ? "…" : "Invia"}
           </button>
         </div>
       </form>
@@ -239,10 +260,7 @@ export function CoachChat({
           {micError}
         </p>
       )}
-      <p className="ds-hint">
-        Il coach vede solo le misure, non ascolta l’audio. Applica una modifica in FL, esporta e carica la nuova
-        versione: ti spiega cosa è cambiato e perché.
-      </p>
+      {hint && <p className="ds-hint">{hint}</p>}
     </section>
   );
 }

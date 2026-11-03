@@ -1,5 +1,9 @@
 # Deep Studio · Collegare Supabase (backend) e Vercel (display)
 
+> **3 nov 2026:** coach attivo (chiave Claude sostituita), database riattivato dopo la pausa del piano Free,
+> migrazione 0004 applicata, studio nel browser in `/studio/crea`. Per la voce del coach aggiungi su Vercel
+> `ELEVENLABS_API_KEY` (Sensitive, Production) e fai redeploy.
+>
 > **Stato al 26 ott 2026:** online su https://deep-studio-azure.vercel.app (progetto Vercel `deep-studio`),
 > database Supabase `rfttvhvvryyhhtwungxf` (UE) con le migrazioni 0001, 0002 e 0003 applicate.
 > Funziona tutto il percorso: login col link magico, upload, worker locale (`avvia-worker.bat`), analisi "pronta"

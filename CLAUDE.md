@@ -1,8 +1,9 @@
 # Deep Studio
 
-Coach di mixaggio per producer **house** (deep, tech, progressive) che lavorano in **FL Studio**.
-Il producer carica il mix (e gli stem, se vuole); l'analisi misura la traccia; il coach (Claude API)
-scrive 3–5 note prioritarie con passi concreti in FL Studio.
+Studio per creare musica **house** (deep, tech, progressive) nel browser, con un coach AI (Claude API) che
+vede il progetto mentre lo crei e ti insegna, anche a voce (ElevenLabs). Resta anche il percorso per chi
+produce in **FL Studio**: carichi il mix, l'analisi lo misura e il coach spiega cosa sistemare.
+Decisione del 3 nov 2026: `docs/ADR-0001-studio-nel-browser.md` (da confermare con Spencer).
 
 - **Francesco**: product e sviluppo, impara a costruire e mantenere il codice.
 - **Spencer**: guida il P6 (architettura e stack), conferma le decisioni difficili da cambiare.
@@ -47,7 +48,8 @@ scrive 3–5 note prioritarie con passi concreti in FL Studio.
 
 ```
 analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script di prova P3/P4
-db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach
+db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach,
+            0004 progetti dello studio (projects) + coach_messages.project_id
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili. Collegamento a Supabase e Vercel: docs/DEPLOY.md
 docs/       USER-STORIES-FASE1.md, MOCKUP-P5.md, P6 architettura, LEGGIMI analisi, PROMPT-M1.md
@@ -91,6 +93,12 @@ cd web && npm run dev
   `COACH_MODEL`, default `claude-sonnet-5-5` come da P6), istruzioni in `web/lib/coach/prompt.ts`
   (versionate), contesto = analisi compatta + versione precedente. Messaggi e costi in `coach_messages`.
   Serve `ANTHROPIC_API_KEY` tra le variabili di Vercel. Voce in/out con la Web Speech API del browser.
+- **Studio nel browser** (`/studio/crea/[id]`): `web/lib/daw/project.ts` (formato del progetto, default,
+  `describe()` per il coach), `web/lib/daw/engine.ts` (Web Audio: sequencer a 16 step, suoni sintetizzati,
+  sidechain, swing), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
+  `/api/coach/crea` + `lib/coach/prompt-crea.ts`; streaming condiviso in `lib/coach/stream.ts`.
+- **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,
+  `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
   `retry_job(id)`; tutti gli altri cambi di stato li fa il worker.

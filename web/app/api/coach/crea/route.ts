@@ -1,0 +1,63 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { COACH_CREA_SYSTEM } from "@/lib/coach/prompt-crea";
+import { streamCoach, trimHistory, type Turn } from "@/lib/coach/stream";
+import { describe, normalize } from "@/lib/daw/project";
+import { createClient } from "@/lib/supabase/server";
+
+// Il coach dello studio nel browser: riceve il pattern attuale (anche se non ancora salvato) e risponde corto.
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const HISTORY_LIMIT = 20;
+
+type Body = { projectId?: string; message?: string; project?: unknown; title?: string };
+
+export async function POST(request: NextRequest) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: "Il coach non è ancora attivo: manca ANTHROPIC_API_KEY." }, { status: 503 });
+  }
+  const body = (await request.json().catch(() => ({}))) as Body;
+  const text = body.message?.trim();
+  if (!body.projectId || !text) return NextResponse.json({ error: "Messaggio vuoto." }, { status: 400 });
+  if (text.length > 2000) return NextResponse.json({ error: "Messaggio troppo lungo." }, { status: 400 });
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Rientra da /accedi." }, { status: 401 });
+
+  // La RLS garantisce che il progetto sia dell'utente
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, title, data")
+    .eq("id", body.projectId)
+    .maybeSingle();
+  if (!project) return NextResponse.json({ error: "Progetto non trovato." }, { status: 404 });
+
+  // Il pattern che il producer sta ascoltando adesso: quello del browser, normalizzato.
+  const state = describe(normalize(body.project ?? project.data), body.title?.slice(0, 120) || project.title);
+
+  const { data: history } = await supabase
+    .from("coach_messages")
+    .select("role, content")
+    .eq("project_id", project.id)
+    .order("created_at", { ascending: false })
+    .limit(HISTORY_LIMIT);
+  const past = trimHistory(((history ?? []) as Turn[]).reverse());
+
+  const { error: insertError } = await supabase
+    .from("coach_messages")
+    .insert({ project_id: project.id, role: "user", content: text });
+  if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+
+  return streamCoach({
+    system: [{ text: COACH_CREA_SYSTEM, cache: true }],
+    // lo stato del pattern va nell'ultimo messaggio: cambia a ogni modifica, la storia no
+    messages: [...past, { role: "user", content: `${text}\n\n[Stato attuale del progetto]\n${state}` }],
+    maxTokens: 600,
+    effort: "low",
+    save: (answer, meta) =>
+      supabase.from("coach_messages").insert({ project_id: project.id, role: "assistant", content: answer, ...meta }),
+  });
+}

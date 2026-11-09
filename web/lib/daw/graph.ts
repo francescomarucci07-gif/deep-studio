@@ -17,8 +17,8 @@ import {
 const mtof = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
 // Posizione nello stereo e quanto di ogni canale va al riverbero (send, dopo il fader)
-const PAN: Record<ChannelId, number> = { kick: 0, clap: 0, hat: 0.18, openhat: -0.15, perc: -0.28, bass: 0, chords: 0 };
-const SEND: Record<ChannelId, number> = { kick: 0, clap: 0.22, hat: 0.04, openhat: 0.12, perc: 0.25, bass: 0, chords: 0.3 };
+const PAN: Record<ChannelId, number> = { kick: 0, clap: 0, hat: 0.18, openhat: -0.15, perc: -0.28, bass: 0, chords: 0, lead: 0.05 };
+const SEND: Record<ChannelId, number> = { kick: 0, clap: 0.22, hat: 0.04, openhat: 0.12, perc: 0.25, bass: 0, chords: 0.3, lead: 0.18 };
 
 // Le frequenze "metalliche" degli hi-hat della TR-808: sei onde quadre che non sono armoniche tra loro
 const HAT_FREQS = [205.3, 304.4, 369.6, 522.7, 540, 800];
@@ -27,6 +27,8 @@ export class Graph {
   readonly channels: Record<ChannelId, GainNode>;
   private duck: GainNode;
   private reverb: ConvolverNode;
+  private delay: DelayNode;
+  private delaySend: GainNode;
   private noise: AudioBuffer;
   private drive: Float32Array<ArrayBuffer>;
   private openHat: GainNode | null = null; // per il "choke": l'hat chiuso taglia l'open hat
@@ -58,6 +60,17 @@ export class Graph {
     lowCut.frequency.value = 250;
     this.reverb.connect(lowCut).connect(master);
 
+    // delay a tempo per il lead: eco a 3/16 (il "rimbalzo" degli hook house), con le basse tagliate
+    this.delay = ctx.createDelay(2);
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0.38;
+    const delayTone = this.filter("highpass", 400);
+    this.delay.connect(delayTone);
+    delayTone.connect(feedback).connect(this.delay);
+    delayTone.connect(master);
+    this.delaySend = ctx.createGain();
+    this.delaySend.connect(this.delay);
+
     // basso e accordi passano dal "duck": il sidechain del kick li abbassa a ogni colpo
     this.duck = ctx.createGain();
     this.duck.connect(master);
@@ -78,7 +91,9 @@ export class Graph {
       ...(Object.fromEntries(DRUMS.map(({ id }) => [id, make(id, master)])) as Record<DrumId, GainNode>),
       bass: make("bass", this.duck),
       chords: make("chords", this.duck),
+      lead: make("lead", master),
     };
+    this.channels.lead.connect(this.delaySend);
 
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = this.noise.getChannelData(0);
@@ -94,11 +109,27 @@ export class Graph {
   // immediate = subito al valore giusto (export offline: niente rampa all'inizio del file)
   applyMixer(immediate = false) {
     const p = this.getProject();
+    const now = this.ctx.currentTime;
     for (const id of Object.keys(this.channels) as ChannelId[]) {
       const c = p.mixer[id];
       const v = c.muted ? 0 : c.volume;
-      if (immediate) this.channels[id].gain.setValueAtTime(v, this.ctx.currentTime);
-      else this.channels[id].gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
+      if (immediate) this.channels[id].gain.setValueAtTime(v, now);
+      else this.channels[id].gain.setTargetAtTime(v, now, 0.01);
+    }
+    this.syncDelay(immediate);
+  }
+
+  // Il delay segue il tempo (3/16 di battuta) e la manopola Delay del lead
+  syncDelay(immediate = false) {
+    const p = this.getProject();
+    const time = (60 / p.bpm / 4) * 3;
+    const now = this.ctx.currentTime;
+    if (immediate) {
+      this.delay.delayTime.setValueAtTime(time, now);
+      this.delaySend.gain.setValueAtTime(p.leadSound.delay, now);
+    } else {
+      this.delay.delayTime.setTargetAtTime(time, now, 0.05);
+      this.delaySend.gain.setTargetAtTime(p.leadSound.delay, now, 0.02);
     }
   }
 
@@ -109,8 +140,13 @@ export class Graph {
     if (pat.drums.kick[s] && p.sidechain) this.sidechain(t, stepDur);
     const n = pat.bass[s];
     if (n !== null) {
-      const len = p.bassSound.length === "lunga" ? this.stepsToNextNote(pat, s) - 0.05 : 0.9;
+      const len = p.bassSound.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
       this.bassNote(t, n, stepDur * len);
+    }
+    const m = pat.lead[s];
+    if (m !== null) {
+      const len = p.leadSound.length === "lunga" ? this.stepsToNext(pat.lead, s) - 0.05 : 0.8;
+      this.leadNote(t, m, stepDur * len);
     }
     if (s % 4 === 0) {
       const chord = pat.chords[s / 4];
@@ -124,13 +160,14 @@ export class Graph {
   preview(id: ChannelId, t: number, opts: { note?: number; chord?: Chord } = {}) {
     const stepDur = 60 / this.getProject().bpm / 4;
     if (id === "bass") this.bassNote(t, opts.note ?? 33, stepDur * 2);
+    else if (id === "lead") this.leadNote(t, opts.note ?? 69, stepDur * 2);
     else if (id === "chords") this.chord(t, opts.chord ?? { root: 9, type: "min7" }, stepDur * 8);
     else this.drum(id, t);
   }
 
-  // quanti step mancano alla prossima nota del basso (ricominciando dall'inizio della battuta)
-  private stepsToNextNote(pat: Pattern, s: number) {
-    for (let k = 1; k < STEPS; k++) if (pat.bass[(s + k) % STEPS] !== null) return k;
+  // quanti step mancano alla prossima nota (ricominciando dall'inizio della battuta)
+  private stepsToNext(line: (number | null)[], s: number) {
+    for (let k = 1; k < STEPS; k++) if (line[(s + k) % STEPS] !== null) return k;
     return STEPS;
   }
 
@@ -293,6 +330,43 @@ export class Graph {
       }
       osc.start(t);
       osc.stop(end + 0.02);
+    }
+  }
+
+  // Lead: un synth monofonico. Saw = due oscillatori un po' stonati (pieno), square = vuoto e "8 bit",
+  // triangle = morbido come un flauto. Il filtro si apre all'attacco; un vibrato leggero dopo un attimo.
+  private leadNote(t: number, midi: number, dur: number) {
+    const { wave, cutoff } = this.getProject().leadSound;
+    const ctx = this.ctx;
+    const end = t + Math.max(dur, 0.05);
+    const f = this.filter("lowpass", cutoff, 2);
+    f.frequency.setValueAtTime(Math.min(16000, cutoff * 2.2), t);
+    f.frequency.exponentialRampToValueAtTime(cutoff, t + 0.15);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.32, t + 0.006);
+    g.gain.setValueAtTime(0.32, end - 0.015);
+    g.gain.linearRampToValueAtTime(0, end + 0.06);
+    f.connect(g).connect(this.channels.lead);
+
+    const vibrato = ctx.createOscillator();
+    vibrato.frequency.value = 5.5;
+    const depth = ctx.createGain();
+    depth.gain.setValueAtTime(0, t);
+    depth.gain.linearRampToValueAtTime(dur > 0.3 ? 9 : 0, t + 0.25); // cent: solo sulle note lunghe
+    vibrato.connect(depth);
+    vibrato.start(t);
+    vibrato.stop(end + 0.1);
+
+    for (const detune of wave === "sawtooth" ? [-6, 6] : [0]) {
+      const o = ctx.createOscillator();
+      o.type = wave;
+      o.frequency.value = mtof(midi);
+      o.detune.value = detune;
+      depth.connect(o.detune);
+      o.connect(f);
+      o.start(t);
+      o.stop(end + 0.1);
     }
   }
 

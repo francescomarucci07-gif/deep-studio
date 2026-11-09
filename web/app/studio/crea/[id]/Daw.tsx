@@ -12,6 +12,9 @@ import {
   BEATS,
   CHORD_TYPES,
   DRUMS,
+  LEAD_HIGH,
+  LEAD_LOW,
+  LEAD_WAVES,
   NOTE_NAMES,
   SLOTS,
   STEPS,
@@ -33,7 +36,13 @@ import { createClient } from "@/lib/supabase/client";
 
 type SaveState = "salvato" | "modificato" | "salvo" | "errore";
 
-const BASS_ROWS = Array.from({ length: BASS_HIGH - BASS_LOW + 1 }, (_, i) => BASS_HIGH - i);
+// righe del piano roll, dall'alto in basso, per ogni strumento con le note
+const rows = (lo: number, hi: number) => Array.from({ length: hi - lo + 1 }, (_, i) => hi - i);
+const ROLLS = {
+  bass: { label: "Bass", rows: rows(BASS_LOW, BASS_HIGH) },
+  lead: { label: "Lead", rows: rows(LEAD_LOW, LEAD_HIGH) },
+} as const;
+type RollId = keyof typeof ROLLS;
 const isSharp = (m: number) => [1, 3, 6, 8, 10].includes(m % 12);
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const two = (n: number) => String(n).padStart(2, "0");
@@ -47,13 +56,16 @@ const PADS: { id: ChannelId; label: string; key: string; color: string }[] = [
   { id: "perc", label: "Perc", key: "b", color: "teal" },
   { id: "bass", label: "Bass", key: "n", color: "green" },
   { id: "chords", label: "Chord", key: "m", color: "purple" },
+  { id: "lead", label: "Lead", key: ",", color: "blue" },
 ];
 const CHANNELS: { id: ChannelId; label: string }[] = [
   ...DRUMS,
   { id: "bass", label: "Bass" },
   { id: "chords", label: "Chords" },
+  { id: "lead", label: "Lead" },
 ];
-const isDrum = (c: ChannelId): c is DrumId => c !== "bass" && c !== "chords";
+const isDrum = (c: ChannelId): c is DrumId => c !== "bass" && c !== "chords" && c !== "lead";
+const WAVE_LABEL: Record<(typeof LEAD_WAVES)[number], string> = { sawtooth: "Saw", square: "Sqr", triangle: "Tri" };
 const TYPE_LABEL: Record<ChordType, string> = {
   min: "minore",
   maj: "maggiore",
@@ -90,6 +102,7 @@ export function Daw({
   const [playingSlot, setPlayingSlot] = useState<Slot | null>(null);
   const pat = project.patterns[editing];
   const [showVersions, setShowVersions] = useState(false);
+  const [roll, setRoll] = useState<RollId>("bass");
   const [exporting, setExporting] = useState<"no" | "sì" | "errore">("no");
   const [versionsTick, setVersionsTick] = useState(0);
 
@@ -133,7 +146,7 @@ export function Daw({
   useEffect(() => () => engineRef.current?.close(), []);
   useEffect(() => {
     engineRef.current?.applyMixer();
-  }, [project.mixer]);
+  }, [project.mixer, project.bpm, project.leadSound.delay]);
 
   const update = useCallback(
     (fn: (p: Project) => void) =>
@@ -150,7 +163,7 @@ export function Daw({
     (c: ChannelId) => {
       const cur = projectRef.current.patterns[playbackRef.current.editing];
       void engine().preview(c, {
-        note: cur.bass.find((n) => n !== null) ?? BASS_LOW,
+        note: c === "lead" ? (cur.lead.find((n) => n !== null) ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
         chord: cur.chords.find((x) => x !== null) ?? undefined,
       });
       setFlash(c);
@@ -239,12 +252,13 @@ export function Daw({
     if (turningOn && !playing) void engine().preview(d);
   };
 
-  const setBass = (i: number, note: number) => {
-    const removing = pat.bass[i] === note;
+  // una nota nel piano roll (basso o lead): clic su una nota accesa = la spegne
+  const setNote = (roll: RollId, i: number, note: number) => {
+    const removing = pat[roll][i] === note;
     update((p) => {
-      p.patterns[editing].bass[i] = removing ? null : note;
+      p.patterns[editing][roll][i] = removing ? null : note;
     });
-    if (!removing && !playing) void engine().preview("bass", { note });
+    if (!removing && !playing) void engine().preview(roll, { note });
   };
 
   // accordo del battito b: nota "" = nessun accordo
@@ -323,8 +337,8 @@ export function Daw({
     flash === c ||
     (sounding !== null &&
       step >= 0 &&
-      (c === "bass"
-        ? sounding.bass[step] !== null
+      (c === "bass" || c === "lead"
+        ? sounding[c][step] !== null
         : c === "chords"
           ? step % 4 === 0 && sounding.chords[step / 4] !== null
           : sounding.drums[c][step]));
@@ -565,6 +579,22 @@ export function Daw({
                   </span>
                 ))}
               </div>
+              <div className="hw-seq-row">
+                <button type="button" className="hw-seq-name" onClick={() => setRoll("lead")}>
+                  Lead
+                </button>
+                {pat.lead.map((n, i) => (
+                  <span
+                    key={i}
+                    className="hw-key hw-key--note hw-key--lead"
+                    data-group={Math.floor(i / 4)}
+                    data-on={n !== null}
+                    data-now={i === step && playingSlot === editing}
+                  >
+                    {n !== null ? noteName(n).replace(/\d$/, "") : ""}
+                  </span>
+                ))}
+              </div>
               <div className="hw-seq-row hw-seq-numbers" aria-hidden="true">
                 <span />
                 {Array.from({ length: STEPS }, (_, i) => (
@@ -746,6 +776,71 @@ export function Daw({
                   808 long
                 </button>
               </div>
+              <div className="hw-strip hw-strip--synth hw-strip--chords hw-strip--lead">
+                <span className="hw-label">Lead synth</span>
+                <div className="hw-seg">
+                  {LEAD_WAVES.map((w) => (
+                    <button
+                      key={w}
+                      type="button"
+                      className="hw-btn hw-btn--small"
+                      aria-pressed={project.leadSound.wave === w}
+                      onClick={() =>
+                        update((p) => {
+                          p.leadSound.wave = w;
+                        })
+                      }
+                    >
+                      <span className="hw-btn-led" />
+                      {WAVE_LABEL[w]}
+                    </button>
+                  ))}
+                </div>
+                <div className="hw-seg">
+                  <Knob
+                    size={44}
+                    label="Cutoff"
+                    value={project.leadSound.cutoff}
+                    min={300}
+                    max={9000}
+                    step={10}
+                    defaultValue={2600}
+                    display={`${Math.round(project.leadSound.cutoff)} Hz`}
+                    onChange={(v) =>
+                      update((p) => {
+                        p.leadSound.cutoff = v;
+                      })
+                    }
+                  />
+                  <Knob
+                    size={44}
+                    label="Delay"
+                    value={project.leadSound.delay}
+                    min={0}
+                    max={0.6}
+                    defaultValue={0.3}
+                    display={pct(project.leadSound.delay / 0.6)}
+                    onChange={(v) =>
+                      update((p) => {
+                        p.leadSound.delay = v;
+                      })
+                    }
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-pressed={project.leadSound.length === "lunga"}
+                  onClick={() =>
+                    update((p) => {
+                      p.leadSound.length = p.leadSound.length === "lunga" ? "corta" : "lunga";
+                    })
+                  }
+                >
+                  <span className="hw-btn-led" />
+                  Legato
+                </button>
+              </div>
               <div className="hw-strip hw-strip--synth hw-strip--chords">
                 <span className="hw-label">Chord synth</span>
                 <div className="hw-seg">
@@ -784,13 +879,25 @@ export function Daw({
             </div>
           </section>
 
-          {/* ---- piano roll del basso ---- */}
-          <section className="hw-panel hw-roll-panel" aria-label="Piano roll della bassline">
-            <h2 className="hw-title">Piano roll · Bass</h2>
-            <div className="daw-roll">
-              {BASS_ROWS.map((note) => (
+          {/* ---- piano roll: basso o melodia ---- */}
+          <section className="hw-panel hw-roll-panel" aria-label={`Piano roll · ${ROLLS[roll].label}`}>
+            <div className="hw-seq-head">
+              <h2 className="hw-title">
+                Piano roll · {ROLLS[roll].label} · Pattern {editing}
+              </h2>
+              <div className="hw-patterns" role="group" aria-label="Strumento nel piano roll">
+                {(Object.keys(ROLLS) as RollId[]).map((r) => (
+                  <button key={r} type="button" className="hw-btn hw-btn--small" aria-pressed={roll === r} onClick={() => setRoll(r)}>
+                    <span className="hw-btn-led" />
+                    {ROLLS[r].label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="daw-roll" data-roll={roll}>
+              {ROLLS[roll].rows.map((note) => (
                 <div key={note} className="daw-roll-row" data-sharp={isSharp(note)}>
-                  <button type="button" className="daw-key" onClick={() => void engine().preview("bass", { note })}>
+                  <button type="button" className="daw-key" onClick={() => void engine().preview(roll, { note })}>
                     {noteName(note)}
                   </button>
                   {Array.from({ length: STEPS }, (_, i) => (
@@ -798,11 +905,11 @@ export function Daw({
                       key={i}
                       type="button"
                       className="daw-cell"
-                      aria-pressed={pat.bass[i] === note}
+                      aria-pressed={pat[roll][i] === note}
                       aria-label={`${noteName(note)} step ${i + 1}`}
                       data-now={i === step && playingSlot === editing}
                       data-beat={i % 4 === 0}
-                      onClick={() => setBass(i, note)}
+                      onClick={() => setNote(roll, i, note)}
                     />
                   ))}
                 </div>
@@ -825,7 +932,7 @@ export function Daw({
           suggestions={[
             "Fammi una traccia deep house con intro, break e drop",
             "Make me a trap beat",
-            "Crea una variazione nel pattern B",
+            "Scrivi una melodia per il drop",
             "Cosa aggiungo adesso?",
           ]}
           intro="Sono qui con te. Chiedimi di creare un beat (lo scrivo io nello studio e ti spiego come l'ho fatto) oppure fallo tu e ti do consigli mentre lo cambi."

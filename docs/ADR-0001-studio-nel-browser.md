@@ -65,3 +65,10 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   hi-hat alla TR-808 con choke, clap a quattro mani, kick con click e saturazione, basso con sub, riverbero send.
 - Export WAV 24 bit dal browser (OfflineAudioContext, stessa catena del play). Verifica sul file esportato con
   `analysis/deep_studio_analyze.py`: -13,7 LUFS, true peak -1,5 dBTP, 122 BPM riconosciuti, nessun allarme.
+
+## Aggiornamento 9 nov 2026 · melodie
+
+- Lead monofonico in ogni pattern (Do4–Do6), synth saw/square/triangle con filtro, legato e delay a 3/16.
+- Piano roll con schede Bass/Lead; pad Lead (tasto ","), canale Lead nel mixer.
+- Il coach scrive la melodia con `scrivi_pattern` (prompt `crea-v5`: motivi corti, note dell'accordo sui battiti
+  forti, domanda e risposta, spazio per il delay). Export di prova: -13,5 LUFS, true peak -1,3 dBTP.

@@ -460,6 +460,10 @@ ol.ds-led-row {
 .daw-cell[data-now="true"] {
   background: var(--ds-border-strong);
 }
+.daw-roll[data-roll="lead"] .daw-cell[aria-pressed="true"] {
+  background: var(--hw-pad-blue);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--hw-pad-blue) 60%, transparent);
+}
 .daw-cell[aria-pressed="true"] {
   background: var(--ds-ok);
   box-shadow: 0 0 6px rgba(63, 214, 164, 0.5);
@@ -888,11 +892,13 @@ ol.ds-led-row {
 .hw-pad[data-color="teal"] { --glow: var(--hw-pad-teal); }
 .hw-pad[data-color="green"] { --glow: var(--hw-pad-green); }
 .hw-pad[data-color="purple"] { --glow: var(--hw-pad-purple); }
-/* il pad degli accordi è largo come tutta la fila */
-.hw-pad[data-color="purple"] {
+.hw-pad[data-color="blue"] { --glow: var(--hw-pad-blue); }
+/* i pad di accordi e lead sono larghi come tutta la fila */
+.hw-pad[data-color="purple"],
+.hw-pad[data-color="blue"] {
   grid-column: 1 / -1;
   aspect-ratio: auto;
-  min-height: 64px;
+  min-height: 56px;
 }
 .hw-pad:active {
   transform: translateY(3px);
@@ -997,6 +1003,9 @@ ol.ds-led-row {
 .hw-key--note {
   cursor: default;
 }
+.hw-key--lead[data-on="true"] {
+  --key: var(--hw-pad-blue);
+}
 .hw-seq-numbers span {
   color: var(--hw-print-faint);
   font: 9px var(--ds-font-mono);
@@ -1006,8 +1015,8 @@ ol.ds-led-row {
 /* mixer: strisce con fader verticali */
 .hw-strips {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ds-space-2);
-  overflow-x: auto;
   padding-bottom: 4px;
 }
 .hw-strip {
@@ -1023,7 +1032,6 @@ ol.ds-led-row {
 }
 .hw-strip--synth {
   min-width: 150px;
-  margin-left: auto;
   justify-content: space-between;
 }
 .hw-strip--chords {

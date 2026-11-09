@@ -12,6 +12,9 @@ import {
   SONG_BARS,
   STEPS,
   isSlot,
+  LEAD_HIGH,
+  LEAD_LOW,
+  LEAD_WAVES,
   normalize,
   type Pattern,
   type Project,
@@ -80,6 +83,22 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
         description: "pad = tappeto lungo (deep house); stab = colpo corto sul battito (house, tech house).",
       },
       filtro_accordi: { type: "number", minimum: 300, maximum: 8000, description: "Cutoff degli accordi in Hz: basso = morbido." },
+      melodia: {
+        type: "array",
+        description: `La melodia (lead): una nota per step, monofonica. MIDI da ${LEAD_LOW} (Do4) a ${LEAD_HIGH} (Do6): 60 Do4, 62 Re4, 64 Mi4, 65 Fa4, 67 Sol4, 69 La4, 71 Si4, 72 Do5, 74 Re5, 76 Mi5, 77 Fa5, 79 Sol5, 81 La5, 83 Si5, 84 Do6 (i diesis sono il numero in mezzo). Lista vuota = niente melodia.`,
+        items: {
+          type: "object",
+          properties: {
+            step: { type: "integer", minimum: 1, maximum: STEPS },
+            nota: { type: "integer", minimum: LEAD_LOW, maximum: LEAD_HIGH },
+          },
+          required: ["step", "nota"],
+        },
+      },
+      onda_lead: { type: "string", enum: [...LEAD_WAVES], description: "sawtooth = pieno, square = vuoto/8 bit, triangle = morbido." },
+      filtro_lead: { type: "number", minimum: 300, maximum: 9000 },
+      durata_lead: { type: "string", enum: ["corta", "lunga"], description: "corta = note staccate; lunga = legate." },
+      delay_lead: { type: "number", minimum: 0, maximum: 0.6, description: "Quanto eco a 3/16 sul lead: 0.2–0.35 tipico per gli hook." },
     },
     required: ["nome", "kick", "clap", "hat", "basso"],
   },
@@ -118,6 +137,11 @@ type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc",
   filtro?: unknown;
   durata?: unknown;
   accordi?: unknown;
+  melodia?: unknown;
+  onda_lead?: unknown;
+  filtro_lead?: unknown;
+  durata_lead?: unknown;
+  delay_lead?: unknown;
   stile_accordi?: unknown;
   filtro_accordi?: unknown;
 };
@@ -141,12 +165,19 @@ export function createStudioWriter(current: Project, editing: Slot) {
     const i = (raw && typeof raw === "object" ? raw : {}) as PatternInput & { battute?: unknown };
     if (name === "scrivi_pattern") {
       const slot: Slot = isSlot(i.slot) ? i.slot : editing;
-      const bass: (number | null)[] = Array(STEPS).fill(null);
-      if (Array.isArray(i.basso)) {
-        for (const n of i.basso as { step?: unknown; nota?: unknown }[]) {
-          if (Number.isInteger(n?.step) && Number.isInteger(n?.nota)) bass[(n.step as number) - 1] = n.nota as number;
+      // note per step (normalize poi scarta quelle fuori dall'estensione dello strumento)
+      const line = (list: unknown) => {
+        const out: (number | null)[] = Array(STEPS).fill(null);
+        if (Array.isArray(list)) {
+          for (const n of list as { step?: unknown; nota?: unknown }[]) {
+            if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && (n.step as number) >= 1 && (n.step as number) <= STEPS) {
+              out[(n.step as number) - 1] = n.nota as number;
+            }
+          }
         }
-      }
+        return out;
+      };
+      const bass = line(i.basso);
       const chords: Pattern["chords"] = Array(BEATS).fill(null);
       if (Array.isArray(i.accordi)) {
         for (const c of i.accordi as { battito?: unknown; radice?: unknown; tipo?: unknown }[]) {
@@ -159,6 +190,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
         drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
         bass,
         chords, // normalize scarta radici e tipi non validi
+        lead: line(i.melodia),
       };
       project = normalize({
         ...project,
@@ -174,6 +206,12 @@ export function createStudioWriter(current: Project, editing: Slot) {
         chordSound: {
           style: i.stile_accordi ?? project.chordSound.style,
           cutoff: i.filtro_accordi ?? project.chordSound.cutoff,
+        },
+        leadSound: {
+          wave: i.onda_lead ?? project.leadSound.wave,
+          cutoff: i.filtro_lead ?? project.leadSound.cutoff,
+          length: i.durata_lead ?? project.leadSound.length,
+          delay: i.delay_lead ?? project.leadSound.delay,
         },
       });
       focus = slot;

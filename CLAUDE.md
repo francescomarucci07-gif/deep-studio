@@ -93,10 +93,11 @@ cd web && npm run dev
   `COACH_MODEL`, default `claude-sonnet-5-5` come da P6), istruzioni in `web/lib/coach/prompt.ts`
   (versionate), contesto = analisi compatta + versione precedente. Messaggi e costi in `coach_messages`.
   Serve `ANTHROPIC_API_KEY` tra le variabili di Vercel. Voce in/out con la Web Speech API del browser.
-- **Studio nel browser** (`/studio/crea/[id]`): `web/lib/daw/project.ts` (formato del progetto, default,
-  `describe()` per il coach), `web/lib/daw/engine.ts` (Web Audio: sequencer a 16 step, suoni sintetizzati,
+- **Studio nel browser** (`/studio/crea/[id]`): `web/lib/daw/project.ts` (formato del progetto v2: pattern
+  A–D + canzone di 16 battute; `normalize()` converte i progetti v1; `describe()` per il coach), `web/lib/daw/engine.ts` (Web Audio: sequencer a 16 step, suoni sintetizzati,
   sidechain, swing), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
-  `/api/coach/crea` + `lib/coach/prompt-crea.ts`; streaming condiviso in `lib/coach/stream.ts`.
+  `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
+  `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone); streaming condiviso in `lib/coach/stream.ts`.
 - **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,

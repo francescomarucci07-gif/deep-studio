@@ -1,6 +1,20 @@
-// Lo strumento che il coach usa per scrivere un pattern nello studio ("creami un beat trap").
+// Gli strumenti che il coach usa per scrivere nello studio: un pattern (A–D) e la canzone.
 // Claude manda step da 1 a 16 e note MIDI; qui diventa un Project valido (normalize scarta il resto).
-import { BASS_HIGH, BASS_LOW, DRUMS, STEPS, normalize, type Project } from "./project";
+// Il coach può chiamarli più volte nella stessa risposta: ogni chiamata parte dal risultato della precedente.
+import type Anthropic from "@anthropic-ai/sdk";
+import {
+  BASS_HIGH,
+  BASS_LOW,
+  DRUMS,
+  SLOTS,
+  SONG_BARS,
+  STEPS,
+  isSlot,
+  normalize,
+  type Pattern,
+  type Project,
+  type Slot,
+} from "./project";
 
 const stepList = (label: string) => ({
   type: "array",
@@ -8,14 +22,15 @@ const stepList = (label: string) => ({
   items: { type: "integer", minimum: 1, maximum: STEPS },
 });
 
-export const PATTERN_TOOL = {
+const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_pattern",
   description:
-    "Scrive un pattern completo nello studio del producer (sostituisce batteria, bassline, BPM, swing e suono del basso; i volumi del mixer restano). Usalo quando il producer ti chiede di creare, generare o riscrivere un beat o una bassline. Prima di chiamarlo spiega in poche frasi cosa costruisci e perché.",
+    "Scrive un pattern (una battuta da 16 step: batteria e bassline) in uno dei 4 slot A, B, C, D dello studio, sostituendo quello che c'era. Può anche cambiare BPM, swing, sidechain e suono del basso, che valgono per tutta la traccia. I volumi del mixer restano. Usalo quando il producer ti chiede di creare, generare o riscrivere un beat. Prima di chiamarlo spiega in poche frasi cosa costruisci e perché.",
   input_schema: {
-    type: "object" as const,
+    type: "object",
     properties: {
-      nome: { type: "string", description: "Titolo breve del pattern, es. 'Trap half-time'." },
+      nome: { type: "string", description: "Titolo breve di quello che scrivi, es. 'Trap half-time' o 'Drop'." },
+      slot: { type: "string", enum: [...SLOTS], description: "Dove scriverlo. Se non lo dici, nel pattern che il producer sta modificando." },
       bpm: { type: "number", minimum: 60, maximum: 200 },
       swing: { type: "number", minimum: 0, maximum: 0.5, description: "0 = dritto, 0.1–0.2 = groove house." },
       sidechain: { type: "boolean", description: "Il kick abbassa il basso." },
@@ -44,13 +59,35 @@ export const PATTERN_TOOL = {
         description: "corta = note staccate (house); lunga = ogni nota tiene fino alla successiva, come un 808 (trap).",
       },
     },
-    required: ["nome", "bpm", "kick", "clap", "hat", "basso"],
+    required: ["nome", "kick", "clap", "hat", "basso"],
   },
   eager_input_streaming: true,
 };
 
-type Input = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc", unknown>> & {
+const SONG_TOOL: Anthropic.Beta.BetaTool = {
+  name: "scrivi_canzone",
+  description: `Scrive l'arrangiamento: quale pattern (A, B, C, D) suona in ognuna delle ${SONG_BARS} battute della canzone, in ordine. "-" = battuta vuota (silenzio). Usalo quando il producer ti chiede una traccia intera, una struttura o un arrangiamento (intro, groove, break, drop), insieme a scrivi_pattern per i pattern che servono.`,
+  input_schema: {
+    type: "object",
+    properties: {
+      battute: {
+        type: "array",
+        description: `Fino a ${SONG_BARS} elementi, es. ["A","A","B","B","C","D","D","D"]. Le battute oltre l'ultima restano vuote.`,
+        items: { type: "string", enum: [...SLOTS, "-"] },
+        maxItems: SONG_BARS,
+      },
+      nome: { type: "string", description: "Nome breve della struttura, es. 'Intro, groove, break, drop'." },
+    },
+    required: ["battute"],
+  },
+  eager_input_streaming: true,
+};
+
+export const STUDIO_TOOLS = [PATTERN_TOOL, SONG_TOOL];
+
+type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc", unknown>> & {
   nome?: unknown;
+  slot?: unknown;
   bpm?: unknown;
   swing?: unknown;
   sidechain?: unknown;
@@ -66,28 +103,59 @@ const steps = (v: unknown) => {
   return on;
 };
 
-// Dal tool al progetto: tiene i volumi attuali, tutto il resto viene dal coach (e passa da normalize).
-export function patternFromTool(raw: unknown, current: Project): { project: Project; name: string } {
-  const i = (raw && typeof raw === "object" ? raw : {}) as Input;
-  const bass: (number | null)[] = Array(STEPS).fill(null);
-  if (Array.isArray(i.basso)) {
-    for (const n of i.basso as { step?: unknown; nota?: unknown }[]) {
-      if (Number.isInteger(n?.step) && Number.isInteger(n?.nota)) bass[(n.step as number) - 1] = n.nota as number;
+const label = (v: unknown, d: string) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 60) : d);
+
+// Un "registro" delle modifiche del coach: parte dal progetto attuale e applica ogni chiamata in ordine.
+export function createStudioWriter(current: Project, editing: Slot) {
+  let project = current;
+  const names: string[] = [];
+  let focus: Slot = editing; // il pattern da mostrare dopo: l'ultimo scritto
+  let songWritten = false;
+
+  function run(name: string, raw: unknown): string | null {
+    const i = (raw && typeof raw === "object" ? raw : {}) as PatternInput & { battute?: unknown };
+    if (name === "scrivi_pattern") {
+      const slot: Slot = isSlot(i.slot) ? i.slot : editing;
+      const bass: (number | null)[] = Array(STEPS).fill(null);
+      if (Array.isArray(i.basso)) {
+        for (const n of i.basso as { step?: unknown; nota?: unknown }[]) {
+          if (Number.isInteger(n?.step) && Number.isInteger(n?.nota)) bass[(n.step as number) - 1] = n.nota as number;
+        }
+      }
+      const pattern: Pattern = {
+        drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
+        bass,
+      };
+      project = normalize({
+        ...project,
+        bpm: i.bpm ?? project.bpm,
+        swing: i.swing ?? project.swing,
+        sidechain: typeof i.sidechain === "boolean" ? i.sidechain : project.sidechain,
+        patterns: { ...project.patterns, [slot]: pattern },
+        bassSound: {
+          wave: i.onda ?? project.bassSound.wave,
+          cutoff: i.filtro ?? project.bassSound.cutoff,
+          length: i.durata ?? project.bassSound.length,
+        },
+      });
+      focus = slot;
+      const n = `${slot}: ${label(i.nome, "pattern")}`;
+      names.push(n);
+      return `Pattern ${n} scritto nello studio`;
     }
+    if (name === "scrivi_canzone" && Array.isArray(i.battute)) {
+      const song = Array.from({ length: SONG_BARS }, (_, k) => (isSlot(i.battute && (i.battute as unknown[])[k]) ? (i.battute as Slot[])[k] : null));
+      project = normalize({ ...project, song });
+      songWritten = true;
+      names.push(label(i.nome, "arrangiamento"));
+      return `Canzone scritta: ${song.map((s) => s ?? "-").join(" ")}`;
+    }
+    return null;
   }
-  const project = normalize({
-    bpm: i.bpm ?? current.bpm,
-    swing: i.swing ?? current.swing,
-    sidechain: typeof i.sidechain === "boolean" ? i.sidechain : current.sidechain,
-    drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])),
-    bass,
-    bassSound: {
-      wave: i.onda ?? current.bassSound.wave,
-      cutoff: i.filtro ?? current.bassSound.cutoff,
-      length: i.durata ?? current.bassSound.length,
-    },
-    mixer: current.mixer,
-  });
-  const name = typeof i.nome === "string" && i.nome.trim() ? i.nome.trim().slice(0, 60) : "Pattern del coach";
-  return { project, name };
+
+  return {
+    run,
+    changed: () => names.length > 0,
+    result: () => ({ project, name: names.join(" · "), focus, song: songWritten }),
+  };
 }

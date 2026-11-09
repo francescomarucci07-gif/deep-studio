@@ -9,12 +9,17 @@ import {
   BASS_HIGH,
   BASS_LOW,
   DRUMS,
+  SLOTS,
   STEPS,
+  emptyPattern,
+  isEmptyPattern,
   normalize,
   noteName,
+  songLength,
   type ChannelId,
   type DrumId,
   type Project,
+  type Slot,
 } from "@/lib/daw/project";
 import { createClient } from "@/lib/supabase/client";
 
@@ -55,6 +60,11 @@ export function Daw({
   const [flash, setFlash] = useState<ChannelId | null>(null);
   const [save, setSave] = useState<SaveState>("salvato");
   const [undo, setUndo] = useState<{ project: Project; name: string } | null>(null);
+  const [editing, setEditing] = useState<Slot>("A"); // il pattern che vedi e modifichi
+  const [songMode, setSongMode] = useState(false);
+  const [bar, setBar] = useState(-1);
+  const [playingSlot, setPlayingSlot] = useState<Slot | null>(null);
+  const pat = project.patterns[editing];
 
   // il motore e la chat leggono sempre lo stato più recente, anche a metà battuta
   const projectRef = useRef(project);
@@ -63,10 +73,22 @@ export function Daw({
   titleRef.current = title;
   const stepRef = useRef(step);
   stepRef.current = step;
+  const playbackRef = useRef({ song: songMode, editing });
+  playbackRef.current = { song: songMode, editing };
+  const playingSlotRef = useRef(playingSlot);
+  playingSlotRef.current = playingSlot;
   const engineRef = useRef<Engine | null>(null);
 
   const engine = useCallback(() => {
-    engineRef.current ??= new Engine(() => projectRef.current, setStep);
+    engineRef.current ??= new Engine(
+      () => projectRef.current,
+      () => playbackRef.current,
+      (s, b, slot) => {
+        setStep(s);
+        setBar(b);
+        setPlayingSlot(slot);
+      },
+    );
     return engineRef.current;
   }, []);
 
@@ -99,13 +121,16 @@ export function Daw({
   // Un colpo sul pad: suona sempre; con REC acceso e Play, scrive il colpo sullo step che sta suonando
   const hitPad = useCallback(
     (c: ChannelId) => {
-      void engine().preview(c, c === "bass" ? projectRef.current.bass.find((n) => n !== null) ?? BASS_LOW : undefined);
+      const cur = projectRef.current.patterns[playbackRef.current.editing];
+      void engine().preview(c, c === "bass" ? cur.bass.find((n) => n !== null) ?? BASS_LOW : undefined);
       setFlash(c);
       setTimeout(() => setFlash((f) => (f === c ? null : f)), 140);
       const s = stepRef.current;
-      if (rec && engineRef.current?.playing && s >= 0 && c !== "bass") {
+      // in modalità song registra nel pattern che sta suonando, altrimenti in quello che modifichi
+      const slot = playbackRef.current.song ? playingSlotRef.current : playbackRef.current.editing;
+      if (rec && engineRef.current?.playing && s >= 0 && c !== "bass" && slot) {
         update((p) => {
-          p.drums[c][s] = true;
+          p.patterns[slot].drums[c][s] = true;
         });
       }
     },
@@ -149,17 +174,17 @@ export function Daw({
   }, [project, title, id]);
 
   const toggleDrum = (d: DrumId, i: number) => {
-    const turningOn = !project.drums[d][i];
+    const turningOn = !pat.drums[d][i];
     update((p) => {
-      p.drums[d][i] = turningOn;
+      p.patterns[editing].drums[d][i] = turningOn;
     });
     if (turningOn && !playing) void engine().preview(d);
   };
 
   const setBass = (i: number, note: number) => {
-    const removing = project.bass[i] === note;
+    const removing = pat.bass[i] === note;
     update((p) => {
-      p.bass[i] = removing ? null : note;
+      p.patterns[editing].bass[i] = removing ? null : note;
     });
     if (!removing && !playing) void engine().preview("bass", note);
   };
@@ -169,18 +194,44 @@ export function Daw({
       p.mixer[c] = { ...p.mixer[c], ...patch };
     });
 
-  // il coach ha scritto un pattern: lo applico e tengo il precedente per "Annulla"
+  // il coach ha scritto pattern e/o canzone: li applico e tengo il progetto di prima per "Annulla"
   const applyFromCoach = (data: unknown) => {
-    const d = data as { pattern?: unknown; name?: string };
-    if (!d?.pattern) return;
-    setUndo({ project: projectRef.current, name: d.name ?? "pattern" });
-    setProject(normalize(d.pattern));
+    const d = data as { project?: unknown; name?: string; focus?: Slot; song?: boolean };
+    if (!d?.project) return;
+    setUndo({ project: projectRef.current, name: d.name || "pattern" });
+    setProject(normalize(d.project));
+    if (d.focus && SLOTS.includes(d.focus)) setEditing(d.focus);
+    if (d.song) setSongMode(true);
     void play();
-    return `Pattern scritto nello studio: ${d.name ?? "nuovo pattern"}`;
+    return `Scritto nello studio: ${d.name || "nuovo pattern"}`;
   };
 
+  // un pattern nuovo da uno vuoto: copia quello che stai modificando nel primo slot libero
+  const firstFree = SLOTS.find((s) => s !== editing && isEmptyPattern(project.patterns[s]));
+  const duplicate = () => {
+    if (!firstFree) return;
+    update((p) => {
+      p.patterns[firstFree] = structuredClone(p.patterns[editing]);
+    });
+    setEditing(firstFree);
+  };
+  const clearPattern = () => {
+    if (isEmptyPattern(pat) || !window.confirm(`Svuoto il pattern ${editing}?`)) return;
+    update((p) => {
+      p.patterns[editing] = emptyPattern();
+    });
+  };
+  const cycleBar = (b: number) =>
+    update((p) => {
+      const order: (Slot | null)[] = [...SLOTS, null];
+      p.song[b] = order[(order.indexOf(p.song[b]) + 1) % order.length];
+    });
+
+  // cosa suona adesso (per accendere pad e meter): il pattern in riproduzione, non quello in modifica
+  const sounding = playing && playingSlot ? project.patterns[playingSlot] : null;
   const hitNow = (c: ChannelId) =>
-    flash === c || (playing && step >= 0 && (c === "bass" ? project.bass[step] !== null : project.drums[c][step]));
+    flash === c ||
+    (sounding !== null && step >= 0 && (c === "bass" ? sounding.bass[step] !== null : sounding.drums[c][step]));
 
   return (
     <div className="console">
@@ -202,8 +253,11 @@ export function Daw({
             <span className="hw-lcd-big">{project.bpm}</span>
             <span className="hw-lcd-unit">BPM</span>
             <span className="hw-lcd-small">
-              STEP {step >= 0 ? two(step + 1) : "--"}/16
+              {songMode ? `SONG · BAR ${bar >= 0 ? two(bar + 1) : "--"}/${two(songLength(project))}` : `PATTERN ${editing}`}
+              {" · "}
+              {playingSlot ? `PAT ${playingSlot}` : "PAT -"}
               <br />
+              STEP {step >= 0 ? two(step + 1) : "--"}/16 ·{" "}
               {save === "errore" ? "NON SALVATO" : save === "salvato" ? "SALVATO" : "SALVO…"}
             </span>
           </div>
@@ -326,14 +380,38 @@ export function Daw({
 
           {/* ---- step sequencer, colori a gruppi di 4 come una TR-808 ---- */}
           <section className="hw-panel hw-seq" aria-label="Step sequencer">
-            <h2 className="hw-title">Step sequencer</h2>
+            <div className="hw-seq-head">
+              <h2 className="hw-title">Step sequencer · Pattern {editing}</h2>
+              <div className="hw-patterns" role="group" aria-label="Pattern da modificare">
+                {SLOTS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="hw-btn hw-btn--small hw-btn--slot"
+                    aria-pressed={editing === s}
+                    data-playing={playingSlot === s}
+                    data-empty={isEmptyPattern(project.patterns[s])}
+                    onClick={() => setEditing(s)}
+                  >
+                    <span className="hw-btn-led" />
+                    {s}
+                  </button>
+                ))}
+                <button type="button" className="hw-btn hw-btn--small" disabled={!firstFree} onClick={duplicate}>
+                  Duplica{firstFree ? ` → ${firstFree}` : ""}
+                </button>
+                <button type="button" className="hw-btn hw-btn--small" onClick={clearPattern}>
+                  Svuota
+                </button>
+              </div>
+            </div>
             <div className="hw-seq-grid">
               {DRUMS.map(({ id: d, label }) => (
                 <div key={d} className="hw-seq-row">
                   <button type="button" className="hw-seq-name" onClick={() => void engine().preview(d)}>
                     {label}
                   </button>
-                  {project.drums[d].map((on, i) => (
+                  {pat.drums[d].map((on, i) => (
                     <button
                       key={i}
                       type="button"
@@ -341,7 +419,7 @@ export function Daw({
                       data-group={Math.floor(i / 4)}
                       aria-pressed={on}
                       aria-label={`${label} step ${i + 1}`}
-                      data-now={i === step}
+                      data-now={i === step && playingSlot === editing}
                       onClick={() => toggleDrum(d, i)}
                     >
                       <span className="hw-key-led" />
@@ -353,8 +431,14 @@ export function Daw({
                 <button type="button" className="hw-seq-name" onClick={() => void engine().preview("bass")}>
                   Bass
                 </button>
-                {project.bass.map((n, i) => (
-                  <span key={i} className="hw-key hw-key--note" data-group={Math.floor(i / 4)} data-on={n !== null} data-now={i === step}>
+                {pat.bass.map((n, i) => (
+                  <span
+                    key={i}
+                    className="hw-key hw-key--note"
+                    data-group={Math.floor(i / 4)}
+                    data-on={n !== null}
+                    data-now={i === step && playingSlot === editing}
+                  >
                     {n !== null ? noteName(n).replace(/\d$/, "") : ""}
                   </span>
                 ))}
@@ -366,6 +450,43 @@ export function Daw({
                 ))}
               </div>
             </div>
+          </section>
+
+          {/* ---- arrangiamento: quale pattern suona in ogni battuta ---- */}
+          <section className="hw-panel hw-song" aria-label="Arrangiamento">
+            <div className="hw-seq-head">
+              <h2 className="hw-title">Song · {songLength(project)} battute</h2>
+              <div className="hw-patterns" role="group" aria-label="Modalità">
+                <button type="button" className="hw-btn hw-btn--small" aria-pressed={!songMode} onClick={() => setSongMode(false)}>
+                  <span className="hw-btn-led" />
+                  Pattern
+                </button>
+                <button type="button" className="hw-btn hw-btn--small" aria-pressed={songMode} onClick={() => setSongMode(true)}>
+                  <span className="hw-btn-led" />
+                  Song
+                </button>
+              </div>
+            </div>
+            <div className="hw-song-bars">
+              {project.song.map((s, b) => (
+                <button
+                  key={b}
+                  type="button"
+                  className="hw-bar"
+                  data-slot={s ?? "none"}
+                  data-now={songMode && playing && b === bar}
+                  aria-label={`Battuta ${b + 1}: ${s ? `pattern ${s}` : "vuota"}. Clic per cambiare`}
+                  onClick={() => cycleBar(b)}
+                >
+                  <span className="hw-bar-num">{b + 1}</span>
+                  <span className="hw-bar-slot">{s ?? "–"}</span>
+                </button>
+              ))}
+            </div>
+            <p className="hw-hint">
+              Clic su una battuta: A → B → C → D → vuota. In <strong>Song</strong> suona la canzone dall&apos;inizio; in{" "}
+              <strong>Pattern</strong> solo il pattern che stai modificando, in loop.
+            </p>
           </section>
 
           {/* ---- mixer ---- */}
@@ -463,9 +584,9 @@ export function Daw({
                       key={i}
                       type="button"
                       className="daw-cell"
-                      aria-pressed={project.bass[i] === note}
+                      aria-pressed={pat.bass[i] === note}
                       aria-label={`${noteName(note)} step ${i + 1}`}
-                      data-now={i === step}
+                      data-now={i === step && playingSlot === editing}
                       data-beat={i % 4 === 0}
                       onClick={() => setBass(i, note)}
                     />
@@ -479,10 +600,20 @@ export function Daw({
         <CoachChat
           compact
           endpoint="/api/coach/crea"
-          payload={() => ({ projectId: id, project: projectRef.current, title: titleRef.current })}
+          payload={() => ({
+            projectId: id,
+            project: projectRef.current,
+            title: titleRef.current,
+            editing: playbackRef.current.editing,
+          })}
           initial={coachMessages}
           onData={applyFromCoach}
-          suggestions={["Creami un beat deep house", "Make me a trap beat", "Cosa aggiungo adesso?", "Rendi la bassline più interessante"]}
+          suggestions={[
+            "Fammi una traccia deep house con intro, break e drop",
+            "Make me a trap beat",
+            "Crea una variazione nel pattern B",
+            "Cosa aggiungo adesso?",
+          ]}
           intro="Sono qui con te. Chiedimi di creare un beat (lo scrivo io nello studio e ti spiego come l'ho fatto) oppure fallo tu e ti do consigli mentre lo cambi."
         />
       </div>

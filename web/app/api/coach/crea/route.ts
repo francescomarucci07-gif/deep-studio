@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COACH_CREA_SYSTEM } from "@/lib/coach/prompt-crea";
 import { streamCoach, trimHistory, type Turn } from "@/lib/coach/stream";
-import { patternFromTool, PATTERN_TOOL } from "@/lib/daw/coach-tool";
-import { describe, normalize } from "@/lib/daw/project";
+import { createStudioWriter, STUDIO_TOOLS } from "@/lib/daw/coach-tool";
+import { describe, isSlot, normalize } from "@/lib/daw/project";
 import { createClient } from "@/lib/supabase/server";
 
 // Il coach dello studio nel browser: riceve il pattern attuale (anche se non ancora salvato) e risponde corto.
@@ -11,7 +11,7 @@ export const maxDuration = 60;
 
 const HISTORY_LIMIT = 20;
 
-type Body = { projectId?: string; message?: string; project?: unknown; title?: string };
+type Body = { projectId?: string; message?: string; project?: unknown; title?: string; editing?: unknown };
 
 export async function POST(request: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
 
   // Il pattern che il producer sta ascoltando adesso: quello del browser, normalizzato.
   const current = normalize(body.project ?? project.data);
-  const state = describe(current, body.title?.slice(0, 120) || project.title);
+  const editing = isSlot(body.editing) ? body.editing : "A";
+  const state = describe(current, body.title?.slice(0, 120) || project.title, editing);
 
   const { data: history } = await supabase
     .from("coach_messages")
@@ -57,16 +58,10 @@ export async function POST(request: NextRequest) {
     system: [{ text: COACH_CREA_SYSTEM, cache: true }],
     // lo stato del pattern va nell'ultimo messaggio: cambia a ogni modifica, la storia no
     messages: [...past, { role: "user", content: `${text}\n\n[Stato attuale del progetto]\n${state}` }],
-    maxTokens: 2000,
+    maxTokens: 6000,
     effort: "low",
     // il coach può scrivere il pattern nello studio; il browser lo applica e si può annullare
-    tool: {
-      definition: PATTERN_TOOL,
-      run: (input) => {
-        const { project: next, name } = patternFromTool(input, current);
-        return { data: { pattern: next, name }, note: `Pattern scritto nello studio: ${name}` };
-      },
-    },
+    tools: { definitions: STUDIO_TOOLS, ...createStudioWriter(current, editing) },
     save: (answer, meta) =>
       supabase.from("coach_messages").insert({ project_id: project.id, role: "assistant", content: answer, ...meta }),
   });

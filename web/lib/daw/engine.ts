@@ -1,7 +1,10 @@
 // Il motore audio dello studio: Web Audio API del browser, niente librerie.
 // Come un sequencer hardware: un orologio guarda 100 ms avanti e programma i colpi con precisione
 // sul tempo dell'AudioContext (setInterval da solo "balla", il clock audio no).
-import { DRUMS, STEPS, type ChannelId, type DrumId, type Project } from "./project";
+import { DRUMS, STEPS, songLength, type ChannelId, type DrumId, type Pattern, type Project, type Slot } from "./project";
+
+// Cosa suona: in modalità pattern il pattern che stai modificando, in modalità song la canzone
+export type Playback = { song: boolean; editing: Slot };
 
 const LOOKAHEAD_S = 0.1;
 const TICK_MS = 25;
@@ -15,11 +18,13 @@ export class Engine {
   private noise: AudioBuffer;
   private timer: ReturnType<typeof setInterval> | null = null;
   private step = 0;
+  private bar = 0;
   private nextTime = 0;
 
   constructor(
     private getProject: () => Project,
-    private onStep: (step: number) => void,
+    private getPlayback: () => Playback,
+    private onStep: (step: number, bar: number, slot: Slot | null) => void,
   ) {
     this.ctx = new AudioContext();
     const master = this.ctx.createGain();
@@ -57,6 +62,7 @@ export class Engine {
   async start() {
     await this.ctx.resume();
     this.step = 0;
+    this.bar = 0;
     this.nextTime = this.ctx.currentTime + 0.05;
     this.timer = setInterval(() => this.tick(), TICK_MS);
   }
@@ -64,7 +70,7 @@ export class Engine {
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
-    this.onStep(-1);
+    this.onStep(-1, -1, null);
   }
 
   close() {
@@ -90,25 +96,35 @@ export class Engine {
 
   private tick() {
     const p = this.getProject();
+    const { song, editing } = this.getPlayback();
     const stepDur = 60 / p.bpm / 4;
     while (this.nextTime < this.ctx.currentTime + LOOKAHEAD_S) {
       const s = this.step;
+      const bar = song ? this.bar % songLength(p) : 0;
+      const slot = song ? p.song[bar] : editing;
       // swing: gli step in levare (2, 4, 6… contando da 1) arrivano un po' dopo
       const t = this.nextTime + (s % 2 === 1 ? p.swing * stepDur : 0);
-      for (const { id } of DRUMS) if (p.drums[id][s]) this.drum(id, t);
-      if (p.drums.kick[s] && p.sidechain) this.sidechain(t, stepDur);
-      const n = p.bass[s];
-      if (n !== null) this.bassNote(t, n, stepDur * (p.bassSound.length === "lunga" ? this.stepsToNext(p, s) - 0.05 : 0.9));
+      if (slot) {
+        const pat = p.patterns[slot];
+        for (const { id } of DRUMS) if (pat.drums[id][s]) this.drum(id, t);
+        if (pat.drums.kick[s] && p.sidechain) this.sidechain(t, stepDur);
+        const n = pat.bass[s];
+        if (n !== null) {
+          const len = p.bassSound.length === "lunga" ? this.stepsToNext(pat, s) - 0.05 : 0.9;
+          this.bassNote(t, n, stepDur * len);
+        }
+      }
       const delay = Math.max(0, (t - this.ctx.currentTime) * 1000);
-      setTimeout(() => this.timer && this.onStep(s), delay);
+      setTimeout(() => this.timer && this.onStep(s, bar, slot), delay);
       this.nextTime += stepDur;
       this.step = (s + 1) % STEPS;
+      if (this.step === 0) this.bar = (bar + 1) % songLength(p);
     }
   }
 
   // quanti step mancano alla prossima nota del basso (ricominciando dall'inizio della battuta)
-  private stepsToNext(p: Project, s: number) {
-    for (let k = 1; k < STEPS; k++) if (p.bass[(s + k) % STEPS] !== null) return k;
+  private stepsToNext(pat: Pattern, s: number) {
+    for (let k = 1; k < STEPS; k++) if (pat.bass[(s + k) % STEPS] !== null) return k;
     return STEPS;
   }
 

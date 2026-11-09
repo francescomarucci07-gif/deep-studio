@@ -42,3 +42,12 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Il coach può **scrivere il pattern** (strumento `scrivi_pattern`, `lib/daw/coach-tool.ts`): spiega come lo
   costruisce, lo studio lo applica e si può annullare. Prompt `crea-v2`, risponde nella lingua del producer.
 - Basso con note lunghe tipo 808 (`bassSound.length`), per trap e hip hop.
+
+## Aggiornamento 9 nov 2026 · arrangiamento
+
+- Il progetto passa alla versione 2: 4 pattern da una battuta (A–D) e una canzone di 16 battute (`song`).
+  I progetti versione 1 diventano il pattern A in `normalize()`, nessuna migrazione del database.
+- Console: tasti A–D (LED verde = pattern che suona), Duplica nel primo slot libero, Svuota,
+  modalità Pattern/Song, fila delle battute (clic: A → B → C → D → vuota).
+- Coach: secondo strumento `scrivi_canzone`; può scrivere più pattern e la canzone nella stessa risposta
+  (prompt `crea-v3`), lingua dell'ultimo messaggio. Prova del 9 nov: beat trap scritto dal coach, costo $0,019.

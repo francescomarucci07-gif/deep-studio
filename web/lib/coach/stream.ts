@@ -14,11 +14,13 @@ type Usage = {
 };
 export type Saved = { model: string; tokens_in: number; tokens_out: number; cost_usd: number | null };
 
-
-// Uno strumento che il coach può chiamare: run() valida l'input e dice cosa mandare al browser.
-export type CoachTool = {
-  definition: Anthropic.Beta.BetaTool;
-  run: (input: unknown) => { data: unknown; note: string };
+// Gli strumenti che il coach può chiamare: run() valida e applica ogni chiamata (in ordine) e
+// restituisce la nota per la storia; result() dice cosa mandare al browser alla fine.
+export type CoachTools = {
+  definitions: Anthropic.Beta.BetaTool[];
+  run: (name: string, input: unknown) => string | null;
+  changed: () => boolean;
+  result: () => unknown;
 };
 
 // La conversazione deve iniziare dall'utente: tolgo le risposte rimaste in testa alla storia.
@@ -35,7 +37,7 @@ export function streamCoach(opts: {
   maxTokens: number;
   effort: "low" | "medium";
   save: (answer: string, meta: Saved) => PromiseLike<unknown>;
-  tool?: CoachTool;
+  tools?: CoachTools;
 }) {
   const client = new Anthropic();
   const encoder = new TextEncoder();
@@ -57,7 +59,7 @@ export function streamCoach(opts: {
             ...(b.cache ? { cache_control: { type: "ephemeral" as const } } : {}),
           })),
           messages: opts.messages,
-          ...(opts.tool ? { tools: [opts.tool.definition] } : {}),
+          ...(opts.tools ? { tools: opts.tools.definitions } : {}),
         });
 
         for await (const event of stream) {
@@ -72,13 +74,19 @@ export function streamCoach(opts: {
           answer += note;
           controller.enqueue(encoder.encode(note));
         }
-        // input troncato (max_tokens) = pattern incompleto: meglio non applicarlo
-        const call = final.content.find((b) => b.type === "tool_use");
-        if (opts.tool && call?.type === "tool_use" && final.stop_reason !== "max_tokens") {
-          const { data, note } = opts.tool.run(call.input);
-          // la nota resta nella storia, così il coach sa cosa ha già scritto nello studio
-          answer += `${answer ? "\n\n" : ""}[${note}]`;
-          controller.enqueue(encoder.encode(DATA_MARK + JSON.stringify(data)));
+        // input troncato (max_tokens) = pattern incompleto: meglio non applicare niente
+        if (opts.tools && final.stop_reason !== "max_tokens") {
+          const notes: string[] = [];
+          for (const b of final.content) {
+            if (b.type !== "tool_use") continue;
+            const note = opts.tools.run(b.name, b.input);
+            if (note) notes.push(note);
+          }
+          if (opts.tools.changed()) {
+            // le note restano nella storia, così il coach sa cosa ha già scritto nello studio
+            answer += `${answer ? "\n\n" : ""}[${notes.join(". ")}]`;
+            controller.enqueue(encoder.encode(DATA_MARK + JSON.stringify(opts.tools.result())));
+          }
         }
         if (answer.trim()) {
           const u = final.usage as Usage;

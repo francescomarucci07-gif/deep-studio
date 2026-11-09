@@ -64,12 +64,14 @@ export class Engine {
     const p = this.getProject();
     const { song, editing } = this.getPlayback();
     const stepDur = 60 / p.bpm / 4;
+    this.graph.setAutomating(song);
     while (this.nextTime < this.ctx.currentTime + LOOKAHEAD_S) {
       const s = this.step;
       const bar = song ? this.bar % songLength(p) : 0;
       const slot = song ? p.song[bar] : editing;
       // swing: gli step in levare (2, 4, 6… contando da 1) arrivano un po' dopo
       const t = this.nextTime + (s % 2 === 1 ? p.swing * stepDur : 0);
+      if (song && s === 0) this.graph.automateBar(bar, this.nextTime, STEPS * stepDur, songLength(p) - 1);
       if (slot) this.graph.playStep(p.patterns[slot], s, t, stepDur);
       const delay = Math.max(0, (t - this.ctx.currentTime) * 1000);
       setTimeout(() => this.timer && this.onStep(s, bar, slot), delay);

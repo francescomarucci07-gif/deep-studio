@@ -3,10 +3,15 @@
 // che renderizza il WAV (render.ts), così il file esportato suona come quello che senti.
 // Tutti i suoni sono sintetizzati: niente campioni da scaricare o licenziare.
 import {
+  AUTO_TARGETS,
   BEATS,
+  CHANNEL_IDS,
   DRUMS,
   STEPS,
   chordNotes,
+  filterFreqs,
+  laneValue,
+  type AutoTarget,
   type ChannelId,
   type Chord,
   type DrumId,
@@ -16,9 +21,12 @@ import {
 
 const mtof = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
-// Posizione nello stereo e quanto di ogni canale va al riverbero (send, dopo il fader)
+// Posizione nello stereo di ogni canale
 const PAN: Record<ChannelId, number> = { kick: 0, clap: 0, hat: 0.18, openhat: -0.15, perc: -0.28, bass: 0, chords: 0, lead: 0.05 };
-const SEND: Record<ChannelId, number> = { kick: 0, clap: 0.22, hat: 0.04, openhat: 0.12, perc: 0.25, bass: 0, chords: 0.3, lead: 0.18 };
+const DELAY_MAX = 0.6; // send del delay al massimo della manopola: oltre, l'eco copre il canale
+
+// Il filtro DJ: un passa-basso e un passa-alto in fila, mossi insieme da un solo valore -1…1
+type DjFilter = { lp: BiquadFilterNode; hp: BiquadFilterNode };
 
 // Le frequenze "metalliche" degli hi-hat della TR-808: sei onde quadre che non sono armoniche tra loro
 const HAT_FREQS = [205.3, 304.4, 369.6, 522.7, 540, 800];
@@ -28,7 +36,9 @@ export class Graph {
   private duck: GainNode;
   private reverb: ConvolverNode;
   private delay: DelayNode;
-  private delaySend: GainNode;
+  private filters: Record<AutoTarget, DjFilter>;
+  private sends: Record<ChannelId, { reverb: GainNode; delay: GainNode }>;
+  private automating = false; // in modalità song le corsie di automazione comandano i loro filtri
   private noise: AudioBuffer;
   private drive: Float32Array<ArrayBuffer>;
   private openHat: GainNode | null = null; // per il "choke": l'hat chiuso taglia l'open hat
@@ -39,7 +49,7 @@ export class Graph {
   ) {
     // master: un compressore leggero che "incolla" il mix, poi un limiter che evita il clip
     const master = ctx.createGain();
-    master.gain.value = 0.85;
+    master.gain.value = 0.72; // margine: con filtri risonanti e automazioni il true peak resta sotto -1 dBTP
     const glue = ctx.createDynamicsCompressor();
     glue.threshold.value = -14;
     glue.ratio.value = 2.5;
@@ -50,7 +60,9 @@ export class Graph {
     limiter.ratio.value = 20;
     limiter.attack.value = 0.002;
     limiter.release.value = 0.15;
-    master.connect(glue).connect(limiter).connect(ctx.destination);
+    const masterFilter = this.djFilter();
+    master.connect(masterFilter.lp);
+    masterFilter.hp.connect(glue).connect(limiter).connect(ctx.destination);
 
     // riverbero condiviso: una "stanza" generata, con le basse tagliate per non impastare il low end
     this.reverb = ctx.createConvolver();
@@ -60,7 +72,7 @@ export class Graph {
     lowCut.frequency.value = 250;
     this.reverb.connect(lowCut).connect(master);
 
-    // delay a tempo per il lead: eco a 3/16 (il "rimbalzo" degli hook house), con le basse tagliate
+    // delay a tempo: eco a 3/16 (il "rimbalzo" degli hook house), con le basse tagliate
     this.delay = ctx.createDelay(2);
     const feedback = ctx.createGain();
     feedback.gain.value = 0.38;
@@ -68,23 +80,27 @@ export class Graph {
     this.delay.connect(delayTone);
     delayTone.connect(feedback).connect(this.delay);
     delayTone.connect(master);
-    this.delaySend = ctx.createGain();
-    this.delaySend.connect(this.delay);
 
     // basso e accordi passano dal "duck": il sidechain del kick li abbassa a ogni colpo
     this.duck = ctx.createGain();
     this.duck.connect(master);
 
+    // ogni canale: fader → filtro DJ → pan → uscita; i send di riverbero e delay partono dopo il filtro
+    const filters: Partial<Record<AutoTarget, DjFilter>> = { master: masterFilter };
+    const sends: Partial<Record<ChannelId, { reverb: GainNode; delay: GainNode }>> = {};
     const make = (id: ChannelId, to: AudioNode) => {
       const g = ctx.createGain();
+      const f = this.djFilter();
       const pan = ctx.createStereoPanner();
       pan.pan.value = PAN[id];
-      g.connect(pan).connect(to);
-      if (SEND[id] > 0) {
-        const send = ctx.createGain();
-        send.gain.value = SEND[id];
-        g.connect(send).connect(this.reverb);
-      }
+      g.connect(f.lp);
+      f.hp.connect(pan).connect(to);
+      const reverb = ctx.createGain();
+      const delay = ctx.createGain();
+      f.hp.connect(reverb).connect(this.reverb);
+      f.hp.connect(delay).connect(this.delay);
+      filters[id] = f;
+      sends[id] = { reverb, delay };
       return g;
     };
     this.channels = {
@@ -93,7 +109,8 @@ export class Graph {
       chords: make("chords", this.duck),
       lead: make("lead", master),
     };
-    this.channels.lead.connect(this.delaySend);
+    this.filters = filters as Record<AutoTarget, DjFilter>;
+    this.sends = sends as Record<ChannelId, { reverb: GainNode; delay: GainNode }>;
 
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
     const data = this.noise.getChannelData(0);
@@ -105,31 +122,74 @@ export class Graph {
     this.applyMixer(true);
   }
 
-  // Volumi e mute: chiamato a ogni modifica del mixer, cambia il suono senza scatti.
+  private djFilter(): DjFilter {
+    const lp = this.filter("lowpass", 20000, 1.1);
+    const hp = this.filter("highpass", 10, 1.1);
+    lp.connect(hp);
+    return { lp, hp };
+  }
+
+  private setFilter(f: DjFilter, v: number, immediate: boolean) {
+    const { lowpass, highpass } = filterFreqs(v);
+    const now = this.ctx.currentTime;
+    for (const [param, hz] of [
+      [f.lp.frequency, lowpass],
+      [f.hp.frequency, highpass],
+    ] as const) {
+      param.cancelScheduledValues(now);
+      if (immediate) param.setValueAtTime(hz, now);
+      else param.setTargetAtTime(hz, now, 0.03);
+    }
+  }
+
+  // Volumi, mute, effetti e tempo del delay: chiamato a ogni modifica, cambia il suono senza scatti.
   // immediate = subito al valore giusto (export offline: niente rampa all'inizio del file)
   applyMixer(immediate = false) {
     const p = this.getProject();
     const now = this.ctx.currentTime;
-    for (const id of Object.keys(this.channels) as ChannelId[]) {
+    const set = (param: AudioParam, v: number) =>
+      immediate ? param.setValueAtTime(v, now) : param.setTargetAtTime(v, now, 0.01);
+    for (const id of CHANNEL_IDS) {
       const c = p.mixer[id];
-      const v = c.muted ? 0 : c.volume;
-      if (immediate) this.channels[id].gain.setValueAtTime(v, now);
-      else this.channels[id].gain.setTargetAtTime(v, now, 0.01);
+      set(this.channels[id].gain, c.muted ? 0 : c.volume);
+      set(this.sends[id].reverb.gain, p.fx[id].reverb);
+      set(this.sends[id].delay.gain, p.fx[id].delay * DELAY_MAX);
     }
-    this.syncDelay(immediate);
+    set(this.delay.delayTime, (60 / p.bpm / 4) * 3);
+    // i filtri con un'automazione, in modalità song, li muove automateBar
+    for (const t of AUTO_TARGETS) {
+      if (this.automating && p.automation[t]) continue;
+      this.setFilter(this.filters[t], t === "master" ? p.masterFilter : p.fx[t].filter, immediate);
+    }
   }
 
-  // Il delay segue il tempo (3/16 di battuta) e la manopola Delay del lead
-  syncDelay(immediate = false) {
+  // Song sì/no: le automazioni valgono solo quando suona la canzone
+  setAutomating(on: boolean) {
+    if (this.automating === on) return;
+    this.automating = on;
+    this.applyMixer();
+  }
+
+  // Inizio della battuta "bar": ogni filtro automatizzato scorre dal suo valore a quello della battuta dopo
+  automateBar(bar: number, t: number, barDur: number, lastBar: number) {
     const p = this.getProject();
-    const time = (60 / p.bpm / 4) * 3;
-    const now = this.ctx.currentTime;
-    if (immediate) {
-      this.delay.delayTime.setValueAtTime(time, now);
-      this.delaySend.gain.setValueAtTime(p.leadSound.delay, now);
-    } else {
-      this.delay.delayTime.setTargetAtTime(time, now, 0.05);
-      this.delaySend.gain.setTargetAtTime(p.leadSound.delay, now, 0.02);
+    for (const target of AUTO_TARGETS) {
+      const lane = p.automation[target];
+      if (!lane) continue;
+      const v0 = laneValue(lane, bar);
+      if (v0 === null) continue;
+      const v1 = bar + 1 <= lastBar ? (laneValue(lane, bar + 1) ?? v0) : v0;
+      const a = filterFreqs(v0);
+      const b = filterFreqs(v1);
+      const f = this.filters[target];
+      for (const [param, from, to] of [
+        [f.lp.frequency, a.lowpass, b.lowpass],
+        [f.hp.frequency, a.highpass, b.highpass],
+      ] as const) {
+        param.cancelScheduledValues(t);
+        param.setValueAtTime(from, t);
+        param.exponentialRampToValueAtTime(to, t + barDur);
+      }
     }
   }
 

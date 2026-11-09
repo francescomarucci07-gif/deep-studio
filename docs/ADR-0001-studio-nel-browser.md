@@ -72,3 +72,12 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Piano roll con schede Bass/Lead; pad Lead (tasto ","), canale Lead nel mixer.
 - Il coach scrive la melodia con `scrivi_pattern` (prompt `crea-v5`: motivi corti, note dell'accordo sui battiti
   forti, domanda e risposta, spazio per il delay). Export di prova: -13,5 LUFS, true peak -1,3 dBTP.
+
+## Aggiornamento 9 nov 2026 · effetti e automazioni
+
+- Ogni canale: filtro DJ (-1…1: passa-basso a sinistra, passa-alto a destra), send di riverbero e di delay a 3/16.
+  Filtro DJ anche sul master. Il vecchio `leadSound.delay` diventa il send Dly del lead (normalize).
+- Automazioni dei filtri (master o canale) per battuta, con passaggio graduale tra i punti; suonano in Song e
+  nell'export. Verifica sul WAV: con il master da -0,85 a 0 nelle battute 5–7 il centroide spettrale sale da
+  ~200 Hz a ~3,4 kHz. Master a 0,72 di guadagno: true peak -1,7 dBTP.
+- Il coach usa il nuovo strumento `scrivi_effetti` (prompt `crea-v6`), per esempio per il build prima del drop.

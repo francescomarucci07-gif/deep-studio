@@ -62,6 +62,17 @@ export type LeadWave = (typeof LEAD_WAVES)[number];
 
 export type Channel = { volume: number; muted: boolean };
 
+// Effetti di ogni canale. filter: -1…1 come il filtro di un mixer da DJ (sinistra = passa-basso,
+// il suono si chiude; destra = passa-alto, si assottiglia; 0 = spento). reverb e delay: 0…1 di send.
+export type ChannelFx = { filter: number; reverb: number; delay: number };
+export const CHANNEL_IDS: ChannelId[] = ["kick", "clap", "hat", "openhat", "perc", "bass", "chords", "lead"];
+
+// Automazioni: il filtro del master o di un canale, un valore (o null) per ogni battuta della canzone.
+// Tra due punti il valore scorre in modo graduale; prima del primo e dopo l'ultimo resta fermo.
+export type AutoTarget = "master" | ChannelId;
+export const AUTO_TARGETS: AutoTarget[] = ["master", ...CHANNEL_IDS];
+export type Lane = (number | null)[];
+
 export type Pattern = {
   drums: Record<DrumId, boolean[]>;
   bass: (number | null)[]; // una nota MIDI per step, oppure null
@@ -77,7 +88,10 @@ export type Project = {
   song: (Slot | null)[]; // SONG_BARS battute; null = battuta vuota
   bassSound: { wave: Wave; cutoff: number; length: NoteLength };
   chordSound: { style: ChordStyle; cutoff: number };
-  leadSound: { wave: LeadWave; cutoff: number; length: NoteLength; delay: number }; // delay: 0–0.6, quanto eco
+  leadSound: { wave: LeadWave; cutoff: number; length: NoteLength };
+  fx: Record<ChannelId, ChannelFx>;
+  masterFilter: number; // -1…1, come i filtri dei canali
+  automation: Partial<Record<AutoTarget, Lane>>;
   sidechain: boolean; // il kick abbassa il basso
   mixer: Record<ChannelId, Channel>;
 };
@@ -104,6 +118,39 @@ export const isEmptyPattern = (p: Pattern) =>
   p.lead.every((n) => n === null) &&
   p.chords.every((c) => c === null) &&
   DRUMS.every(({ id }) => p.drums[id].every((s) => !s));
+
+// Valore di una corsia di automazione alla battuta "bar" (anche con la virgola: 4.5 = metà della quinta)
+export function laneValue(lane: Lane | undefined, bar: number): number | null {
+  if (!lane) return null;
+  let prev = -1;
+  let next = -1;
+  for (let i = 0; i < lane.length; i++) {
+    if (lane[i] === null) continue;
+    if (i <= bar) prev = i;
+    if (i >= bar && next < 0) next = i;
+  }
+  if (prev < 0 && next < 0) return null;
+  if (prev < 0) return lane[next];
+  if (next < 0 || next === prev) return lane[prev];
+  const a = lane[prev] as number;
+  const b = lane[next] as number;
+  return a + ((b - a) * (bar - prev)) / (next - prev);
+}
+
+// Il filtro DJ in frequenze: passa-basso da 20 kHz (aperto) a 200 Hz, passa-alto da 10 Hz a 4 kHz
+export function filterFreqs(v: number) {
+  const x = Math.max(-1, Math.min(1, v));
+  return {
+    lowpass: x < 0 ? 20000 * (200 / 20000) ** -x : 20000,
+    highpass: x > 0 ? 10 * (4000 / 10) ** x : 10,
+  };
+}
+export function filterLabel(v: number) {
+  if (Math.abs(v) < 0.02) return "off";
+  const f = filterFreqs(v);
+  const hz = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${Math.round(n)}`);
+  return v < 0 ? `LP ${hz(f.lowpass)}` : `HP ${hz(f.highpass)}`;
+}
 
 // La canzone dura fino all'ultima battuta usata (almeno 1)
 export function songLength(p: Project) {
@@ -137,7 +184,19 @@ export function starterProject(): Project {
     song: ["A", "A", "A", "A", ...Array(SONG_BARS - 4).fill(null)],
     bassSound: { wave: "sawtooth", cutoff: 700, length: "corta" },
     chordSound: { style: "pad", cutoff: 1800 },
-    leadSound: { wave: "sawtooth", cutoff: 2600, length: "corta", delay: 0.3 },
+    leadSound: { wave: "sawtooth", cutoff: 2600, length: "corta" },
+    fx: {
+      kick: { filter: 0, reverb: 0, delay: 0 },
+      clap: { filter: 0, reverb: 0.22, delay: 0 },
+      hat: { filter: 0, reverb: 0.04, delay: 0 },
+      openhat: { filter: 0, reverb: 0.12, delay: 0 },
+      perc: { filter: 0, reverb: 0.25, delay: 0.15 },
+      bass: { filter: 0, reverb: 0, delay: 0 },
+      chords: { filter: 0, reverb: 0.3, delay: 0 },
+      lead: { filter: 0, reverb: 0.18, delay: 0.5 },
+    },
+    masterFilter: 0,
+    automation: {},
     sidechain: true,
     mixer: {
       kick: { volume: 0.9, muted: false },
@@ -212,8 +271,34 @@ export function normalize(raw: unknown): Project {
       wave: LEAD_WAVES.includes(r.leadSound?.wave as LeadWave) ? (r.leadSound?.wave as LeadWave) : d.leadSound.wave,
       cutoff: clamp(r.leadSound?.cutoff, 300, 9000, d.leadSound.cutoff),
       length: r.leadSound?.length === "lunga" ? "lunga" : "corta",
-      delay: clamp(r.leadSound?.delay, 0, 0.6, d.leadSound.delay),
     },
+    fx: Object.fromEntries(
+      CHANNEL_IDS.map((id) => {
+        const f = r.fx?.[id];
+        // progetti di prima: il delay del lead stava in leadSound.delay (0–0.6)
+        const oldLeadDelay = id === "lead" ? (r.leadSound as { delay?: unknown } | undefined)?.delay : undefined;
+        const delayDefault = typeof oldLeadDelay === "number" ? oldLeadDelay / 0.6 : d.fx[id].delay;
+        return [
+          id,
+          {
+            filter: clamp(f?.filter, -1, 1, d.fx[id].filter),
+            reverb: clamp(f?.reverb, 0, 1, d.fx[id].reverb),
+            delay: clamp(f?.delay, 0, 1, delayDefault),
+          },
+        ];
+      }),
+    ) as Project["fx"],
+    masterFilter: clamp(r.masterFilter, -1, 1, 0),
+    automation: Object.fromEntries(
+      AUTO_TARGETS.flatMap((t) => {
+        const lane = r.automation?.[t];
+        if (!Array.isArray(lane)) return [];
+        const clean = Array.from({ length: SONG_BARS }, (_, i) =>
+          typeof lane[i] === "number" && Number.isFinite(lane[i]) ? Math.max(-1, Math.min(1, lane[i] as number)) : null,
+        );
+        return clean.some((v) => v !== null) ? [[t, clean]] : [];
+      }),
+    ),
     sidechain: typeof r.sidechain === "boolean" ? r.sidechain : d.sidechain,
     mixer: Object.fromEntries(
       (Object.keys(d.mixer) as ChannelId[]).map((id) => [
@@ -235,7 +320,10 @@ export function describe(p: Project, title: string, editing: Slot) {
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
     `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}.`,
     `Accordi: suono ${p.chordSound.style === "pad" ? "pad (tiene fino all'accordo dopo)" : "stab (colpo corto sul battito)"}, filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
-    `Lead: onda ${p.leadSound.wave}, filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}, delay ${pct(p.leadSound.delay)}.`,
+    `Lead: onda ${p.leadSound.wave}, filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}.`,
+    `Effetti (filtro DJ -1…1: negativo = passa-basso, positivo = passa-alto; riverbero e delay 0…1): ${CHANNEL_IDS.map(
+      (id) => `${id} filtro ${p.fx[id].filter.toFixed(2)} (${filterLabel(p.fx[id].filter)}) rev ${p.fx[id].reverb.toFixed(2)} dly ${p.fx[id].delay.toFixed(2)}`,
+    ).join("; ")}; master filtro ${p.masterFilter.toFixed(2)} (${filterLabel(p.masterFilter)}).`,
     `Basso: onda ${p.bassSound.wave === "sawtooth" ? "dente di sega" : "quadra"}, filtro ${Math.round(p.bassSound.cutoff)} Hz, note ${p.bassSound.length === "lunga" ? "lunghe (808)" : "corte"}.`,
     "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti). x = colpo, . = vuoto.",
     `Il producer sta modificando il pattern ${editing}.`,
@@ -255,5 +343,13 @@ export function describe(p: Project, title: string, editing: Slot) {
     lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
   }
   lines.push(`Canzone (${SONG_BARS} battute, - = vuota): ${p.song.map((s) => s ?? "-").join(" ")}`);
+  const lanes = AUTO_TARGETS.filter((t) => p.automation[t]);
+  lines.push(
+    lanes.length
+      ? `Automazioni del filtro (valore per battuta, - = nessun punto): ${lanes
+          .map((t) => `${t}: ${(p.automation[t] as Lane).map((v) => (v === null ? "-" : v.toFixed(2))).join(" ")}`)
+          .join("; ")}`
+      : "Automazioni: nessuna.",
+  );
   return lines.join("\n");
 }

@@ -24,6 +24,12 @@ import {
   noteName,
   songLength,
   chordName,
+  AUTO_TARGETS,
+  SONG_BARS,
+  filterLabel,
+  laneValue,
+  type AutoTarget,
+  type ChannelFx,
   type ChannelId,
   type ChordType,
   type DrumId,
@@ -103,6 +109,7 @@ export function Daw({
   const pat = project.patterns[editing];
   const [showVersions, setShowVersions] = useState(false);
   const [roll, setRoll] = useState<RollId>("bass");
+  const [autoTarget, setAutoTarget] = useState<AutoTarget>("master");
   const [exporting, setExporting] = useState<"no" | "sì" | "errore">("no");
   const [versionsTick, setVersionsTick] = useState(0);
 
@@ -146,7 +153,7 @@ export function Daw({
   useEffect(() => () => engineRef.current?.close(), []);
   useEffect(() => {
     engineRef.current?.applyMixer();
-  }, [project.mixer, project.bpm, project.leadSound.delay]);
+  }, [project.mixer, project.bpm, project.fx, project.masterFilter, project.automation]);
 
   const update = useCallback(
     (fn: (p: Project) => void) =>
@@ -270,6 +277,25 @@ export function Daw({
     });
     if (next && !playing) void engine().preview("chords", { chord: next });
   };
+
+  const setFx = (c: ChannelId, patch: Partial<ChannelFx>) =>
+    update((p) => {
+      p.fx[c] = { ...p.fx[c], ...patch };
+    });
+
+  // automazione: un punto per battuta (null = nessun punto). Una corsia senza punti sparisce.
+  const lane = project.automation[autoTarget];
+  const setPoint = (b: number, v: number | null) =>
+    update((p) => {
+      const l = p.automation[autoTarget] ?? Array(SONG_BARS).fill(null);
+      l[b] = v;
+      if (l.some((x) => x !== null)) p.automation[autoTarget] = l;
+      else delete p.automation[autoTarget];
+    });
+  const clearLane = () =>
+    update((p) => {
+      delete p.automation[autoTarget];
+    });
 
   const setChannel = (c: ChannelId, patch: Partial<Project["mixer"][ChannelId]>) =>
     update((p) => {
@@ -698,6 +724,73 @@ export function Daw({
             </p>
           </section>
 
+          {/* ---- automazioni dei filtri, battuta per battuta ---- */}
+          <section className="hw-panel hw-auto" aria-label="Automazione">
+            <div className="hw-seq-head">
+              <h2 className="hw-title">Automazione · filtro</h2>
+              <div className="hw-patterns">
+                <label className="hw-visually-hidden" htmlFor="auto-target">
+                  Cosa automatizzare
+                </label>
+                <select
+                  id="auto-target"
+                  className="hw-select"
+                  value={autoTarget}
+                  onChange={(e) => setAutoTarget(e.target.value as AutoTarget)}
+                >
+                  {AUTO_TARGETS.map((t) => (
+                    <option key={t} value={t}>
+                      {project.automation[t] ? "● " : ""}
+                      {t === "master" ? "Master" : CHANNELS.find((c) => c.id === t)?.label}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="hw-btn hw-btn--small" disabled={!lane} onClick={clearLane}>
+                  Cancella
+                </button>
+              </div>
+            </div>
+            <div className="hw-auto-grid">
+              {/* la curva: il valore all'inizio di ogni battuta e come scorre fino alla successiva */}
+              <svg className="hw-auto-curve" viewBox={`0 0 ${SONG_BARS} 2`} preserveAspectRatio="none" aria-hidden="true">
+                <line x1="0" y1="1" x2={SONG_BARS} y2="1" className="hw-auto-zero" />
+                {lane && (
+                  <polyline
+                    points={Array.from({ length: SONG_BARS + 1 }, (_, b) => {
+                      const v = laneValue(lane, Math.min(b, SONG_BARS - 1)) ?? 0;
+                      return `${b},${1 - v}`;
+                    }).join(" ")}
+                  />
+                )}
+              </svg>
+              {project.song.map((_, b) => {
+                const v = lane?.[b] ?? null;
+                return (
+                  <div key={b} className="hw-auto-bar" data-now={songMode && playing && b === bar} data-point={v !== null}>
+                    <input
+                      className="hw-auto-fader"
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.02}
+                      value={v ?? laneValue(lane, b) ?? 0}
+                      aria-label={`Battuta ${b + 1}: filtro ${v === null ? "senza punto" : filterLabel(v)}`}
+                      onChange={(e) => setPoint(b, Number(e.target.value))}
+                      onDoubleClick={() => setPoint(b, null)}
+                    />
+                    <span className="hw-bar-num">{b + 1}</span>
+                    <span className="hw-value">{v === null ? "·" : filterLabel(v)}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="hw-hint">
+              Trascina un cursore per mettere un punto, doppio clic per toglierlo: tra due punti il filtro scorre da
+              solo. In alto = si apre verso il passa-alto, in basso = si chiude (passa-basso), al centro spento. Suona in{" "}
+              <strong>Song</strong> e nell&apos;export. Esempio di build: battuta 5 in basso, battuta 8 al centro, drop alla 9.
+            </p>
+          </section>
+
           {/* ---- mixer ---- */}
           <section className="hw-panel hw-mixer" aria-label="Mixer">
             <h2 className="hw-title">Mixer</h2>
@@ -725,9 +818,60 @@ export function Daw({
                   >
                     <span className="hw-btn-led" />M
                   </button>
+                  <div className="hw-strip-fx">
+                    <Knob
+                      size={30}
+                      label="Filter"
+                      value={project.fx[c].filter}
+                      min={-1}
+                      max={1}
+                      defaultValue={0}
+                      display={filterLabel(project.fx[c].filter)}
+                      onChange={(v) => setFx(c, { filter: v })}
+                    />
+                    <Knob
+                      size={30}
+                      label="Rev"
+                      value={project.fx[c].reverb}
+                      min={0}
+                      max={1}
+                      defaultValue={0}
+                      display={pct(project.fx[c].reverb)}
+                      onChange={(v) => setFx(c, { reverb: v })}
+                    />
+                    <Knob
+                      size={30}
+                      label="Dly"
+                      value={project.fx[c].delay}
+                      min={0}
+                      max={1}
+                      defaultValue={0}
+                      display={pct(project.fx[c].delay)}
+                      onChange={(v) => setFx(c, { delay: v })}
+                    />
+                  </div>
                   <span className="hw-strip-name">{label}</span>
                 </div>
               ))}
+              <div className="hw-strip hw-strip--master">
+                <span className="hw-label">Master</span>
+                <Knob
+                  label="Filter"
+                  value={project.masterFilter}
+                  min={-1}
+                  max={1}
+                  defaultValue={0}
+                  display={filterLabel(project.masterFilter)}
+                  onChange={(v) =>
+                    update((p) => {
+                      p.masterFilter = v;
+                    })
+                  }
+                />
+                <span className="hw-value">
+                  {project.automation.master ? "automatizzato in Song" : "doppio clic: spento"}
+                </span>
+              </div>
               <div className="hw-strip hw-strip--synth">
                 <span className="hw-label">Bass synth</span>
                 <div className="hw-seg">
@@ -796,9 +940,7 @@ export function Daw({
                     </button>
                   ))}
                 </div>
-                <div className="hw-seg">
-                  <Knob
-                    size={44}
+                <Knob
                     label="Cutoff"
                     value={project.leadSound.cutoff}
                     min={300}
@@ -812,21 +954,6 @@ export function Daw({
                       })
                     }
                   />
-                  <Knob
-                    size={44}
-                    label="Delay"
-                    value={project.leadSound.delay}
-                    min={0}
-                    max={0.6}
-                    defaultValue={0.3}
-                    display={pct(project.leadSound.delay / 0.6)}
-                    onChange={(v) =>
-                      update((p) => {
-                        p.leadSound.delay = v;
-                      })
-                    }
-                  />
-                </div>
                 <button
                   type="button"
                   className="hw-btn hw-btn--small"
@@ -932,7 +1059,7 @@ export function Daw({
           suggestions={[
             "Fammi una traccia deep house con intro, break e drop",
             "Make me a trap beat",
-            "Scrivi una melodia per il drop",
+            "Fammi un build prima del drop",
             "Cosa aggiungo adesso?",
           ]}
           intro="Sono qui con te. Chiedimi di creare un beat (lo scrivo io nello studio e ti spiego come l'ho fatto) oppure fallo tu e ti do consigli mentre lo cambi."

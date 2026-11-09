@@ -507,7 +507,8 @@ ol.ds-led-row {
 .hw-mixer,
 .hw-roll-panel,
 .hw-song,
-.hw-chords {
+.hw-chords,
+.hw-auto {
   grid-column: 1 / -1;
 }
 .console-body .ds-coach {
@@ -1237,6 +1238,90 @@ ol.ds-led-row {
 .hw-select:focus-visible {
   outline: 2px solid var(--ds-accent);
   outline-offset: 2px;
+}
+
+/* effetti nelle strisce del mixer */
+.hw-strip-fx {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.hw-strip-fx .hw-knob {
+  gap: 1px;
+}
+.hw-strip-fx .hw-label {
+  font-size: 8px;
+}
+.hw-strip-fx .hw-value {
+  font-size: 9px;
+}
+.hw-strip--master {
+  min-width: 110px;
+  justify-content: center;
+  border-color: color-mix(in srgb, var(--ds-accent) 40%, #111214);
+}
+
+/* automazione: una colonna per battuta, la curva disegnata sopra */
+.hw-auto-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(16, minmax(36px, 1fr));
+  gap: 5px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.hw-auto-curve {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 96px;
+  pointer-events: none;
+}
+.hw-auto-curve polyline {
+  fill: none;
+  stroke: var(--ds-accent);
+}
+.hw-auto-curve polyline,
+.hw-auto-zero {
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.hw-auto-zero {
+  stroke: var(--hw-panel-edge);
+  stroke-dasharray: 4 4;
+}
+.hw-auto-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 36px;
+  padding-top: 4px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.hw-auto-bar[data-now="true"] {
+  box-shadow: 0 0 0 2px #fff inset;
+}
+.hw-auto-fader {
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 24px;
+  height: 88px;
+  margin: 0;
+  accent-color: var(--hw-print-faint);
+  opacity: 0.45;
+  cursor: ns-resize;
+}
+.hw-auto-bar[data-point="true"] .hw-auto-fader {
+  accent-color: var(--ds-accent);
+  opacity: 1;
+}
+.hw-auto-bar .hw-value {
+  min-height: 12px;
+  font-size: 9px;
 }
 
 /* cronologia delle versioni */

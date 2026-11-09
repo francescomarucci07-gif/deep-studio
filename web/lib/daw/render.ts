@@ -20,7 +20,9 @@ export async function renderAudio(p: Project, what: RenderWhat): Promise<AudioBu
   const ctx = new OfflineAudioContext(2, Math.ceil(seconds * SAMPLE_RATE), SAMPLE_RATE);
   const graph = new Graph(ctx, () => p);
   graph.applyMixer(true);
+  if (what.song) graph.setAutomating(true);
   bars.forEach((slot, b) => {
+    if (what.song) graph.automateBar(b, 0.05 + b * STEPS * stepDur, STEPS * stepDur, bars.length - 1);
     if (!slot) return;
     for (let s = 0; s < STEPS; s++) {
       const t = 0.05 + (b * STEPS + s) * stepDur + (s % 2 === 1 ? p.swing * stepDur : 0);

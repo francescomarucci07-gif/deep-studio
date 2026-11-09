@@ -3,6 +3,8 @@
 // Il coach può chiamarli più volte nella stessa risposta: ogni chiamata parte dal risultato della precedente.
 import type Anthropic from "@anthropic-ai/sdk";
 import {
+  AUTO_TARGETS,
+  CHANNEL_IDS,
   BASS_HIGH,
   BASS_LOW,
   BEATS,
@@ -98,7 +100,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       onda_lead: { type: "string", enum: [...LEAD_WAVES], description: "sawtooth = pieno, square = vuoto/8 bit, triangle = morbido." },
       filtro_lead: { type: "number", minimum: 300, maximum: 9000 },
       durata_lead: { type: "string", enum: ["corta", "lunga"], description: "corta = note staccate; lunga = legate." },
-      delay_lead: { type: "number", minimum: 0, maximum: 0.6, description: "Quanto eco a 3/16 sul lead: 0.2–0.35 tipico per gli hook." },
+
     },
     required: ["nome", "kick", "clap", "hat", "basso"],
   },
@@ -124,7 +126,63 @@ const SONG_TOOL: Anthropic.Beta.BetaTool = {
   eager_input_streaming: true,
 };
 
-export const STUDIO_TOOLS = [PATTERN_TOOL, SONG_TOOL];
+const FX_TOOL: Anthropic.Beta.BetaTool = {
+  name: "scrivi_effetti",
+  description:
+    "Imposta gli effetti dei canali (filtro DJ, riverbero, delay a 3/16) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
+  input_schema: {
+    type: "object",
+    properties: {
+      nome: { type: "string", description: "Titolo breve, es. 'Build prima del drop'." },
+      effetti: {
+        type: "array",
+        description: "Effetti da cambiare. Solo i canali e i valori che vuoi cambiare.",
+        items: {
+          type: "object",
+          properties: {
+            canale: { type: "string", enum: ["master", ...CHANNEL_IDS] },
+            filtro: {
+              type: "number",
+              minimum: -1,
+              maximum: 1,
+              description: "Filtro DJ: 0 spento; negativo = passa-basso (-0.5 ≈ 2 kHz, -0.8 ≈ 500 Hz, -1 = 200 Hz); positivo = passa-alto (0.5 ≈ 200 Hz, 0.8 ≈ 1,2 kHz, 1 = 4 kHz).",
+            },
+            riverbero: { type: "number", minimum: 0, maximum: 1, description: "Send al riverbero. Il master non ce l'ha." },
+            delay: { type: "number", minimum: 0, maximum: 1, description: "Send al delay a 3/16. Il master non ce l'ha." },
+          },
+          required: ["canale"],
+        },
+      },
+      automazioni: {
+        type: "array",
+        description:
+          "Automazioni del filtro. Ogni bersaglio riceve i punti (battuta 1–16 della canzone, valore -1…1 come il filtro): tra due punti il valore scorre gradualmente, prima del primo e dopo l'ultimo resta fermo. Una corsia scritta sostituisce quella che c'era; punti vuoti = cancella la corsia.",
+        items: {
+          type: "object",
+          properties: {
+            bersaglio: { type: "string", enum: [...AUTO_TARGETS] },
+            punti: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  battuta: { type: "integer", minimum: 1, maximum: SONG_BARS },
+                  valore: { type: "number", minimum: -1, maximum: 1 },
+                },
+                required: ["battuta", "valore"],
+              },
+            },
+          },
+          required: ["bersaglio", "punti"],
+        },
+      },
+    },
+    required: ["nome"],
+  },
+  eager_input_streaming: true,
+};
+
+export const STUDIO_TOOLS = [PATTERN_TOOL, SONG_TOOL, FX_TOOL];
 
 type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc", unknown>> & {
   nome?: unknown;
@@ -141,7 +199,7 @@ type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc",
   onda_lead?: unknown;
   filtro_lead?: unknown;
   durata_lead?: unknown;
-  delay_lead?: unknown;
+
   stile_accordi?: unknown;
   filtro_accordi?: unknown;
 };
@@ -211,13 +269,53 @@ export function createStudioWriter(current: Project, editing: Slot) {
           wave: i.onda_lead ?? project.leadSound.wave,
           cutoff: i.filtro_lead ?? project.leadSound.cutoff,
           length: i.durata_lead ?? project.leadSound.length,
-          delay: i.delay_lead ?? project.leadSound.delay,
         },
       });
       focus = slot;
       const n = `${slot}: ${label(i.nome, "pattern")}`;
       names.push(n);
       return `Pattern ${n} scritto nello studio`;
+    }
+    if (name === "scrivi_effetti") {
+      const raw = i as { effetti?: unknown; automazioni?: unknown; nome?: unknown };
+      const fx = structuredClone(project.fx);
+      let masterFilter = project.masterFilter;
+      const automation = { ...project.automation };
+      if (Array.isArray(raw.effetti)) {
+        for (const e of raw.effetti as { canale?: unknown; filtro?: unknown; riverbero?: unknown; delay?: unknown }[]) {
+          const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+          if (e?.canale === "master") {
+            masterFilter = num(e.filtro) ?? masterFilter;
+          } else if (CHANNEL_IDS.includes(e?.canale as (typeof CHANNEL_IDS)[number])) {
+            const c = e.canale as (typeof CHANNEL_IDS)[number];
+            fx[c] = {
+              filter: num(e.filtro) ?? fx[c].filter,
+              reverb: num(e.riverbero) ?? fx[c].reverb,
+              delay: num(e.delay) ?? fx[c].delay,
+            };
+          }
+        }
+      }
+      let lanes = 0;
+      if (Array.isArray(raw.automazioni)) {
+        for (const a of raw.automazioni as { bersaglio?: unknown; punti?: unknown }[]) {
+          if (!AUTO_TARGETS.includes(a?.bersaglio as (typeof AUTO_TARGETS)[number])) continue;
+          const lane: (number | null)[] = Array(SONG_BARS).fill(null);
+          if (Array.isArray(a.punti)) {
+            for (const pt of a.punti as { battuta?: unknown; valore?: unknown }[]) {
+              const b = pt?.battuta;
+              if (Number.isInteger(b) && (b as number) >= 1 && (b as number) <= SONG_BARS && typeof pt.valore === "number") {
+                lane[(b as number) - 1] = pt.valore;
+              }
+            }
+          }
+          automation[a.bersaglio as (typeof AUTO_TARGETS)[number]] = lane; // normalize toglie le corsie vuote
+          lanes++;
+        }
+      }
+      project = normalize({ ...project, fx, masterFilter, automation });
+      names.push(label(raw.nome, "effetti"));
+      return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}: ${label(raw.nome, "effetti")}`;
     }
     if (name === "scrivi_canzone" && Array.isArray(i.battute)) {
       const song = Array.from({ length: SONG_BARS }, (_, k) => (isSlot(i.battute && (i.battute as unknown[])[k]) ? (i.battute as Slot[])[k] : null));

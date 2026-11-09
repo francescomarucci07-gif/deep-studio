@@ -5,6 +5,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import {
   BASS_HIGH,
   BASS_LOW,
+  BEATS,
+  CHORD_TYPES,
   DRUMS,
   SLOTS,
   SONG_BARS,
@@ -58,6 +60,26 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
         enum: ["corta", "lunga"],
         description: "corta = note staccate (house); lunga = ogni nota tiene fino alla successiva, come un 808 (trap).",
       },
+      accordi: {
+        type: "array",
+        description:
+          "Accordi del pattern, uno per battito (1–4). radice: 0 Do, 1 Do#, 2 Re, 3 Re#, 4 Mi, 5 Fa, 6 Fa#, 7 Sol, 8 Sol#, 9 La, 10 La#, 11 Si. Un battito senza accordo continua quello prima (pad). Lista vuota = niente accordi.",
+        items: {
+          type: "object",
+          properties: {
+            battito: { type: "integer", minimum: 1, maximum: BEATS },
+            radice: { type: "integer", minimum: 0, maximum: 11 },
+            tipo: { type: "string", enum: [...CHORD_TYPES] },
+          },
+          required: ["battito", "radice", "tipo"],
+        },
+      },
+      stile_accordi: {
+        type: "string",
+        enum: ["pad", "stab"],
+        description: "pad = tappeto lungo (deep house); stab = colpo corto sul battito (house, tech house).",
+      },
+      filtro_accordi: { type: "number", minimum: 300, maximum: 8000, description: "Cutoff degli accordi in Hz: basso = morbido." },
     },
     required: ["nome", "kick", "clap", "hat", "basso"],
   },
@@ -95,6 +117,9 @@ type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc",
   onda?: unknown;
   filtro?: unknown;
   durata?: unknown;
+  accordi?: unknown;
+  stile_accordi?: unknown;
+  filtro_accordi?: unknown;
 };
 
 const steps = (v: unknown) => {
@@ -122,9 +147,18 @@ export function createStudioWriter(current: Project, editing: Slot) {
           if (Number.isInteger(n?.step) && Number.isInteger(n?.nota)) bass[(n.step as number) - 1] = n.nota as number;
         }
       }
+      const chords: Pattern["chords"] = Array(BEATS).fill(null);
+      if (Array.isArray(i.accordi)) {
+        for (const c of i.accordi as { battito?: unknown; radice?: unknown; tipo?: unknown }[]) {
+          if (Number.isInteger(c?.battito) && (c.battito as number) >= 1 && (c.battito as number) <= BEATS) {
+            chords[(c.battito as number) - 1] = { root: c.radice, type: c.tipo } as Pattern["chords"][number];
+          }
+        }
+      }
       const pattern: Pattern = {
         drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
         bass,
+        chords, // normalize scarta radici e tipi non validi
       };
       project = normalize({
         ...project,
@@ -136,6 +170,10 @@ export function createStudioWriter(current: Project, editing: Slot) {
           wave: i.onda ?? project.bassSound.wave,
           cutoff: i.filtro ?? project.bassSound.cutoff,
           length: i.durata ?? project.bassSound.length,
+        },
+        chordSound: {
+          style: i.stile_accordi ?? project.chordSound.style,
+          cutoff: i.filtro_accordi ?? project.chordSound.cutoff,
         },
       });
       focus = slot;

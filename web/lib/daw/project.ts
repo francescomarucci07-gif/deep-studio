@@ -1,5 +1,5 @@
-// Il progetto dello studio nel browser: 4 pattern da una battuta (A–D) con batteria + bassline,
-// una canzone di 16 battute che dice quale pattern suona, suono del basso e mixer.
+// Il progetto dello studio nel browser: 4 pattern da una battuta (A–D) con batteria, bassline e accordi,
+// una canzone di 16 battute che dice quale pattern suona, suoni di basso e accordi, mixer.
 // È anche il JSON salvato in projects.data, quindi ogni campo ha un default (vedi normalize).
 
 export const STEPS = 16;
@@ -13,7 +13,36 @@ export const DRUMS = [
   { id: "perc", label: "Perc" },
 ] as const;
 export type DrumId = (typeof DRUMS)[number]["id"];
-export type ChannelId = DrumId | "bass";
+export type ChannelId = DrumId | "bass" | "chords";
+
+// Accordi: uno per battito (4 per battuta). root = nota da 0 (Do) a 11 (Si)
+export const BEATS = 4;
+export const CHORD_TYPES = ["min", "maj", "min7", "maj7", "dom7", "min9", "sus2", "sus4"] as const;
+export type ChordType = (typeof CHORD_TYPES)[number];
+export type Chord = { root: number; type: ChordType };
+export type ChordStyle = "pad" | "stab";
+const CHORD_INTERVALS: Record<ChordType, number[]> = {
+  min: [0, 3, 7],
+  maj: [0, 4, 7],
+  min7: [0, 3, 7, 10],
+  maj7: [0, 4, 7, 11],
+  dom7: [0, 4, 7, 10],
+  min9: [0, 3, 7, 10, 14],
+  sus2: [0, 2, 7],
+  sus4: [0, 5, 7],
+};
+const CHORD_SUFFIX: Record<ChordType, string> = {
+  min: "m",
+  maj: "",
+  min7: "m7",
+  maj7: "maj7",
+  dom7: "7",
+  min9: "m9",
+  sus2: "sus2",
+  sus4: "sus4",
+};
+// Note MIDI dell'accordo: fondamentale nell'ottava di Do3 (48–59), il resto sopra
+export const chordNotes = (c: Chord) => CHORD_INTERVALS[c.type].map((i) => 48 + c.root + i);
 
 export const SLOTS = ["A", "B", "C", "D"] as const;
 export type Slot = (typeof SLOTS)[number];
@@ -30,6 +59,7 @@ export type Channel = { volume: number; muted: boolean };
 export type Pattern = {
   drums: Record<DrumId, boolean[]>;
   bass: (number | null)[]; // una nota MIDI per step, oppure null
+  chords: (Chord | null)[]; // uno per battito; null = continua l'accordo prima (pad) o niente (stab)
 };
 
 export type Project = {
@@ -39,11 +69,13 @@ export type Project = {
   patterns: Record<Slot, Pattern>;
   song: (Slot | null)[]; // SONG_BARS battute; null = battuta vuota
   bassSound: { wave: Wave; cutoff: number; length: NoteLength };
+  chordSound: { style: ChordStyle; cutoff: number };
   sidechain: boolean; // il kick abbassa il basso
   mixer: Record<ChannelId, Channel>;
 };
 
-const NOTE_NAMES = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"];
+export const NOTE_NAMES = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"];
+export const chordName = (c: Chord) => `${NOTE_NAMES[c.root]}${CHORD_SUFFIX[c.type]}`;
 export function noteName(midi: number) {
   return `${NOTE_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`;
 }
@@ -54,11 +86,14 @@ export function emptyPattern(): Pattern {
   return {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, on()])) as Pattern["drums"],
     bass: Array(STEPS).fill(null),
+    chords: Array(BEATS).fill(null),
   };
 }
 
 export const isEmptyPattern = (p: Pattern) =>
-  p.bass.every((n) => n === null) && DRUMS.every(({ id }) => p.drums[id].every((s) => !s));
+  p.bass.every((n) => n === null) &&
+  p.chords.every((c) => c === null) &&
+  DRUMS.every(({ id }) => p.drums[id].every((s) => !s));
 
 // La canzone dura fino all'ultima battuta usata (almeno 1)
 export function songLength(p: Project) {
@@ -79,13 +114,18 @@ export function starterProject(): Project {
     bpm: 122,
     swing: 0.1,
     patterns: {
-      A: { drums: { kick: on(0, 4, 8, 12), clap: on(4, 12), hat: on(2, 6, 10, 14), openhat: on(), perc: on() }, bass },
+      A: {
+        drums: { kick: on(0, 4, 8, 12), clap: on(4, 12), hat: on(2, 6, 10, 14), openhat: on(), perc: on() },
+        bass,
+        chords: [{ root: 9, type: "min7" }, null, null, null],
+      },
       B: emptyPattern(),
       C: emptyPattern(),
       D: emptyPattern(),
     },
     song: ["A", "A", "A", "A", ...Array(SONG_BARS - 4).fill(null)],
     bassSound: { wave: "sawtooth", cutoff: 700, length: "corta" },
+    chordSound: { style: "pad", cutoff: 1800 },
     sidechain: true,
     mixer: {
       kick: { volume: 0.9, muted: false },
@@ -94,6 +134,7 @@ export function starterProject(): Project {
       openhat: { volume: 0.4, muted: false },
       perc: { volume: 0.5, muted: false },
       bass: { volume: 0.7, muted: false },
+      chords: { volume: 0.45, muted: false },
     },
   };
 }
@@ -110,7 +151,14 @@ function normalizePattern(raw: unknown): Pattern {
       const n = Array.isArray(r.bass) ? r.bass[i] : null;
       return typeof n === "number" && n >= BASS_LOW && n <= BASS_HIGH ? Math.round(n) : null;
     }),
+    chords: Array.from({ length: BEATS }, (_, i) => normalizeChord(Array.isArray(r.chords) ? r.chords[i] : null)),
   };
+}
+
+function normalizeChord(raw: unknown): Chord | null {
+  const c = raw as Partial<Chord> | null;
+  if (!c || !Number.isInteger(c.root) || (c.root as number) < 0 || (c.root as number) > 11) return null;
+  return { root: c.root as number, type: CHORD_TYPES.includes(c.type as ChordType) ? (c.type as ChordType) : "min" };
 }
 
 // Legge un progetto dal database o dal browser: tutto ciò che manca o è strano torna al default.
@@ -137,6 +185,10 @@ export function normalize(raw: unknown): Project {
       cutoff: clamp(r.bassSound?.cutoff, 150, 4000, d.bassSound.cutoff),
       length: r.bassSound?.length === "lunga" ? "lunga" : "corta",
     },
+    chordSound: {
+      style: r.chordSound?.style === "stab" ? "stab" : "pad",
+      cutoff: clamp(r.chordSound?.cutoff, 300, 8000, d.chordSound.cutoff),
+    },
     sidechain: typeof r.sidechain === "boolean" ? r.sidechain : d.sidechain,
     mixer: Object.fromEntries(
       (Object.keys(d.mixer) as ChannelId[]).map((id) => [
@@ -156,7 +208,8 @@ export function describe(p: Project, title: string, editing: Slot) {
   const ch = (id: ChannelId) => `vol ${pct(p.mixer[id].volume)}${p.mixer[id].muted ? ", MUTO" : ""}`;
   const lines = [
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
-    `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}.`,
+    `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}.`,
+    `Accordi: suono ${p.chordSound.style === "pad" ? "pad (tiene fino all'accordo dopo)" : "stab (colpo corto sul battito)"}, filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
     `Basso: onda ${p.bassSound.wave === "sawtooth" ? "dente di sega" : "quadra"}, filtro ${Math.round(p.bassSound.cutoff)} Hz, note ${p.bassSound.length === "lunga" ? "lunghe (808)" : "corte"}.`,
     "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti). x = colpo, . = vuoto.",
     `Il producer sta modificando il pattern ${editing}.`,
@@ -171,6 +224,7 @@ export function describe(p: Project, title: string, editing: Slot) {
     for (const { id, label } of DRUMS) lines.push(`  ${label.padEnd(9)} ${pat.drums[id].map((x) => (x ? "x" : ".")).join("")}`);
     const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}`)).filter(Boolean);
     lines.push(`  Bass      ${notes.length ? notes.join(" ") : "nessuna nota"}`);
+    lines.push(`  Accordi   ${pat.chords.map((c, b) => `battito ${b + 1}: ${c ? chordName(c) : "-"}`).join(", ")}`);
   }
   lines.push(`Canzone (${SONG_BARS} battute, - = vuota): ${p.song.map((s) => s ?? "-").join(" ")}`);
   return lines.join("\n");

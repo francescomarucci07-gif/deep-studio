@@ -9,7 +9,10 @@ import { Engine } from "@/lib/daw/engine";
 import {
   BASS_HIGH,
   BASS_LOW,
+  BEATS,
+  CHORD_TYPES,
   DRUMS,
+  NOTE_NAMES,
   SLOTS,
   STEPS,
   emptyPattern,
@@ -17,7 +20,9 @@ import {
   normalize,
   noteName,
   songLength,
+  chordName,
   type ChannelId,
+  type ChordType,
   type DrumId,
   type Project,
   type Slot,
@@ -40,8 +45,24 @@ const PADS: { id: ChannelId; label: string; key: string; color: string }[] = [
   { id: "openhat", label: "Open hat", key: "v", color: "yellow" },
   { id: "perc", label: "Perc", key: "b", color: "teal" },
   { id: "bass", label: "Bass", key: "n", color: "green" },
+  { id: "chords", label: "Chord", key: "m", color: "purple" },
 ];
-const CHANNELS: { id: ChannelId; label: string }[] = [...DRUMS, { id: "bass", label: "Bass" }];
+const CHANNELS: { id: ChannelId; label: string }[] = [
+  ...DRUMS,
+  { id: "bass", label: "Bass" },
+  { id: "chords", label: "Chords" },
+];
+const isDrum = (c: ChannelId): c is DrumId => c !== "bass" && c !== "chords";
+const TYPE_LABEL: Record<ChordType, string> = {
+  min: "minore",
+  maj: "maggiore",
+  min7: "m7",
+  maj7: "maj7",
+  dom7: "7",
+  min9: "m9",
+  sus2: "sus2",
+  sus4: "sus4",
+};
 
 export function Daw({
   id,
@@ -126,13 +147,16 @@ export function Daw({
   const hitPad = useCallback(
     (c: ChannelId) => {
       const cur = projectRef.current.patterns[playbackRef.current.editing];
-      void engine().preview(c, c === "bass" ? cur.bass.find((n) => n !== null) ?? BASS_LOW : undefined);
+      void engine().preview(c, {
+        note: cur.bass.find((n) => n !== null) ?? BASS_LOW,
+        chord: cur.chords.find((x) => x !== null) ?? undefined,
+      });
       setFlash(c);
       setTimeout(() => setFlash((f) => (f === c ? null : f)), 140);
       const s = stepRef.current;
       // in modalità song registra nel pattern che sta suonando, altrimenti in quello che modifichi
       const slot = playbackRef.current.song ? playingSlotRef.current : playbackRef.current.editing;
-      if (rec && engineRef.current?.playing && s >= 0 && c !== "bass" && slot) {
+      if (rec && engineRef.current?.playing && s >= 0 && isDrum(c) && slot) {
         update((p) => {
           p.patterns[slot].drums[c][s] = true;
         });
@@ -218,7 +242,17 @@ export function Daw({
     update((p) => {
       p.patterns[editing].bass[i] = removing ? null : note;
     });
-    if (!removing && !playing) void engine().preview("bass", note);
+    if (!removing && !playing) void engine().preview("bass", { note });
+  };
+
+  // accordo del battito b: nota "" = nessun accordo
+  const setChord = (b: number, root: string, type?: ChordType) => {
+    const prev = pat.chords[b];
+    const next = root === "" ? null : { root: Number(root), type: type ?? prev?.type ?? "min7" };
+    update((p) => {
+      p.patterns[editing].chords[b] = next;
+    });
+    if (next && !playing) void engine().preview("chords", { chord: next });
   };
 
   const setChannel = (c: ChannelId, patch: Partial<Project["mixer"][ChannelId]>) =>
@@ -264,7 +298,13 @@ export function Daw({
   const sounding = playing && playingSlot ? project.patterns[playingSlot] : null;
   const hitNow = (c: ChannelId) =>
     flash === c ||
-    (sounding !== null && step >= 0 && (c === "bass" ? sounding.bass[step] !== null : sounding.drums[c][step]));
+    (sounding !== null &&
+      step >= 0 &&
+      (c === "bass"
+        ? sounding.bass[step] !== null
+        : c === "chords"
+          ? step % 4 === 0 && sounding.chords[step / 4] !== null
+          : sounding.drums[c][step]));
 
   return (
     <div className="console">
@@ -500,6 +540,63 @@ export function Daw({
             </div>
           </section>
 
+          {/* ---- accordi del pattern: uno per battito ---- */}
+          <section className="hw-panel hw-chords" aria-label="Accordi">
+            <div className="hw-seq-head">
+              <h2 className="hw-title">Accordi · Pattern {editing}</h2>
+              <span className="hw-value">
+                {pat.chords.some(Boolean) ? pat.chords.map((c) => (c ? chordName(c) : "·")).join("  ") : "nessun accordo"}
+              </span>
+            </div>
+            <div className="hw-chord-row">
+              {Array.from({ length: BEATS }, (_, b) => {
+                const c = pat.chords[b];
+                return (
+                  <div key={b} className="hw-chord" data-on={c !== null} data-now={playingSlot === editing && Math.floor(step / 4) === b}>
+                    <span className="hw-label">Battito {b + 1}</span>
+                    <span className="hw-chord-name">{c ? chordName(c) : "–"}</span>
+                    <label className="hw-visually-hidden" htmlFor={`nota-${b}`}>
+                      Nota dell&apos;accordo, battito {b + 1}
+                    </label>
+                    <select
+                      id={`nota-${b}`}
+                      className="hw-select"
+                      value={c ? String(c.root) : ""}
+                      onChange={(e) => setChord(b, e.target.value)}
+                    >
+                      <option value="">{b === 0 ? "nessuno" : "tiene il prima"}</option>
+                      {NOTE_NAMES.map((n, i) => (
+                        <option key={n} value={i}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="hw-visually-hidden" htmlFor={`tipo-${b}`}>
+                      Tipo di accordo, battito {b + 1}
+                    </label>
+                    <select
+                      id={`tipo-${b}`}
+                      className="hw-select"
+                      value={c?.type ?? "min7"}
+                      disabled={!c}
+                      onChange={(e) => c && setChord(b, String(c.root), e.target.value as ChordType)}
+                    >
+                      {CHORD_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {TYPE_LABEL[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="hw-hint">
+              Un accordo per battito. In <strong>Pad</strong> un accordo tiene finché non arriva il successivo; in{" "}
+              <strong>Stab</strong> è un colpo corto sul battito. Per la deep house prova La m7 → Fa maj7 → Do maj7 → Sol.
+            </p>
+          </section>
+
           {/* ---- arrangiamento: quale pattern suona in ogni battuta ---- */}
           <section className="hw-panel hw-song" aria-label="Arrangiamento">
             <div className="hw-seq-head">
@@ -615,6 +712,41 @@ export function Daw({
                   808 long
                 </button>
               </div>
+              <div className="hw-strip hw-strip--synth hw-strip--chords">
+                <span className="hw-label">Chord synth</span>
+                <div className="hw-seg">
+                  {(["pad", "stab"] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      className="hw-btn hw-btn--small"
+                      aria-pressed={project.chordSound.style === st}
+                      onClick={() =>
+                        update((p) => {
+                          p.chordSound.style = st;
+                        })
+                      }
+                    >
+                      <span className="hw-btn-led" />
+                      {st === "pad" ? "Pad" : "Stab"}
+                    </button>
+                  ))}
+                </div>
+                <Knob
+                  label="Cutoff"
+                  value={project.chordSound.cutoff}
+                  min={300}
+                  max={8000}
+                  step={10}
+                  defaultValue={1800}
+                  display={`${Math.round(project.chordSound.cutoff)} Hz`}
+                  onChange={(v) =>
+                    update((p) => {
+                      p.chordSound.cutoff = v;
+                    })
+                  }
+                />
+              </div>
             </div>
           </section>
 
@@ -624,7 +756,7 @@ export function Daw({
             <div className="daw-roll">
               {BASS_ROWS.map((note) => (
                 <div key={note} className="daw-roll-row" data-sharp={isSharp(note)}>
-                  <button type="button" className="daw-key" onClick={() => void engine().preview("bass", note)}>
+                  <button type="button" className="daw-key" onClick={() => void engine().preview("bass", { note })}>
                     {noteName(note)}
                   </button>
                   {Array.from({ length: STEPS }, (_, i) => (

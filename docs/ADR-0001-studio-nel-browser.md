@@ -51,3 +51,10 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   modalità Pattern/Song, fila delle battute (clic: A → B → C → D → vuota).
 - Coach: secondo strumento `scrivi_canzone`; può scrivere più pattern e la canzone nella stessa risposta
   (prompt `crea-v3`), lingua dell'ultimo messaggio. Prova del 9 nov: beat trap scritto dal coach, costo $0,019.
+
+## Aggiornamento 9 nov 2026 · cronologia e accordi
+
+- Cronologia: migrazione 0005 (`project_versions`), versioni automatiche e manuali, ripristino.
+- Accordi: uno per battito in ogni pattern (8 tipi), synth pad o stab con filtro, canale Chords nel mixer
+  (passa dal sidechain). Il coach li scrive con `scrivi_pattern` (prompt `crea-v4`).
+- I suoni stanno in `graph.ts`, separati dall'orologio (`engine.ts`), per poter renderizzare il WAV offline.

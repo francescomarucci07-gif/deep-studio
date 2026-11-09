@@ -91,6 +91,7 @@
   --hw-pad-yellow: #ffd23f;
   --hw-pad-teal: #3fd6c8;
   --hw-pad-green: #57e389;
+  --hw-pad-purple: #b07cff;
   --hw-knob-cap: radial-gradient(circle at 40% 30%, #5b6068 0%, #2b2e33 70%);
 
   --ds-duration: 120ms;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CoachChat, type Msg } from "@/components/CoachChat";
 import { Knob } from "@/components/hw/Knob";
+import { VersionsPanel } from "@/components/hw/VersionsPanel";
 import { Engine } from "@/lib/daw/engine";
 import {
   BASS_HIGH,
@@ -21,6 +22,7 @@ import {
   type Project,
   type Slot,
 } from "@/lib/daw/project";
+import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
 import { createClient } from "@/lib/supabase/client";
 
 type SaveState = "salvato" | "modificato" | "salvo" | "errore";
@@ -65,6 +67,8 @@ export function Daw({
   const [bar, setBar] = useState(-1);
   const [playingSlot, setPlayingSlot] = useState<Slot | null>(null);
   const pat = project.patterns[editing];
+  const [showVersions, setShowVersions] = useState(false);
+  const [versionsTick, setVersionsTick] = useState(0);
 
   // il motore e la chat leggono sempre lo stato più recente, anche a metà battuta
   const projectRef = useRef(project);
@@ -154,8 +158,20 @@ export function Daw({
     return () => window.removeEventListener("keydown", onKey);
   }, [togglePlay, hitPad]);
 
-  // salvataggio automatico, un attimo dopo l'ultima modifica
+  // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
+  const snapshot = useCallback(
+    async (label: string, data = projectRef.current, t = titleRef.current) => {
+      const ok = await saveVersion(id, t, data, label);
+      if (ok) setVersionsTick((n) => n + 1);
+      return ok;
+    },
+    [id],
+  );
+
+  // salvataggio automatico, un attimo dopo l'ultima modifica. Alla prima modifica salvo anche
+  // com'era il progetto all'apertura, poi una fotografia ogni 10 minuti di lavoro.
   const first = useRef(true);
+  const lastSnapshot = useRef(0);
   useEffect(() => {
     if (first.current) {
       first.current = false;
@@ -164,6 +180,13 @@ export function Daw({
     setSave("modificato");
     const t = setTimeout(async () => {
       setSave("salvo");
+      if (lastSnapshot.current === 0) {
+        lastSnapshot.current = Date.now();
+        await snapshot("Com'era all'apertura", initialProject, initialTitle);
+      } else if (Date.now() - lastSnapshot.current > AUTO_EVERY_MS) {
+        lastSnapshot.current = Date.now();
+        await snapshot("Automatica");
+      }
       const { error } = await createClient()
         .from("projects")
         .update({ title: title.trim() || "Senza titolo", bpm: project.bpm, data: project })
@@ -171,7 +194,16 @@ export function Daw({
       setSave(error ? "errore" : "salvato");
     }, 1200);
     return () => clearTimeout(t);
-  }, [project, title, id]);
+  }, [project, title, id, snapshot, initialProject, initialTitle]);
+
+  const restore = async (v: Version) => {
+    const saved = await loadVersion(v.id);
+    if (!saved) return;
+    await snapshot(`Prima del ripristino di “${v.label}”`);
+    setUndo(null);
+    setProject(normalize(saved.data));
+    setTitle(saved.title);
+  };
 
   const toggleDrum = (d: DrumId, i: number) => {
     const turningOn = !pat.drums[d][i];
@@ -199,6 +231,7 @@ export function Daw({
     const d = data as { project?: unknown; name?: string; focus?: Slot; song?: boolean };
     if (!d?.project) return;
     setUndo({ project: projectRef.current, name: d.name || "pattern" });
+    void snapshot(`Prima del coach: ${d.name || "modifica"}`);
     setProject(normalize(d.project));
     if (d.focus && SLOTS.includes(d.focus)) setEditing(d.focus);
     if (d.song) setSongMode(true);
@@ -278,6 +311,9 @@ export function Daw({
           <button type="button" className="hw-btn hw-btn--rec" aria-pressed={rec} onClick={() => setRec(!rec)}>
             <span className="hw-btn-led" />● Rec
           </button>
+          <button type="button" className="hw-btn" aria-pressed={showVersions} onClick={() => setShowVersions(!showVersions)}>
+            <span className="hw-btn-led" />↺ Versioni
+          </button>
         </div>
 
         <div className="hw-knobs">
@@ -324,6 +360,18 @@ export function Daw({
           </button>
         </div>
       </section>
+
+      {showVersions && (
+        <VersionsPanel
+          projectId={id}
+          refresh={versionsTick}
+          onSave={async (label) => {
+            await snapshot(label);
+          }}
+          onRestore={restore}
+          onClose={() => setShowVersions(false)}
+        />
+      )}
 
       {undo && (
         <div className="hw-toast" role="status">

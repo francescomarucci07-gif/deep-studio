@@ -748,6 +748,7 @@ ol.ds-led-row {
 }
 .hw-transport {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--ds-space-2);
 }
 .hw-knobs {
@@ -1163,6 +1164,41 @@ ol.ds-led-row {
 }
 .hw-bar-slot {
   font: 800 var(--ds-text-md) var(--ds-font-mono);
+}
+
+/* cronologia delle versioni */
+.hw-versions-save {
+  display: flex;
+  gap: var(--ds-space-2);
+  margin-bottom: var(--ds-space-3);
+}
+.hw-versions-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 280px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border-top: 1px solid var(--hw-panel-edge);
+}
+.hw-versions-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-2) 0;
+  border-bottom: 1px solid var(--hw-panel-edge);
+  color: var(--ds-text);
+  font-size: var(--ds-text-sm);
+}
+.hw-versions-list li > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.hw-versions-list .hw-value {
+  text-align: left;
 }
 
 /* piano roll nella console */

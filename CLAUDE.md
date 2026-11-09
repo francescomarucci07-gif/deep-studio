@@ -49,7 +49,7 @@ Decisione del 3 nov 2026: `docs/ADR-0001-studio-nel-browser.md` (da confermare c
 ```
 analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script di prova P3/P4
 db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach,
-            0004 progetti dello studio (projects) + coach_messages.project_id
+            0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions)
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili. Collegamento a Supabase e Vercel: docs/DEPLOY.md
 docs/       USER-STORIES-FASE1.md, MOCKUP-P5.md, P6 architettura, LEGGIMI analisi, PROMPT-M1.md
@@ -98,6 +98,8 @@ cd web && npm run dev
   sidechain, swing), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
   `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone); streaming condiviso in `lib/coach/stream.ts`.
+- **Cronologia**: `project_versions` (ultime 60 per progetto, trigger di pulizia); il browser salva una versione
+  alla prima modifica, prima di ogni modifica del coach, ogni 10 minuti e a mano (`lib/daw/versions.ts`).
 - **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,

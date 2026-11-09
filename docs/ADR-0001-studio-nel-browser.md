@@ -58,3 +58,10 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Accordi: uno per battito in ogni pattern (8 tipi), synth pad o stab con filtro, canale Chords nel mixer
   (passa dal sidechain). Il coach li scrive con `scrivi_pattern` (prompt `crea-v4`).
 - I suoni stanno in `graph.ts`, separati dall'orologio (`engine.ts`), per poter renderizzare il WAV offline.
+
+## Aggiornamento 9 nov 2026 · suoni ed export
+
+- Suoni ancora sintetizzati (nessun campione: niente licenze e niente audio nel repository), ma più realistici:
+  hi-hat alla TR-808 con choke, clap a quattro mani, kick con click e saturazione, basso con sub, riverbero send.
+- Export WAV 24 bit dal browser (OfflineAudioContext, stessa catena del play). Verifica sul file esportato con
+  `analysis/deep_studio_analyze.py`: -13,7 LUFS, true peak -1,5 dBTP, 122 BPM riconosciuti, nessun allarme.

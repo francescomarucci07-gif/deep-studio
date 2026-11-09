@@ -98,6 +98,8 @@ cd web && npm run dev
   in tempo reale e per l'export), `web/lib/daw/engine.ts` (l'orologio del sequencer, swing, pattern/song), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
   `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone); streaming condiviso in `lib/coach/stream.ts`.
+- **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
+  (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
 - **Cronologia**: `project_versions` (ultime 60 per progetto, trigger di pulizia); il browser salva una versione
   alla prima modifica, prima di ogni modifica del coach, ogni 10 minuti e a mano (`lib/daw/versions.ts`).
 - **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,

@@ -27,6 +27,7 @@ import {
   type Project,
   type Slot,
 } from "@/lib/daw/project";
+import { encodeWav, renderAudio } from "@/lib/daw/render";
 import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
 import { createClient } from "@/lib/supabase/client";
 
@@ -89,6 +90,7 @@ export function Daw({
   const [playingSlot, setPlayingSlot] = useState<Slot | null>(null);
   const pat = project.patterns[editing];
   const [showVersions, setShowVersions] = useState(false);
+  const [exporting, setExporting] = useState<"no" | "sì" | "errore">("no");
   const [versionsTick, setVersionsTick] = useState(0);
 
   // il motore e la chat leggono sempre lo stato più recente, anche a metà battuta
@@ -273,6 +275,27 @@ export function Daw({
     return `Scritto nello studio: ${d.name || "nuovo pattern"}`;
   };
 
+  // Export WAV: in Song tutta la canzone, in Pattern 4 giri del loop che stai modificando
+  const exportWav = async () => {
+    setExporting("sì");
+    try {
+      const buf = await renderAudio(projectRef.current, songMode ? { song: true } : { song: false, slot: editing });
+      const url = URL.createObjectURL(encodeWav(buf));
+      const a = document.createElement("a");
+      const name = (titleRef.current.trim() || "deep-studio").replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "deep-studio";
+      a.href = url;
+      a.download = `${name}${songMode ? "" : ` - pattern ${editing}`}.wav`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setExporting("no");
+    } catch (e) {
+      console.error("export", e);
+      setExporting("errore");
+    }
+  };
+
   // un pattern nuovo da uno vuoto: copia quello che stai modificando nel primo slot libero
   const firstFree = SLOTS.find((s) => s !== editing && isEmptyPattern(project.patterns[s]));
   const duplicate = () => {
@@ -353,6 +376,17 @@ export function Daw({
           </button>
           <button type="button" className="hw-btn" aria-pressed={showVersions} onClick={() => setShowVersions(!showVersions)}>
             <span className="hw-btn-led" />↺ Versioni
+          </button>
+          <button
+            type="button"
+            className="hw-btn"
+            aria-pressed={exporting === "sì"}
+            disabled={exporting === "sì"}
+            title={songMode ? "Esporta tutta la canzone" : `Esporta 4 giri del pattern ${editing}`}
+            onClick={() => void exportWav()}
+          >
+            <span className="hw-btn-led" />
+            {exporting === "sì" ? "Esporto…" : exporting === "errore" ? "Riprova WAV" : "⤓ WAV"}
           </button>
         </div>
 

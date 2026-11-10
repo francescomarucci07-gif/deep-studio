@@ -239,14 +239,20 @@ export function Daw({
 
   // tastiera: spazio = play/stop, Z X C V B N = pad (non mentre scrivi)
   useEffect(() => {
+    // lo spazio fa sempre Play/Stop, anche se l'ultimo pulsante cliccato ha ancora il focus;
+    // solo mentre scrivi (titolo, chat del coach) resta uno spazio
+    const typing = (el: EventTarget | null) =>
+      el instanceof HTMLTextAreaElement ||
+      (el instanceof HTMLInputElement && !["range", "checkbox", "radio", "button", "submit"].includes(el.type)) ||
+      (el instanceof HTMLElement && el.isContentEditable);
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.metaKey || e.ctrlKey || e.repeat) return;
-      if (e.code === "Space" && tag !== "BUTTON") {
-        e.preventDefault();
-        togglePlay();
+      if (e.code === "Space" && !typing(e.target) && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault(); // niente pagina che scorre, niente pulsante premuto
+        if (!e.repeat) togglePlay();
         return;
       }
+      const tag = (e.target as HTMLElement).tagName;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.metaKey || e.ctrlKey || e.repeat) return;
       // 1–6: cambia vista (le cifre non sono usate dai pad)
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= VIEWS.length && !e.altKey) {
@@ -256,8 +262,16 @@ export function Daw({
       const pad = PADS.find((p) => p.key === e.key.toLowerCase());
       if (pad) hitPad(pad.id);
     };
+    // i browser "cliccano" il pulsante col focus quando lo spazio viene rilasciato: lo blocco anche lì
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space" && !typing(e.target)) e.preventDefault();
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, [togglePlay, hitPad, chooseView]);
 
   // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
@@ -889,6 +903,43 @@ export function Daw({
               Un accordo per battito. In <strong>Pad</strong> un accordo tiene finché non arriva il successivo; in{" "}
               <strong>Stab</strong> è un colpo corto sul battito. Per la deep house prova La m7 → Fa maj7 → Do maj7 → Sol.
             </p>
+            <div className="hw-synths">
+              <div className="hw-strip hw-strip--synth hw-strip--chords">
+                <span className="hw-label">Chord synth</span>
+                <div className="hw-seg">
+                  {(["pad", "stab"] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      className="hw-btn hw-btn--small"
+                      aria-pressed={project.chordSound.style === st}
+                      onClick={() =>
+                        update((p) => {
+                          p.chordSound.style = st;
+                        })
+                      }
+                    >
+                      <span className="hw-btn-led" />
+                      {st === "pad" ? "Pad" : "Stab"}
+                    </button>
+                  ))}
+                </div>
+                <Knob
+                  label="Cutoff"
+                  value={project.chordSound.cutoff}
+                  min={300}
+                  max={8000}
+                  step={10}
+                  defaultValue={1800}
+                  display={`${Math.round(project.chordSound.cutoff)} Hz`}
+                  onChange={(v) =>
+                    update((p) => {
+                      p.chordSound.cutoff = v;
+                    })
+                  }
+                />
+              </div>
+            </div>
           </section>
 
           {/* ---- arrangiamento: quale pattern suona in ogni battuta ---- */}
@@ -1076,137 +1127,6 @@ export function Daw({
                   {project.automation.master ? "automatizzato in Song" : "doppio clic: spento"}
                 </span>
               </div>
-              <div className="hw-strip hw-strip--synth">
-                <span className="hw-label">Bass synth</span>
-                <div className="hw-seg">
-                  {(["sawtooth", "square"] as const).map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      className="hw-btn hw-btn--small"
-                      aria-pressed={project.bassSound.wave === w}
-                      onClick={() =>
-                        update((p) => {
-                          p.bassSound.wave = w;
-                        })
-                      }
-                    >
-                      <span className="hw-btn-led" />
-                      {w === "sawtooth" ? "Saw" : "Sqr"}
-                    </button>
-                  ))}
-                </div>
-                <Knob
-                  label="Cutoff"
-                  value={project.bassSound.cutoff}
-                  min={150}
-                  max={4000}
-                  step={10}
-                  defaultValue={700}
-                  display={`${Math.round(project.bassSound.cutoff)} Hz`}
-                  onChange={(v) =>
-                    update((p) => {
-                      p.bassSound.cutoff = v;
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  className="hw-btn hw-btn--small"
-                  aria-pressed={project.bassSound.length === "lunga"}
-                  onClick={() =>
-                    update((p) => {
-                      p.bassSound.length = p.bassSound.length === "lunga" ? "corta" : "lunga";
-                    })
-                  }
-                >
-                  <span className="hw-btn-led" />
-                  808 long
-                </button>
-              </div>
-              <div className="hw-strip hw-strip--synth hw-strip--chords hw-strip--lead">
-                <span className="hw-label">Lead synth</span>
-                <div className="hw-seg">
-                  {LEAD_WAVES.map((w) => (
-                    <button
-                      key={w}
-                      type="button"
-                      className="hw-btn hw-btn--small"
-                      aria-pressed={project.leadSound.wave === w}
-                      onClick={() =>
-                        update((p) => {
-                          p.leadSound.wave = w;
-                        })
-                      }
-                    >
-                      <span className="hw-btn-led" />
-                      {WAVE_LABEL[w]}
-                    </button>
-                  ))}
-                </div>
-                <Knob
-                    label="Cutoff"
-                    value={project.leadSound.cutoff}
-                    min={300}
-                    max={9000}
-                    step={10}
-                    defaultValue={2600}
-                    display={`${Math.round(project.leadSound.cutoff)} Hz`}
-                    onChange={(v) =>
-                      update((p) => {
-                        p.leadSound.cutoff = v;
-                      })
-                    }
-                  />
-                <button
-                  type="button"
-                  className="hw-btn hw-btn--small"
-                  aria-pressed={project.leadSound.length === "lunga"}
-                  onClick={() =>
-                    update((p) => {
-                      p.leadSound.length = p.leadSound.length === "lunga" ? "corta" : "lunga";
-                    })
-                  }
-                >
-                  <span className="hw-btn-led" />
-                  Legato
-                </button>
-              </div>
-              <div className="hw-strip hw-strip--synth hw-strip--chords">
-                <span className="hw-label">Chord synth</span>
-                <div className="hw-seg">
-                  {(["pad", "stab"] as const).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      className="hw-btn hw-btn--small"
-                      aria-pressed={project.chordSound.style === st}
-                      onClick={() =>
-                        update((p) => {
-                          p.chordSound.style = st;
-                        })
-                      }
-                    >
-                      <span className="hw-btn-led" />
-                      {st === "pad" ? "Pad" : "Stab"}
-                    </button>
-                  ))}
-                </div>
-                <Knob
-                  label="Cutoff"
-                  value={project.chordSound.cutoff}
-                  min={300}
-                  max={8000}
-                  step={10}
-                  defaultValue={1800}
-                  display={`${Math.round(project.chordSound.cutoff)} Hz`}
-                  onChange={(v) =>
-                    update((p) => {
-                      p.chordSound.cutoff = v;
-                    })
-                  }
-                />
-              </div>
             </div>
           </section>
 
@@ -1245,6 +1165,107 @@ export function Daw({
                   ))}
                 </div>
               ))}
+            </div>
+            <div className="hw-synths">
+              {roll === "bass" ? (
+                  <div className="hw-strip hw-strip--synth">
+                    <span className="hw-label">Bass synth</span>
+                    <div className="hw-seg">
+                      {(["sawtooth", "square"] as const).map((w) => (
+                        <button
+                          key={w}
+                          type="button"
+                          className="hw-btn hw-btn--small"
+                          aria-pressed={project.bassSound.wave === w}
+                          onClick={() =>
+                            update((p) => {
+                              p.bassSound.wave = w;
+                            })
+                          }
+                        >
+                          <span className="hw-btn-led" />
+                          {w === "sawtooth" ? "Saw" : "Sqr"}
+                        </button>
+                      ))}
+                    </div>
+                    <Knob
+                      label="Cutoff"
+                      value={project.bassSound.cutoff}
+                      min={150}
+                      max={4000}
+                      step={10}
+                      defaultValue={700}
+                      display={`${Math.round(project.bassSound.cutoff)} Hz`}
+                      onChange={(v) =>
+                        update((p) => {
+                          p.bassSound.cutoff = v;
+                        })
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="hw-btn hw-btn--small"
+                      aria-pressed={project.bassSound.length === "lunga"}
+                      onClick={() =>
+                        update((p) => {
+                          p.bassSound.length = p.bassSound.length === "lunga" ? "corta" : "lunga";
+                        })
+                      }
+                    >
+                      <span className="hw-btn-led" />
+                      808 long
+                    </button>
+                  </div>
+              ) : (
+                  <div className="hw-strip hw-strip--synth hw-strip--chords hw-strip--lead">
+                    <span className="hw-label">Lead synth</span>
+                    <div className="hw-seg">
+                      {LEAD_WAVES.map((w) => (
+                        <button
+                          key={w}
+                          type="button"
+                          className="hw-btn hw-btn--small"
+                          aria-pressed={project.leadSound.wave === w}
+                          onClick={() =>
+                            update((p) => {
+                              p.leadSound.wave = w;
+                            })
+                          }
+                        >
+                          <span className="hw-btn-led" />
+                          {WAVE_LABEL[w]}
+                        </button>
+                      ))}
+                    </div>
+                    <Knob
+                        label="Cutoff"
+                        value={project.leadSound.cutoff}
+                        min={300}
+                        max={9000}
+                        step={10}
+                        defaultValue={2600}
+                        display={`${Math.round(project.leadSound.cutoff)} Hz`}
+                        onChange={(v) =>
+                          update((p) => {
+                            p.leadSound.cutoff = v;
+                          })
+                        }
+                      />
+                    <button
+                      type="button"
+                      className="hw-btn hw-btn--small"
+                      aria-pressed={project.leadSound.length === "lunga"}
+                      onClick={() =>
+                        update((p) => {
+                          p.leadSound.length = p.leadSound.length === "lunga" ? "corta" : "lunga";
+                        })
+                      }
+                    >
+                      <span className="hw-btn-led" />
+                      Legato
+                    </button>
+                  </div>
+              )}
             </div>
           </section>
         </div>

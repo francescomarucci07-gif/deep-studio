@@ -114,3 +114,8 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   Beat, Roll, Accordi, Song, Mixer, Auto (tasti 1–6). La vista e il coach aperto restano scelti nel browser.
 - Telefono: la stessa console in colonna, a scorrimento, come prima. Una sola pagina per entrambi: cambia solo
   il CSS, quindi le due versioni non possono andare fuori sincrono.
+- 10 nov, dopo la prova dell'utente: la console a pagine parte da 1000 px (i portatili Windows con lo zoom
+  al 125% sono larghi ~1100 px e prima finivano nella versione a scorrimento). Step, piano roll, pad e fader
+  si adattano all'altezza dello schermo; la chat del coach scorre al suo interno. I synth Bass/Lead stanno
+  nella vista Roll e il Chord synth negli Accordi (il mixer ha solo canali ed effetti). La barra spaziatrice
+  fa sempre Play/Stop, tranne quando si scrive (titolo, chat).

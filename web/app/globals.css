@@ -1398,6 +1398,21 @@ ol.ds-led-row {
   text-align: left;
 }
 
+/* synth dello strumento (Bass/Lead nel Roll, Chord negli Accordi) */
+.hw-synths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+  margin-top: var(--ds-space-3);
+}
+.hw-synths .hw-strip--synth {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-3);
+  padding: var(--ds-space-2) var(--ds-space-3);
+}
+
 /* piano roll nella console */
 .hw-roll-panel .daw-key {
   background: var(--hw-print);
@@ -1427,7 +1442,7 @@ ol.ds-led-row {
 }
 
 /* tablet e finestre medie: pad a sinistra, il resto accanto, coach sotto */
-@media (min-width: 900px) and (max-width: 1199px) {
+@media (min-width: 760px) and (max-width: 999px) {
   .console-body {
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr);
@@ -1439,11 +1454,11 @@ ol.ds-led-row {
 }
 
 /* ---------------------------------------------------------------------------
- * Console a pagine (computer, da 1200 px): come FL Studio.
+ * Console a pagine (computer, da 1000 px: anche i portatili con lo zoom di Windows al 125%): come FL Studio.
  * Barra in alto, pad a sinistra, vista scelta al centro, coach a destra (si può chiudere).
  * La pagina non scorre: scorre solo la vista centrale se è più alta dello schermo.
  * ------------------------------------------------------------------------- */
-@media (min-width: 1200px) {
+@media (min-width: 1000px) {
   .ds-shell:has(.console) {
     height: 100dvh;
     min-height: 0;
@@ -1522,6 +1537,86 @@ ol.ds-led-row {
     }
     .console .hw-top .hw-transport {
       gap: 6px;
+    }
+  }
+  /* schermi da 1000 a 1280 (portatili, zoom di Windows): tutto più compatto per stare in una schermata */
+  @media (max-width: 1279px) {
+    .console-body {
+      grid-template-columns: 172px minmax(0, 1fr) 280px;
+    }
+    .console[data-coach="off"] .console-body {
+      grid-template-columns: 172px minmax(0, 1fr);
+    }
+    .console .hw-top {
+      grid-template-columns: auto 232px 1fr auto;
+      gap: var(--ds-space-2);
+      padding: var(--ds-space-2) var(--ds-space-3);
+    }
+    .console .hw-brand-name {
+      font-size: var(--ds-text-md);
+    }
+    .console .hw-lcd-big {
+      font-size: 1.3rem;
+    }
+    .console .hw-top .hw-btn {
+      padding: 0 7px;
+      font-size: 11px;
+    }
+    .console .hw-top .hw-btn-led {
+      display: none;
+    }
+    .console .hw-knobs {
+      gap: var(--ds-space-1);
+    }
+    .console-side .hw-panel {
+      padding: var(--ds-space-3);
+    }
+    .console-side .hw-seg .hw-btn {
+      font-size: 10px;
+      letter-spacing: 0.02em;
+    }
+    .console-stage {
+      padding-left: var(--ds-space-3);
+      padding-right: var(--ds-space-3);
+    }
+    .hw-views {
+      margin-left: calc(-1 * var(--ds-space-3));
+      margin-right: calc(-1 * var(--ds-space-3));
+      padding-left: var(--ds-space-3);
+      padding-right: var(--ds-space-3);
+    }
+    .hw-view {
+      min-width: 0;
+      padding: 6px 8px 5px;
+    }
+    .console-stage .hw-panel {
+      padding: var(--ds-space-3);
+    }
+    .console-stage .hw-seq-row {
+      grid-template-columns: 80px repeat(16, minmax(22px, 1fr));
+      gap: 4px;
+    }
+    .console-stage .hw-seq-name {
+      padding: 0 4px;
+      font-size: 10px;
+    }
+    .console .console-coach .ds-chat-input {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .console .console-coach .ds-chat-input .ds-row {
+      flex-direction: row;
+    }
+    .console .console-coach .ds-chat-input .ds-pad {
+      min-height: 34px;
+      padding-top: 0;
+      padding-bottom: 0;
+    }
+    .console .console-coach .ds-chat-input textarea {
+      min-height: 0;
+      height: 52px;
+    }
+    .console .hw-lcd-small {
+      font-size: 9px;
     }
   }
   /* colonna sinistra: kit e pad, sempre a portata di mano */
@@ -1634,14 +1729,6 @@ ol.ds-led-row {
     grid-template-columns: 92px repeat(16, minmax(26px, 1fr));
     gap: 5px;
   }
-  .console-stage .daw-cell,
-  .console-stage .daw-key {
-    height: 30px;
-  }
-  .console-stage .hw-key,
-  .console-stage .hw-seq-name {
-    height: 46px;
-  }
   .console-stage .hw-seq-grid {
     gap: 8px;
   }
@@ -1655,17 +1742,89 @@ ol.ds-led-row {
   .console-coach .ds-coach {
     display: flex;
     flex-direction: column;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
     padding: var(--ds-space-4);
     border: 0;
     border-radius: 0;
     background: transparent;
     box-shadow: none;
   }
+  /* la chat prende lo spazio che resta e scorre al suo interno */
   .console-coach .ds-chat {
-    flex: 1;
-    min-height: 180px;
+    flex: 1 1 0;
+    min-height: 90px;
     max-height: none;
+  }
+  .console-coach .ds-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+  .console-coach .ds-chip {
+    flex: none;
+    white-space: nowrap;
+  }
+  /* tutto tranne la chat resta alto quanto serve; la chat prende il resto */
+  .console-coach .ds-coach > :not(.ds-chat) {
+    flex: none;
+  }
+  .console-coach .ds-coach > .ds-row--between > .ds-row {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .console-coach .ds-coach > .ds-row--between .ds-select {
+    min-width: 0;
+    max-width: 190px;
+  }
+  /* campo di testo con Parla e Invia accanto, non sotto: più spazio per la chat */
+  .console-coach .ds-chat-input {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+    gap: var(--ds-space-2);
+  }
+  .console-coach .ds-chat-input textarea {
+    resize: none;
+  }
+  .console-coach .ds-chat-input .ds-row {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: var(--ds-space-1);
+  }
+  /* step, piano roll e pad si adattano all'altezza dello schermo */
+  .console-stage .hw-key,
+  .console-stage .hw-seq-name {
+    height: clamp(22px, calc((100dvh - 400px) / 8), 46px);
+  }
+  .console-stage .daw-cell,
+  .console-stage .daw-key {
+    height: clamp(15px, calc((100dvh - 480px) / 13), 30px);
+  }
+  .console-side .hw-pad {
+    aspect-ratio: auto;
+    min-height: clamp(40px, calc((100dvh - 430px) / 3), 92px);
+  }
+  .console-side .hw-pad[data-color="purple"],
+  .console-side .hw-pad[data-color="blue"] {
+    min-height: clamp(34px, calc((100dvh - 430px) / 6), 52px);
+  }
+  .console-side .hw-hint {
+    display: none;
+  }
+  /* mixer: canali e master su una riga, i tre synth sotto; fader più corti sugli schermi bassi */
+  .console-stage .hw-strips {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .console-stage .hw-strip {
+    min-width: 0;
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .console-stage .hw-fader {
+    height: clamp(44px, calc(100dvh - 560px), 140px);
   }
 }
 

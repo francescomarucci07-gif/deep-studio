@@ -176,9 +176,10 @@ export class Graph {
     for (const target of AUTO_TARGETS) {
       const lane = p.automation[target];
       if (!lane) continue;
-      const v0 = laneValue(lane, bar);
-      if (v0 === null) continue;
-      const v1 = bar + 1 <= lastBar ? (laneValue(lane, bar + 1) ?? v0) : v0;
+      const base = target === "master" ? p.masterFilter : p.fx[target].filter;
+      const v0 = laneValue(lane, bar, base);
+      // fine battuta: dove arriva la curva (prima del primo punto resta su base, niente anticipo)
+      const v1 = bar + 1 <= lastBar ? laneValue(lane, bar + 0.999, base) : v0;
       const a = filterFreqs(v0);
       const b = filterFreqs(v1);
       const f = this.filters[target];

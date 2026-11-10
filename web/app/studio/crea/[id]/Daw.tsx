@@ -285,6 +285,7 @@ export function Daw({
 
   // automazione: un punto per battuta (null = nessun punto). Una corsia senza punti sparisce.
   const lane = project.automation[autoTarget];
+  const autoBase = autoTarget === "master" ? project.masterFilter : project.fx[autoTarget].filter; // prima del primo punto
   const setPoint = (b: number, v: number | null) =>
     update((p) => {
       const l = p.automation[autoTarget] ?? Array(SONG_BARS).fill(null);
@@ -757,7 +758,7 @@ export function Daw({
                 {lane && (
                   <polyline
                     points={Array.from({ length: SONG_BARS + 1 }, (_, b) => {
-                      const v = laneValue(lane, Math.min(b, SONG_BARS - 1)) ?? 0;
+                      const v = laneValue(lane, Math.min(b, SONG_BARS - 1), autoBase);
                       return `${b},${1 - v}`;
                     }).join(" ")}
                   />
@@ -773,7 +774,7 @@ export function Daw({
                       min={-1}
                       max={1}
                       step={0.02}
-                      value={v ?? laneValue(lane, b) ?? 0}
+                      value={v ?? laneValue(lane, b, autoBase)}
                       aria-label={`Battuta ${b + 1}: filtro ${v === null ? "senza punto" : filterLabel(v)}`}
                       onChange={(e) => setPoint(b, Number(e.target.value))}
                       onDoubleClick={() => setPoint(b, null)}

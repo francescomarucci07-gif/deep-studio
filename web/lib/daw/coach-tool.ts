@@ -156,7 +156,7 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
       automazioni: {
         type: "array",
         description:
-          "Automazioni del filtro. Ogni bersaglio riceve i punti (battuta 1–16 della canzone, valore -1…1 come il filtro): tra due punti il valore scorre gradualmente, prima del primo e dopo l'ultimo resta fermo. Una corsia scritta sostituisce quella che c'era; punti vuoti = cancella la corsia.",
+          "Automazioni del filtro. Ogni bersaglio riceve i punti (battuta 1–16 della canzone, valore -1…1 come il filtro): tra due punti il valore scorre gradualmente; prima del primo punto vale la manopola Filter del bersaglio (di solito 0, aperto); dopo l'ultimo resta fermo sull'ultimo valore, quindi per riaprire il filtro dopo un build metti un punto a 0. Una corsia scritta sostituisce quella che c'era; punti vuoti = cancella la corsia.",
         items: {
           type: "object",
           properties: {

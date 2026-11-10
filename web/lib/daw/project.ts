@@ -119,9 +119,11 @@ export const isEmptyPattern = (p: Pattern) =>
   p.chords.every((c) => c === null) &&
   DRUMS.every(({ id }) => p.drums[id].every((s) => !s));
 
-// Valore di una corsia di automazione alla battuta "bar" (anche con la virgola: 4.5 = metà della quinta)
-export function laneValue(lane: Lane | undefined, bar: number): number | null {
-  if (!lane) return null;
+// Valore di una corsia di automazione alla battuta "bar" (anche con la virgola: 4.5 = metà della quinta).
+// Prima del primo punto vale "base", cioè la manopola del filtro: un build che parte alla battuta 9
+// non deve chiudere anche le battute 1–8. Tra due punti il valore scorre; dopo l'ultimo resta fermo.
+export function laneValue(lane: Lane | undefined, bar: number, base: number): number {
+  if (!lane) return base;
   let prev = -1;
   let next = -1;
   for (let i = 0; i < lane.length; i++) {
@@ -129,9 +131,8 @@ export function laneValue(lane: Lane | undefined, bar: number): number | null {
     if (i <= bar) prev = i;
     if (i >= bar && next < 0) next = i;
   }
-  if (prev < 0 && next < 0) return null;
-  if (prev < 0) return lane[next];
-  if (next < 0 || next === prev) return lane[prev];
+  if (prev < 0) return base;
+  if (next < 0 || next === prev) return lane[prev] as number;
   const a = lane[prev] as number;
   const b = lane[next] as number;
   return a + ((b - a) * (bar - prev)) / (next - prev);

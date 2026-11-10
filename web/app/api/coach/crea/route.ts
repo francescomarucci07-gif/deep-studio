@@ -11,7 +11,14 @@ export const maxDuration = 60;
 
 const HISTORY_LIMIT = 20;
 
-type Body = { projectId?: string; message?: string; project?: unknown; title?: string; editing?: unknown };
+type Body = {
+  projectId?: string;
+  message?: string;
+  project?: unknown;
+  title?: string;
+  editing?: unknown;
+  misure?: unknown; // le misure dell'export calcolate nel browser ("Fammi un parere")
+};
 
 export async function POST(request: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
@@ -49,6 +56,10 @@ export async function POST(request: NextRequest) {
     .limit(HISTORY_LIMIT);
   const past = trimHistory(((history ?? []) as Turn[]).reverse());
 
+  // le misure vanno solo a Claude, non nella storia salvata: sono tante e cambiano a ogni export
+  const misure = body.misure && typeof body.misure === "object" ? JSON.stringify(body.misure) : "";
+  const listening = misure.length > 0 && misure.length < 8000 ? `\n\n[Misure dell'export]\n${misure}` : "";
+
   const { error: insertError } = await supabase
     .from("coach_messages")
     .insert({ project_id: project.id, role: "user", content: text });
@@ -57,7 +68,7 @@ export async function POST(request: NextRequest) {
   return streamCoach({
     system: [{ text: COACH_CREA_SYSTEM, cache: true }],
     // lo stato del pattern va nell'ultimo messaggio: cambia a ogni modifica, la storia no
-    messages: [...past, { role: "user", content: `${text}\n\n[Stato attuale del progetto]\n${state}` }],
+    messages: [...past, { role: "user", content: `${text}\n\n[Stato attuale del progetto]\n${state}${listening}` }],
     maxTokens: 6000,
     effort: "low",
     // il coach può scrivere il pattern nello studio; il browser lo applica e si può annullare

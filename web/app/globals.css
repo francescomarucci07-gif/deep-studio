@@ -1324,6 +1324,75 @@ ol.ds-led-row {
   font-size: 9px;
 }
 
+/* parere del coach: misure dell'ultimo ascolto */
+.hw-btn--listen[aria-pressed="true"] .hw-btn-led {
+  background: var(--hw-led-green);
+  box-shadow: 0 0 8px 2px var(--hw-led-green);
+  animation: ds-blink 0.8s steps(2, start) infinite;
+}
+.hw-meas-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--ds-space-2);
+}
+.hw-meas {
+  display: flex;
+  flex-direction: column;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  border-radius: 6px;
+  background: var(--hw-lcd-bg);
+}
+.hw-meas .hw-label,
+.hw-meas .hw-value {
+  text-align: left;
+}
+.hw-meas-value {
+  color: var(--hw-lcd-text);
+  font: 700 var(--ds-text-lg) var(--ds-font-mono);
+  text-shadow: var(--hw-lcd-glow);
+}
+.hw-meas-bands {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--ds-space-2);
+  height: 120px;
+  margin-top: var(--ds-space-3);
+}
+.hw-meas-band {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+}
+.hw-meas-bar {
+  width: 70%;
+  border-radius: 3px 3px 0 0;
+  background: var(--hw-lcd-text);
+  box-shadow: var(--hw-lcd-glow);
+}
+.hw-meas-energy {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: end;
+  gap: 3px;
+  height: 48px;
+  margin-top: var(--ds-space-3);
+  padding: 4px;
+  border-radius: 6px;
+  background: var(--hw-lcd-bg);
+}
+.hw-meas-energy span {
+  border-radius: 2px;
+  background: var(--hw-lcd-text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .hw-btn--listen[aria-pressed="true"] .hw-btn-led {
+    animation: none;
+  }
+}
+
 /* cronologia delle versioni */
 .hw-versions-save {
   display: flex;

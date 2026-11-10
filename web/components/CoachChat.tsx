@@ -53,6 +53,7 @@ export function CoachChat({
   hint,
   compact = false,
   onData,
+  ask,
 }: {
   endpoint: string;
   payload: () => Record<string, unknown>;
@@ -63,6 +64,8 @@ export function CoachChat({
   compact?: boolean;
   // dati che il coach manda allo studio (un pattern); restituisce la nota da mostrare in chat
   onData?: (data: unknown) => string | void;
+  // una domanda che arriva dallo studio (es. "Fammi un parere"), con dati in più per il server
+  ask?: { id: number; text: string; extra?: Record<string, unknown> };
 }) {
   const [messages, setMessages] = useState<Msg[]>(initial);
   const [input, setInput] = useState("");
@@ -101,7 +104,7 @@ export function CoachChat({
     void speak("Ciao, sono il tuo coach. Facciamo musica.", v);
   }
 
-  async function send(text: string) {
+  async function send(text: string, extra: Record<string, unknown> = {}) {
     const question = text.trim();
     if (!question || busy) return;
     stopSpeaking();
@@ -113,7 +116,7 @@ export function CoachChat({
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload(), message: question }),
+        body: JSON.stringify({ ...payload(), ...extra, message: question }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: "Il coach non risponde." }));
@@ -146,6 +149,13 @@ export function CoachChat({
     setBusy(false);
     if (readAloud && said.trim()) void speak(said, voice);
   }
+
+  // la domanda dallo studio parte da sola quando cambia ask.id
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  useEffect(() => {
+    if (ask) void sendRef.current(ask.text, ask.extra);
+  }, [ask]);
 
   function toggleMic() {
     if (listening) {

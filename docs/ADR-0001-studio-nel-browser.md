@@ -81,3 +81,13 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   nell'export. Verifica sul WAV: con il master da -0,85 a 0 nelle battute 5–7 il centroide spettrale sale da
   ~200 Hz a ~3,4 kHz. Master a 0,72 di guadagno: true peak -1,7 dBTP.
 - Il coach usa il nuovo strumento `scrivi_effetti` (prompt `crea-v6`), per esempio per il build prima del drop.
+
+## Aggiornamento 10 nov 2026 · il coach ascolta l'export
+
+- Pulsante **◉ Parere**: renderizza come l'export (Song o 4 giri del pattern), misura l'audio nel browser
+  (`web/lib/daw/measure.ts`, port di `analysis/deep_studio_analyze.py`: LUFS con gate, true peak ×4, LRA,
+  crest, bande, stereo con split a 120 Hz, energia e brillantezza per battuta) e manda le misure al coach.
+  Verifica: sullo stesso WAV le misure coincidono con quelle del Python.
+- Le misure vanno solo nel messaggio a Claude, non nella storia salvata (cambiano a ogni ascolto). Nessun audio
+  lascia il browser. Il coach risponde con priorità e numeri (prompt `crea-v8`) e può correggere con
+  `scrivi_effetti`, che ora regola anche i volumi dei canali e del master.

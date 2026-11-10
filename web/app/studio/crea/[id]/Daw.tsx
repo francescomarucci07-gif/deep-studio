@@ -36,7 +36,8 @@ import {
   type Project,
   type Slot,
 } from "@/lib/daw/project";
-import { encodeWav, renderAudio } from "@/lib/daw/render";
+import { measure, type Measures } from "@/lib/daw/measure";
+import { encodeWav, renderAudio, renderPlan, SAMPLE_RATE } from "@/lib/daw/render";
 import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
 import { createClient } from "@/lib/supabase/client";
 
@@ -111,6 +112,9 @@ export function Daw({
   const [roll, setRoll] = useState<RollId>("bass");
   const [autoTarget, setAutoTarget] = useState<AutoTarget>("master");
   const [exporting, setExporting] = useState<"no" | "sì" | "errore">("no");
+  const [listening, setListening] = useState(false);
+  const [measures, setMeasures] = useState<Measures | null>(null);
+  const [ask, setAsk] = useState<{ id: number; text: string; extra?: Record<string, unknown> }>();
   const [versionsTick, setVersionsTick] = useState(0);
 
   // il motore e la chat leggono sempre lo stato più recente, anche a metà battuta
@@ -337,6 +341,32 @@ export function Daw({
     }
   };
 
+  // "Fammi un parere": renderizzo come l'export, misuro nel browser e mando le misure al coach
+  const listen = async () => {
+    setListening(true);
+    try {
+      const p = projectRef.current;
+      const what = songMode ? ({ song: true } as const) : ({ song: false, slot: editing } as const);
+      const buf = await renderAudio(p, what);
+      const barLen = Math.round((60 / p.bpm) * 4 * SAMPLE_RATE);
+      const plan = renderPlan(p, what).map((slot, b) => ({
+        start: Math.round(0.05 * SAMPLE_RATE) + b * barLen,
+        length: barLen,
+        slot: slot ?? "-",
+      }));
+      // le misure bloccano il browser per un paio di secondi: lascio prima aggiornare il pulsante
+      await new Promise((r) => setTimeout(r, 30));
+      const chans = Array.from({ length: buf.numberOfChannels }, (_, c) => buf.getChannelData(c));
+      const m = measure(chans, buf.sampleRate, plan);
+      setMeasures(m);
+      const what_ = songMode ? `sulla canzone (${plan.length} battute)` : `sul pattern ${editing} (4 giri)`;
+      setAsk({ id: Date.now(), text: `Fammi un parere ${what_}: come suona?`, extra: { misure: m } });
+    } catch (e) {
+      console.error("parere", e);
+    }
+    setListening(false);
+  };
+
   // un pattern nuovo da uno vuoto: copia quello che stai modificando nel primo slot libero
   const firstFree = SLOTS.find((s) => s !== editing && isEmptyPattern(project.patterns[s]));
   const duplicate = () => {
@@ -429,6 +459,17 @@ export function Daw({
             <span className="hw-btn-led" />
             {exporting === "sì" ? "Esporto…" : exporting === "errore" ? "Riprova WAV" : "⤓ WAV"}
           </button>
+          <button
+            type="button"
+            className="hw-btn hw-btn--listen"
+            aria-pressed={listening}
+            disabled={listening}
+            title={songMode ? "Il coach ascolta tutta la canzone" : `Il coach ascolta il pattern ${editing}`}
+            onClick={() => void listen()}
+          >
+            <span className="hw-btn-led" />
+            {listening ? "Ascolto…" : "◉ Parere"}
+          </button>
         </div>
 
         <div className="hw-knobs">
@@ -486,6 +527,55 @@ export function Daw({
           onRestore={restore}
           onClose={() => setShowVersions(false)}
         />
+      )}
+
+      {measures && (
+        <section className="hw-panel hw-measures" aria-label="Misure dell'ultimo ascolto">
+          <div className="hw-seq-head">
+            <h2 className="hw-title">Ultimo ascolto del coach</h2>
+            <button type="button" className="hw-btn hw-btn--small" onClick={() => setMeasures(null)}>
+              Chiudi
+            </button>
+          </div>
+          <div className="hw-meas-row">
+            {[
+              ["Loudness", measures.integrated_lufs === null ? "—" : String(measures.integrated_lufs), "LUFS"],
+              ["True peak", String(measures.true_peak_dbtp), "dBTP"],
+              ["Dinamica", String(measures.crest_factor_db), "dB crest"],
+              ["Variazione", measures.lra_lu === null ? "—" : String(measures.lra_lu), "LU"],
+              ["Low end mono", measures.stereo.side_ratio_low <= 0.1 ? "sì" : "no", `side ${measures.stereo.side_ratio_low}`],
+            ].map(([label, value, unit]) => (
+              <div key={label} className="hw-meas">
+                <span className="hw-label">{label}</span>
+                <span className="hw-meas-value">{value}</span>
+                <span className="hw-value">{unit}</span>
+              </div>
+            ))}
+          </div>
+          <div className="hw-meas-bands" aria-label="Bilancio delle frequenze">
+            {Object.entries(measures.bands_db).map(([band, v]) => (
+              <div key={band} className="hw-meas-band" title={`${band}: ${v} dB`}>
+                <span className="hw-meas-bar" style={{ height: `${Math.max(4, Math.min(100, ((v + 40) / 40) * 100))}%` }} />
+                <span className="hw-value">{band.replace("_", " ")}</span>
+                <span className="hw-value">{v}</span>
+              </div>
+            ))}
+          </div>
+          {measures.bars.length > 1 && (
+            <div className="hw-meas-energy" aria-label="Energia per battuta">
+              {measures.bars.map((b) => (
+                <span
+                  key={b.bar}
+                  title={`Battuta ${b.bar} (${b.slot}): ${b.rms_db} dB, brillantezza ${b.above_6k_db} dB`}
+                  style={{ height: `${Math.max(4, Math.min(100, ((b.rms_db + 40) / 40) * 100))}%`, opacity: 0.35 + Math.max(0, Math.min(1, (b.above_6k_db + 40) / 30)) * 0.65 }}
+                />
+              ))}
+            </div>
+          )}
+          {measures.checks.length > 0 && (
+            <p className="hw-hint">Allarmi: {measures.checks.map((c) => c.detail).join(" · ")}</p>
+          )}
+        </section>
       )}
 
       {undo && (
@@ -1057,6 +1147,7 @@ export function Daw({
           })}
           initial={coachMessages}
           onData={applyFromCoach}
+          ask={ask}
           suggestions={[
             "Fammi una traccia deep house con intro, break e drop",
             "Make me a trap beat",

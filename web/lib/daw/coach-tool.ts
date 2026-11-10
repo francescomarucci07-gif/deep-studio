@@ -129,7 +129,7 @@ const SONG_TOOL: Anthropic.Beta.BetaTool = {
 const FX_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_effetti",
   description:
-    "Imposta gli effetti dei canali (filtro DJ, riverbero, delay a 3/16) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
+    "Imposta volume ed effetti dei canali (volume del fader, filtro DJ, riverbero, delay a 3/16) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
   input_schema: {
     type: "object",
     properties: {
@@ -141,6 +141,7 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
           type: "object",
           properties: {
             canale: { type: "string", enum: ["master", ...CHANNEL_IDS] },
+            volume: { type: "number", minimum: 0, maximum: 1, description: "Fader del canale (0–1). Il master non ce l'ha." },
             filtro: {
               type: "number",
               minimum: -1,
@@ -279,15 +280,17 @@ export function createStudioWriter(current: Project, editing: Slot) {
     if (name === "scrivi_effetti") {
       const raw = i as { effetti?: unknown; automazioni?: unknown; nome?: unknown };
       const fx = structuredClone(project.fx);
+      const mixer = structuredClone(project.mixer);
       let masterFilter = project.masterFilter;
       const automation = { ...project.automation };
       if (Array.isArray(raw.effetti)) {
-        for (const e of raw.effetti as { canale?: unknown; filtro?: unknown; riverbero?: unknown; delay?: unknown }[]) {
+        for (const e of raw.effetti as { canale?: unknown; volume?: unknown; filtro?: unknown; riverbero?: unknown; delay?: unknown }[]) {
           const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
           if (e?.canale === "master") {
             masterFilter = num(e.filtro) ?? masterFilter;
           } else if (CHANNEL_IDS.includes(e?.canale as (typeof CHANNEL_IDS)[number])) {
             const c = e.canale as (typeof CHANNEL_IDS)[number];
+            mixer[c] = { ...mixer[c], volume: num(e.volume) ?? mixer[c].volume };
             fx[c] = {
               filter: num(e.filtro) ?? fx[c].filter,
               reverb: num(e.riverbero) ?? fx[c].reverb,
@@ -313,7 +316,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
           lanes++;
         }
       }
-      project = normalize({ ...project, fx, masterFilter, automation });
+      project = normalize({ ...project, fx, mixer, masterFilter, automation });
       names.push(label(raw.nome, "effetti"));
       return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}: ${label(raw.nome, "effetti")}`;
     }

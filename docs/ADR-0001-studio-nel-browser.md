@@ -119,3 +119,15 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   si adattano all'altezza dello schermo; la chat del coach scorre al suo interno. I synth Bass/Lead stanno
   nella vista Roll e il Chord synth negli Accordi (il mixer ha solo canali ed effetti). La barra spaziatrice
   fa sempre Play/Stop, tranne quando si scrive (titolo, chat).
+
+## Aggiornamento 10 nov 2026 · canzoni lunghe
+
+- La canzone non è più fissa a 16 battute: parte da 16 e cresce con +4/+8 (−4 toglie, con conferma se le
+  battute non sono vuote) fino a 256 battute (a 124 BPM più di 8 minuti). Il tetto protegge l'export: il WAV
+  si costruisce tutto in memoria nel browser (256 battute a 124 BPM ≈ 170 MB durante il render).
+- `resizeSong()` allunga o accorcia anche le corsie di automazione; `normalize()` accetta canzoni di ogni
+  lunghezza tra 16 e 256. Motore ed export usavano già la lunghezza della canzone: nessun cambio lì.
+- Coach (prompt `crea-v10`): `scrivi_canzone` scrive canzoni lunghe quanto la lista (strutture da club in
+  sezioni da 8/16 battute); un punto di automazione oltre la fine allunga la canzone. Nel testo per il coach
+  la canzone va a righe da 16 e le automazioni sono solo i punti (meno token con canzoni lunghe).
+- Le misure del Parere per battuta passano fino a 24.000 caratteri (prima 8.000): bastano per 256 battute.

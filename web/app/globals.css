@@ -1234,13 +1234,18 @@ ol.ds-led-row {
 }
 
 /* automazione: una colonna per battuta, la curva disegnata sopra */
+/* la striscia è lunga quanto la canzone e scorre in orizzontale; la curva la copre tutta */
+.hw-auto-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
 .hw-auto-grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(16, minmax(36px, 1fr));
+  grid-template-columns: repeat(var(--bars, 16), minmax(36px, 1fr));
   gap: 5px;
-  overflow-x: auto;
-  padding-bottom: 4px;
+  width: calc(var(--bars, 16) * 41px - 5px);
+  min-width: 100%;
 }
 .hw-auto-curve {
   position: absolute;

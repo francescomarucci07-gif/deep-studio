@@ -58,7 +58,8 @@ export async function POST(request: NextRequest) {
 
   // le misure vanno solo a Claude, non nella storia salvata: sono tante e cambiano a ogni export
   const misure = body.misure && typeof body.misure === "object" ? JSON.stringify(body.misure) : "";
-  const listening = misure.length > 0 && misure.length < 8000 ? `\n\n[Misure dell'export]\n${misure}` : "";
+  // con 256 battute le misure per battuta sono ~15.000 caratteri: il tetto è più alto, ma resta un tetto
+  const listening = misure.length > 0 && misure.length < 24000 ? `\n\n[Misure dell'export]\n${misure}` : "";
 
   const { error: insertError } = await supabase
     .from("coach_messages")

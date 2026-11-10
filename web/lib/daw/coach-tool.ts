@@ -12,7 +12,9 @@ import {
   CHORD_TYPES,
   DRUMS,
   SLOTS,
-  SONG_BARS,
+  MAX_SONG_BARS,
+  MIN_SONG_BARS,
+  songSize,
   STEPS,
   isSlot,
   LEAD_HIGH,
@@ -116,15 +118,15 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
 
 const SONG_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_canzone",
-  description: `Scrive l'arrangiamento: quale pattern (A, B, C, D) suona in ognuna delle ${SONG_BARS} battute della canzone, in ordine. "-" = battuta vuota (silenzio). Usalo quando il producer ti chiede una traccia intera, una struttura o un arrangiamento (intro, groove, break, drop), insieme a scrivi_pattern per i pattern che servono.`,
+  description: `Scrive l'arrangiamento: quale pattern (A, B, C, D) suona in ogni battuta della canzone, in ordine. "-" = battuta vuota (silenzio). La canzone è lunga quanto la lista che mandi (da ${MIN_SONG_BARS} fino a ${MAX_SONG_BARS} battute) e sostituisce quella di prima. Usalo quando il producer ti chiede una traccia intera, una struttura o un arrangiamento (intro, groove, break, drop), insieme a scrivi_pattern per i pattern che servono.`,
   input_schema: {
     type: "object",
     properties: {
       battute: {
         type: "array",
-        description: `Fino a ${SONG_BARS} elementi, es. ["A","A","B","B","C","D","D","D"]. Le battute oltre l'ultima restano vuote.`,
+        description: `Una voce per battuta, fino a ${MAX_SONG_BARS}, es. ["A","A","A","A","B","B","B","B","C","C","D","D"]. Sotto le ${MIN_SONG_BARS} battute la fila si completa con battute vuote.`,
         items: { type: "string", enum: [...SLOTS, "-"] },
-        maxItems: SONG_BARS,
+        maxItems: MAX_SONG_BARS,
       },
       nome: { type: "string", description: "Nome breve della struttura, es. 'Intro, groove, break, drop'." },
     },
@@ -174,7 +176,7 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
               items: {
                 type: "object",
                 properties: {
-                  battuta: { type: "integer", minimum: 1, maximum: SONG_BARS },
+                  battuta: { type: "integer", minimum: 1, maximum: MAX_SONG_BARS },
                   valore: { type: "number", minimum: -1, maximum: 1 },
                 },
                 required: ["battuta", "valore"],
@@ -309,14 +311,22 @@ export function createStudioWriter(current: Project, editing: Slot) {
         }
       }
       let lanes = 0;
+      // un punto oltre la fine della canzone la allunga (fino al massimo), invece di andare perso
+      let size = project.song.length;
       if (Array.isArray(raw.automazioni)) {
+        for (const a of raw.automazioni as { punti?: unknown }[]) {
+          if (!Array.isArray(a?.punti)) continue;
+          for (const pt of a.punti as { battuta?: unknown }[]) {
+            if (Number.isInteger(pt?.battuta)) size = Math.max(size, songSize(pt.battuta as number));
+          }
+        }
         for (const a of raw.automazioni as { bersaglio?: unknown; punti?: unknown }[]) {
           if (!AUTO_TARGETS.includes(a?.bersaglio as (typeof AUTO_TARGETS)[number])) continue;
-          const lane: (number | null)[] = Array(SONG_BARS).fill(null);
+          const lane: (number | null)[] = Array(size).fill(null);
           if (Array.isArray(a.punti)) {
             for (const pt of a.punti as { battuta?: unknown; valore?: unknown }[]) {
               const b = pt?.battuta;
-              if (Number.isInteger(b) && (b as number) >= 1 && (b as number) <= SONG_BARS && typeof pt.valore === "number") {
+              if (Number.isInteger(b) && (b as number) >= 1 && (b as number) <= size && typeof pt.valore === "number") {
                 lane[(b as number) - 1] = pt.valore;
               }
             }
@@ -325,16 +335,18 @@ export function createStudioWriter(current: Project, editing: Slot) {
           lanes++;
         }
       }
-      project = normalize({ ...project, fx, mixer, masterFilter, automation });
+      const song = Array.from({ length: size }, (_, k) => project.song[k] ?? null);
+      project = normalize({ ...project, song, fx, mixer, masterFilter, automation });
       names.push(label(raw.nome, "effetti"));
       return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}: ${label(raw.nome, "effetti")}`;
     }
     if (name === "scrivi_canzone" && Array.isArray(i.battute)) {
-      const song = Array.from({ length: SONG_BARS }, (_, k) => (isSlot(i.battute && (i.battute as unknown[])[k]) ? (i.battute as Slot[])[k] : null));
+      const list = i.battute as unknown[];
+      const song = Array.from({ length: songSize(list.length) }, (_, k) => (isSlot(list[k]) ? (list[k] as Slot) : null));
       project = normalize({ ...project, song });
       songWritten = true;
       names.push(label(i.nome, "arrangiamento"));
-      return `Canzone scritta: ${song.map((s) => s ?? "-").join(" ")}`;
+      return `Canzone scritta (${project.song.length} battute): ${project.song.map((s) => s ?? "-").join(" ")}`;
     }
     return null;
   }

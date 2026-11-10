@@ -25,7 +25,10 @@ import {
   songLength,
   chordName,
   AUTO_TARGETS,
-  SONG_BARS,
+  MAX_SONG_BARS,
+  MIN_SONG_BARS,
+  resizeSong,
+  songSeconds,
   filterLabel,
   laneValue,
   type AutoTarget,
@@ -43,6 +46,12 @@ import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw
 import { createClient } from "@/lib/supabase/client";
 
 type SaveState = "salvato" | "modificato" | "salvo" | "errore";
+
+// durata in minuti:secondi, per il titolo della canzone
+const clock = (seconds: number) => {
+  const t = Math.round(seconds);
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};
 
 // Le viste della console sul computer (una alla volta, come le finestre di FL Studio).
 // Icone disegnate con un solo tracciato SVG 24×24.
@@ -358,11 +367,32 @@ export function Daw({
   const autoBase = autoTarget === "master" ? project.masterFilter : project.fx[autoTarget].filter; // prima del primo punto
   const setPoint = (b: number, v: number | null) =>
     update((p) => {
-      const l = p.automation[autoTarget] ?? Array(SONG_BARS).fill(null);
+      const l = p.automation[autoTarget] ?? Array(p.song.length).fill(null);
       l[b] = v;
       if (l.some((x) => x !== null)) p.automation[autoTarget] = l;
       else delete p.automation[autoTarget];
     });
+  // durante il play la striscia dell'automazione segue la battuta che suona (solo in orizzontale)
+  const autoScroll = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = autoScroll.current;
+    if (!box || !songMode || bar < 0 || box.scrollWidth <= box.clientWidth) return;
+    const cell = box.querySelectorAll<HTMLElement>(".hw-auto-bar")[bar];
+    if (!cell) return;
+    const left = cell.offsetLeft, right = left + cell.offsetWidth;
+    if (left < box.scrollLeft || right > box.scrollLeft + box.clientWidth) box.scrollLeft = left - 40;
+  }, [bar, songMode]);
+
+  // la canzone cresce a blocchi di 4 o 8 battute; togliendo battute piene chiedo conferma
+  const addBars = (n: number) => update((p) => resizeSong(p, p.song.length + n));
+  const removeBars = () => {
+    const from = project.song.length - 4;
+    const full =
+      project.song.slice(from).some(Boolean) ||
+      AUTO_TARGETS.some((t) => project.automation[t]?.slice(from).some((v) => v !== null));
+    if (full && !window.confirm(`Le battute ${from + 1}–${project.song.length} non sono vuote: le tolgo?`)) return;
+    update((p) => resizeSong(p, p.song.length - 4));
+  };
   const clearLane = () =>
     update((p) => {
       delete p.automation[autoTarget];
@@ -945,7 +975,35 @@ export function Daw({
           {/* ---- arrangiamento: quale pattern suona in ogni battuta ---- */}
           <section className="hw-panel hw-song" data-panel="song" aria-label="Arrangiamento">
             <div className="hw-seq-head">
-              <h2 className="hw-title">Song · {songLength(project)} battute</h2>
+              <h2 className="hw-title">
+                Song · {songLength(project)} battute · {clock(songSeconds(project))}
+              </h2>
+              <div className="hw-patterns" role="group" aria-label="Lunghezza della canzone">
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  disabled={project.song.length >= MAX_SONG_BARS}
+                  onClick={() => addBars(4)}
+                >
+                  +4
+                </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  disabled={project.song.length >= MAX_SONG_BARS}
+                  onClick={() => addBars(8)}
+                >
+                  +8
+                </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  disabled={project.song.length <= MIN_SONG_BARS}
+                  onClick={removeBars}
+                >
+                  −4
+                </button>
+              </div>
               <div className="hw-patterns" role="group" aria-label="Modalità">
                 <button type="button" className="hw-btn hw-btn--small" aria-pressed={!songMode} onClick={() => setSongMode(false)}>
                   <span className="hw-btn-led" />
@@ -974,8 +1032,9 @@ export function Daw({
               ))}
             </div>
             <p className="hw-hint">
-              Clic su una battuta: A → B → C → D → vuota. In <strong>Song</strong> suona la canzone dall&apos;inizio; in{" "}
-              <strong>Pattern</strong> solo il pattern che stai modificando, in loop.
+              Clic su una battuta: A → B → C → D → vuota. <strong>+4</strong> e <strong>+8</strong> allungano la canzone
+              (fino a {MAX_SONG_BARS} battute), <strong>−4</strong> toglie le ultime quattro. In <strong>Song</strong> suona la
+              canzone dall&apos;inizio; in <strong>Pattern</strong> solo il pattern che stai modificando, in loop.
             </p>
           </section>
 
@@ -1005,14 +1064,20 @@ export function Daw({
                 </button>
               </div>
             </div>
-            <div className="hw-auto-grid">
+            <div className="hw-auto-scroll" ref={autoScroll}>
+            <div className="hw-auto-grid" style={{ "--bars": project.song.length } as React.CSSProperties}>
               {/* la curva: il valore all'inizio di ogni battuta e come scorre fino alla successiva */}
-              <svg className="hw-auto-curve" viewBox={`0 0 ${SONG_BARS} 2`} preserveAspectRatio="none" aria-hidden="true">
-                <line x1="0" y1="1" x2={SONG_BARS} y2="1" className="hw-auto-zero" />
+              <svg
+                className="hw-auto-curve"
+                viewBox={`0 0 ${project.song.length} 2`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <line x1="0" y1="1" x2={project.song.length} y2="1" className="hw-auto-zero" />
                 {lane && (
                   <polyline
-                    points={Array.from({ length: SONG_BARS + 1 }, (_, b) => {
-                      const v = laneValue(lane, Math.min(b, SONG_BARS - 1), autoBase);
+                    points={Array.from({ length: project.song.length + 1 }, (_, b) => {
+                      const v = laneValue(lane, Math.min(b, project.song.length - 1), autoBase);
                       return `${b},${1 - v}`;
                     }).join(" ")}
                   />
@@ -1038,6 +1103,7 @@ export function Daw({
                   </div>
                 );
               })}
+            </div>
             </div>
             <p className="hw-hint">
               Trascina un cursore per mettere un punto, doppio clic per toglierlo: tra due punti il filtro scorre da

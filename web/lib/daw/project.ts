@@ -1,10 +1,13 @@
 // Il progetto dello studio nel browser: 4 pattern da una battuta (A–D) con batteria, bassline, accordi
-// e melodia (lead), una canzone di 16 battute che dice quale pattern suona, suoni dei synth, mixer.
+// e melodia (lead), una canzone (da 16 a 256 battute) che dice quale pattern suona, suoni dei synth, mixer.
 // È anche il JSON salvato in projects.data, quindi ogni campo ha un default (vedi normalize).
 import { isKit, KITS, type KitId } from "./kits";
 
 export const STEPS = 16;
-export const SONG_BARS = 16;
+// La canzone parte da 16 battute e cresce quanto serve. Il tetto (256 battute: a 124 BPM più di 8 minuti)
+// protegge l'export: il browser costruisce tutto il WAV in memoria.
+export const MIN_SONG_BARS = 16;
+export const MAX_SONG_BARS = 256;
 
 export const DRUMS = [
   { id: "kick", label: "Kick" },
@@ -86,7 +89,7 @@ export type Project = {
   bpm: number;
   swing: number; // 0–0.5: quanto ritardano gli step pari, come lo swing di FL
   patterns: Record<Slot, Pattern>;
-  song: (Slot | null)[]; // SONG_BARS battute; null = battuta vuota
+  song: (Slot | null)[]; // da MIN_SONG_BARS a MAX_SONG_BARS battute; null = battuta vuota
   kit: KitId; // il timbro della batteria (kits.ts)
   bassSound: { wave: Wave; cutoff: number; length: NoteLength };
   chordSound: { style: ChordStyle; cutoff: number };
@@ -156,6 +159,30 @@ export function filterLabel(v: number) {
 }
 
 // La canzone dura fino all'ultima battuta usata (almeno 1)
+// quante battute ha la fila della canzone: almeno 16, al massimo 256
+export function songSize(n: number) {
+  return Math.min(MAX_SONG_BARS, Math.max(MIN_SONG_BARS, Math.ceil(Number.isFinite(n) ? n : 0)));
+}
+
+// Allunga o accorcia la fila della canzone (e le corsie di automazione con lei)
+export function resizeSong(p: Project, bars: number) {
+  const n = songSize(bars);
+  const fit = <T,>(a: T[]) => Array.from({ length: n }, (_, i) => (i < a.length ? a[i] : null)) as (T | null)[];
+  p.song = fit(p.song);
+  for (const t of AUTO_TARGETS) {
+    const lane = p.automation[t];
+    if (!lane) continue;
+    const l = fit(lane) as Lane;
+    if (l.some((v) => v !== null)) p.automation[t] = l;
+    else delete p.automation[t];
+  }
+}
+
+// la durata della canzone in secondi (fino all'ultima battuta usata)
+export function songSeconds(p: Project) {
+  return (songLength(p) * STEPS * 60) / p.bpm / 4;
+}
+
 export function songLength(p: Project) {
   let last = 0;
   p.song.forEach((s, i) => s && (last = i + 1));
@@ -184,7 +211,7 @@ export function starterProject(): Project {
       C: emptyPattern(),
       D: emptyPattern(),
     },
-    song: ["A", "A", "A", "A", ...Array(SONG_BARS - 4).fill(null)],
+    song: ["A", "A", "A", "A", ...Array(MIN_SONG_BARS - 4).fill(null)],
     kit: "house",
     bassSound: { wave: "sawtooth", cutoff: 700, length: "corta" },
     chordSound: { style: "pad", cutoff: 1800 },
@@ -255,7 +282,9 @@ export function normalize(raw: unknown): Project {
   ) as Project["patterns"];
   const song = v1
     ? d.song
-    : Array.from({ length: SONG_BARS }, (_, i) => (Array.isArray(r.song) && isSlot(r.song[i]) ? r.song[i] : null));
+    : Array.from({ length: songSize(Array.isArray(r.song) ? r.song.length : 0) }, (_, i) =>
+        Array.isArray(r.song) && isSlot(r.song[i]) ? r.song[i] : null,
+      );
   return {
     version: 2,
     bpm: clamp(r.bpm, 60, 200, d.bpm),
@@ -298,7 +327,7 @@ export function normalize(raw: unknown): Project {
       AUTO_TARGETS.flatMap((t) => {
         const lane = r.automation?.[t];
         if (!Array.isArray(lane)) return [];
-        const clean = Array.from({ length: SONG_BARS }, (_, i) =>
+        const clean = Array.from({ length: song.length }, (_, i) =>
           typeof lane[i] === "number" && Number.isFinite(lane[i]) ? Math.max(-1, Math.min(1, lane[i] as number)) : null,
         );
         return clean.some((v) => v !== null) ? [[t, clean]] : [];
@@ -348,12 +377,23 @@ export function describe(p: Project, title: string, editing: Slot) {
     const lead = pat.lead.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}`)).filter(Boolean);
     lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
   }
-  lines.push(`Canzone (${SONG_BARS} battute, - = vuota): ${p.song.map((s) => s ?? "-").join(" ")}`);
+  // la canzone a righe da 16 battute (le pagine della playlist), più facile da leggere
+  lines.push(
+    `Canzone (${p.song.length} battute nella fila, usate fino alla ${songLength(p)}, ${Math.round(songSeconds(p))} s; - = vuota; massimo ${MAX_SONG_BARS}):`,
+  );
+  for (let i = 0; i < p.song.length; i += 16) {
+    lines.push(`  battute ${i + 1}–${Math.min(i + 16, p.song.length)}: ${p.song.slice(i, i + 16).map((s) => s ?? "-").join(" ")}`);
+  }
   const lanes = AUTO_TARGETS.filter((t) => p.automation[t]);
   lines.push(
     lanes.length
-      ? `Automazioni del filtro (valore per battuta, - = nessun punto): ${lanes
-          .map((t) => `${t}: ${(p.automation[t] as Lane).map((v) => (v === null ? "-" : v.toFixed(2))).join(" ")}`)
+      ? `Automazioni del filtro (solo i punti, battuta=valore; tra due punti il valore scorre): ${lanes
+          .map(
+            (t) =>
+              `${t}: ${(p.automation[t] as Lane)
+                .flatMap((v, b) => (v === null ? [] : [`${b + 1}=${v.toFixed(2)}`]))
+                .join(" ")}`,
+          )
           .join("; ")}`
       : "Automazioni: nessuna.",
   );

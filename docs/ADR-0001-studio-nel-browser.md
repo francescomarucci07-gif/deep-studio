@@ -91,3 +91,13 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Le misure vanno solo nel messaggio a Claude, non nella storia salvata (cambiano a ogni ascolto). Nessun audio
   lascia il browser. Il coach risponde con priorità e numeri (prompt `crea-v8`) e può correggere con
   `scrivi_effetti`, che ora regola anche i volumi dei canali e del master.
+
+## Aggiornamento 10 nov 2026 · kit di batteria
+
+- Quattro kit (`web/lib/daw/kits.ts`): House (quello di prima), 909, 808, Trap. Sempre sintetizzati: un kit è una
+  tabella di numeri (tono e coda del kick, timbro del clap con o senza corpo da rullante, decay degli hat) più il
+  tipo di perc (conga, rim, cowbell). Campo `kit` nel progetto; i progetti di prima restano House.
+- Kick e hat ora hanno un "choke" con un gain dedicato: un colpo nuovo taglia la coda di quello prima, così la
+  coda lunga dell'808 non si accumula (e l'open hat non resta a pieno volume prima del taglio).
+- Il coach sceglie il kit con `scrivi_pattern` (prompt `crea-v9`). Export di prova sullo stesso pattern:
+  da -15,1 LUFS (909) a -11,9 LUFS (Trap), true peak sempre sotto -2,2 dBTP, nessun allarme.

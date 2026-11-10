@@ -36,6 +36,7 @@ import {
   type Project,
   type Slot,
 } from "@/lib/daw/project";
+import { KIT_IDS, KITS } from "@/lib/daw/kits";
 import { measure, type Measures } from "@/lib/daw/measure";
 import { encodeWav, renderAudio, renderPlan, SAMPLE_RATE } from "@/lib/daw/render";
 import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
@@ -603,7 +604,31 @@ export function Daw({
         <div className="console-main">
           {/* ---- drum pad ---- */}
           <section className="hw-panel hw-pads-panel" aria-label="Drum pad">
-            <h2 className="hw-title">Pads</h2>
+            <div className="hw-seq-head">
+              <h2 className="hw-title">Pads · Kit {KITS[project.kit].label}</h2>
+              <div className="hw-seg" role="group" aria-label="Kit di batteria">
+                {KIT_IDS.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className="hw-btn hw-btn--small"
+                    aria-pressed={project.kit === k}
+                    title={KITS[k].hint}
+                    onClick={() => {
+                      update((p) => {
+                        p.kit = k;
+                      });
+                      // senti subito il kick del kit nuovo (il ref prima del render, senza registrare)
+                      projectRef.current = { ...projectRef.current, kit: k };
+                      void engine().preview("kick");
+                    }}
+                  >
+                    <span className="hw-btn-led" />
+                    {KITS[k].label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="hw-pads">
               {PADS.map((p) => (
                 <button

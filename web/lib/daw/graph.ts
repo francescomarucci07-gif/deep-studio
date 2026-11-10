@@ -18,6 +18,7 @@ import {
   type Pattern,
   type Project,
 } from "./project";
+import { KITS } from "./kits";
 
 const mtof = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
@@ -41,7 +42,9 @@ export class Graph {
   private automating = false; // in modalità song le corsie di automazione comandano i loro filtri
   private noise: AudioBuffer;
   private drive: Float32Array<ArrayBuffer>;
-  private openHat: GainNode | null = null; // per il "choke": l'hat chiuso taglia l'open hat
+  // "choke": un colpo nuovo taglia la coda di quello prima (hat chiuso → open hat; kick → kick,
+  // così la coda lunga dell'808 non si accumula). Un gain a parte, senza toccare l'inviluppo.
+  private chokes: { kick: GainNode | null; hat: GainNode | null } = { kick: null, hat: null };
 
   constructor(
     readonly ctx: BaseAudioContext,
@@ -282,6 +285,13 @@ export class Graph {
     return f;
   }
 
+  private choke(group: "kick" | "hat", t: number) {
+    this.chokes[group]?.gain.setTargetAtTime(0, t, group === "kick" ? 0.004 : 0.008);
+    const g = this.ctx.createGain();
+    this.chokes[group] = g;
+    return g;
+  }
+
   private shaper() {
     const s = this.ctx.createWaveShaper();
     s.curve = this.drive;
@@ -291,20 +301,26 @@ export class Graph {
   private drum(id: DrumId, t: number) {
     const out = this.channels[id];
     const ctx = this.ctx;
+    const kit = KITS[this.getProject().kit] ?? KITS.house;
     if (id === "kick") {
-      // corpo: sinusoide che scende di tono (il "boom"), saturata un filo per il calore
+      // corpo: sinusoide che scende di tono (il "boom"), saturata un filo per il calore.
+      // 909 = discesa rapida e coda corta (punch); 808/trap = coda lunga che fa da nota
+      const k = kit.kick;
       const o = ctx.createOscillator();
-      o.frequency.setValueAtTime(230, t);
-      o.frequency.exponentialRampToValueAtTime(55, t + 0.07);
-      o.frequency.exponentialRampToValueAtTime(44, t + 0.4);
-      const body = this.env(t, 1, 0.45, 0.002);
-      o.connect(body).connect(this.shaper()).connect(out);
+      o.frequency.setValueAtTime(k.start, t);
+      o.frequency.exponentialRampToValueAtTime(k.knee, t + k.sweep);
+      o.frequency.exponentialRampToValueAtTime(k.end, t + Math.max(0.4, k.decay));
+      const body = this.env(t, 1, k.decay, 0.002);
+      o.connect(body).connect(this.choke("kick", t)).connect(this.shaper()).connect(out);
       o.start(t);
-      o.stop(t + 0.5);
+      o.stop(t + k.decay + 0.1);
       // attacco: un click cortissimo che fa sentire il kick anche sulle casse piccole
-      this.noiseSource(t, 0.02).connect(this.filter("highpass", 3000)).connect(this.env(t, 0.35, 0.008)).connect(out);
+      if (k.click > 0) {
+        this.noiseSource(t, 0.02).connect(this.filter("highpass", 3000)).connect(this.env(t, k.click, 0.008)).connect(out);
+      }
     } else if (id === "clap") {
       // quattro "mani" quasi insieme, poi la coda della stanza
+      const c = kit.clap;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t);
       for (const dt of [0, 0.009, 0.018, 0.027]) {
@@ -312,23 +328,31 @@ export class Graph {
         g.gain.exponentialRampToValueAtTime(0.15, t + dt + 0.008);
       }
       g.gain.setValueAtTime(0.6, t + 0.03);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
-      this.noiseSource(t, 0.36)
-        .connect(this.filter("bandpass", 1500, 1.2))
+      g.gain.exponentialRampToValueAtTime(0.001, t + c.tail);
+      this.noiseSource(t, c.tail + 0.04)
+        .connect(this.filter("bandpass", c.tone, 1.2))
         .connect(this.filter("highpass", 600))
         .connect(g)
         .connect(out);
+      // corpo da rullante: un tono a ~190 Hz che scende, sotto il rumore (909 e trap)
+      if (c.body > 0) {
+        const o = ctx.createOscillator();
+        o.type = "triangle";
+        o.frequency.setValueAtTime(240, t);
+        o.frequency.exponentialRampToValueAtTime(180, t + 0.05);
+        o.connect(this.env(t, c.body, 0.09)).connect(out);
+        o.start(t);
+        o.stop(t + 0.15);
+      }
     } else if (id === "hat" || id === "openhat") {
       // choke: un hat nuovo (chiuso o aperto) taglia l'open hat che sta ancora suonando
-      if (this.openHat) {
-        this.openHat.gain.cancelScheduledValues(t);
-        this.openHat.gain.setTargetAtTime(0, t, 0.008);
-        this.openHat = null;
-      }
-      const decay = id === "hat" ? 0.055 : 0.38;
-      const g = this.env(t, 0.85, decay);
-      const band = this.filter("bandpass", 10000, 0.8);
-      band.connect(this.filter("highpass", 7000)).connect(g).connect(out);
+      const h = kit.hat;
+      const decay = id === "hat" ? h.closed : h.open;
+      const g = this.env(t, h.level, decay);
+      const band = this.filter("bandpass", h.center, 0.8);
+      const cut = this.choke("hat", t);
+      band.connect(this.filter("highpass", h.cut)).connect(g).connect(cut).connect(out);
+      if (id === "hat") this.chokes.hat = null; // l'hat chiuso taglia l'open hat, ma non se stesso
       for (const f of HAT_FREQS) {
         const o = ctx.createOscillator();
         o.type = "square";
@@ -337,7 +361,33 @@ export class Graph {
         o.start(t);
         o.stop(t + decay + 0.05);
       }
-      if (id === "openhat") this.openHat = g;
+    } else if (kit.perc === "cowbell") {
+      // cowbell della 808: due onde quadre stonate tra loro (540 e 800 Hz) in un passa-banda
+      const band = this.filter("bandpass", 900, 2);
+      const g = this.env(t, 0.5, 0.22);
+      band.connect(g).connect(out);
+      for (const f of [540, 800]) {
+        const o = ctx.createOscillator();
+        o.type = "square";
+        o.frequency.value = f;
+        o.connect(band);
+        o.start(t);
+        o.stop(t + 0.3);
+      }
+    } else if (kit.perc === "rim") {
+      // rimshot: un "tock" cortissimo, due toni alti più un click
+      for (const [f, peak] of [
+        [480, 0.5],
+        [1650, 0.3],
+      ]) {
+        const o = ctx.createOscillator();
+        o.type = "triangle";
+        o.frequency.value = f;
+        o.connect(this.env(t, peak, 0.03)).connect(out);
+        o.start(t);
+        o.stop(t + 0.06);
+      }
+      this.noiseSource(t, 0.015).connect(this.filter("highpass", 2500)).connect(this.env(t, 0.3, 0.006)).connect(out);
     } else {
       // perc tipo conga: tono che scende un po' più un armonico, e un piccolo click di pelle
       for (const [f0, f1, peak] of [

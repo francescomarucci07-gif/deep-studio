@@ -2,6 +2,7 @@
 // Claude manda step da 1 a 16 e note MIDI; qui diventa un Project valido (normalize scarta il resto).
 // Il coach può chiamarli più volte nella stessa risposta: ogni chiamata parte dal risultato della precedente.
 import type Anthropic from "@anthropic-ai/sdk";
+import { KIT_IDS } from "./kits";
 import {
   AUTO_TARGETS,
   CHANNEL_IDS,
@@ -57,6 +58,12 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
           },
           required: ["step", "nota"],
         },
+      },
+      kit: {
+        type: "string",
+        enum: [...KIT_IDS],
+        description:
+          "Kit di batteria (vale per tutto il progetto): house = kick rotondo, clap largo, conga; 909 = kick secco, hat brillanti, rim (tech house, techno); 808 = kick lungo e morbido, cowbell; trap = 808 profondo e lungo, rullante con corpo, hat secchi.",
       },
       onda: { type: "string", enum: ["sawtooth", "square"], description: "Timbro del basso." },
       filtro: { type: "number", minimum: 150, maximum: 4000, description: "Cutoff del basso in Hz: basso = scuro e caldo." },
@@ -192,6 +199,7 @@ type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc",
   swing?: unknown;
   sidechain?: unknown;
   basso?: unknown;
+  kit?: unknown;
   onda?: unknown;
   filtro?: unknown;
   durata?: unknown;
@@ -256,6 +264,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
         bpm: i.bpm ?? project.bpm,
         swing: i.swing ?? project.swing,
         sidechain: typeof i.sidechain === "boolean" ? i.sidechain : project.sidechain,
+        kit: i.kit ?? project.kit, // normalize scarta i kit che non esistono
         patterns: { ...project.patterns, [slot]: pattern },
         bassSound: {
           wave: i.onda ?? project.bassSound.wave,

@@ -1,6 +1,7 @@
 // Il progetto dello studio nel browser: 4 pattern da una battuta (A–D) con batteria, bassline, accordi
 // e melodia (lead), una canzone di 16 battute che dice quale pattern suona, suoni dei synth, mixer.
 // È anche il JSON salvato in projects.data, quindi ogni campo ha un default (vedi normalize).
+import { isKit, KITS, type KitId } from "./kits";
 
 export const STEPS = 16;
 export const SONG_BARS = 16;
@@ -86,6 +87,7 @@ export type Project = {
   swing: number; // 0–0.5: quanto ritardano gli step pari, come lo swing di FL
   patterns: Record<Slot, Pattern>;
   song: (Slot | null)[]; // SONG_BARS battute; null = battuta vuota
+  kit: KitId; // il timbro della batteria (kits.ts)
   bassSound: { wave: Wave; cutoff: number; length: NoteLength };
   chordSound: { style: ChordStyle; cutoff: number };
   leadSound: { wave: LeadWave; cutoff: number; length: NoteLength };
@@ -183,6 +185,7 @@ export function starterProject(): Project {
       D: emptyPattern(),
     },
     song: ["A", "A", "A", "A", ...Array(SONG_BARS - 4).fill(null)],
+    kit: "house",
     bassSound: { wave: "sawtooth", cutoff: 700, length: "corta" },
     chordSound: { style: "pad", cutoff: 1800 },
     leadSound: { wave: "sawtooth", cutoff: 2600, length: "corta" },
@@ -259,6 +262,7 @@ export function normalize(raw: unknown): Project {
     swing: clamp(r.swing, 0, 0.5, d.swing),
     patterns,
     song,
+    kit: isKit(r.kit) ? r.kit : d.kit, // i progetti di prima suonano come prima: house
     bassSound: {
       wave: r.bassSound?.wave === "square" ? "square" : "sawtooth",
       cutoff: clamp(r.bassSound?.cutoff, 150, 4000, d.bassSound.cutoff),
@@ -320,6 +324,7 @@ export function describe(p: Project, title: string, editing: Slot) {
   const lines = [
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
     `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}.`,
+    `Kit di batteria: ${KITS[p.kit].label} (${KITS[p.kit].hint}).`,
     `Accordi: suono ${p.chordSound.style === "pad" ? "pad (tiene fino all'accordo dopo)" : "stab (colpo corto sul battito)"}, filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
     `Lead: onda ${p.leadSound.wave}, filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}.`,
     `Effetti (filtro DJ -1…1: negativo = passa-basso, positivo = passa-alto; riverbero e delay 0…1): ${CHANNEL_IDS.map(

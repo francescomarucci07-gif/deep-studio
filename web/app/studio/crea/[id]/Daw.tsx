@@ -44,6 +44,34 @@ import { createClient } from "@/lib/supabase/client";
 
 type SaveState = "salvato" | "modificato" | "salvo" | "errore";
 
+// Le viste della console sul computer (una alla volta, come le finestre di FL Studio).
+// Icone disegnate con un solo tracciato SVG 24×24.
+const VIEWS = [
+  { id: "beat", label: "Beat", icon: "M4 6h4v4H4zM10 6h4v4h-4zM16 6h4v4h-4zM4 14h4v4H4zM16 14h4v4h-4z" },
+  { id: "roll", label: "Roll", icon: "M3 6h7M8 11h9M5 16h6M14 19h7" },
+  { id: "chords", label: "Accordi", icon: "M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3zm0 0V6l11-2v12m0 0a3 3 0 1 1-3-3 3 3 0 0 1 3 3z" },
+  { id: "song", label: "Song", icon: "M3 5h7v4H3zM12 5h9v4h-9zM6 11h9v4H6zM3 17h12v3H3z" },
+  { id: "mixer", label: "Mixer", icon: "M6 3v18M12 3v18M18 3v18M4 14h4M10 8h4M16 16h4" },
+  { id: "auto", label: "Auto", icon: "M3 18c4 0 4-12 9-12s5 8 9 8" },
+] as const;
+type ViewId = (typeof VIEWS)[number]["id"];
+const isView = (v: unknown): v is ViewId => VIEWS.some((x) => x.id === v);
+
+function stored(key: string) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function store(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // storage non disponibile: la scelta vale solo per questa visita
+  }
+}
+
 // righe del piano roll, dall'alto in basso, per ogni strumento con le note
 const rows = (lo: number, hi: number) => Array.from({ length: hi - lo + 1 }, (_, i) => hi - i);
 const ROLLS = {
@@ -111,6 +139,23 @@ export function Daw({
   const pat = project.patterns[editing];
   const [showVersions, setShowVersions] = useState(false);
   const [roll, setRoll] = useState<RollId>("bass");
+  const [view, setView] = useState<ViewId>("beat"); // la vista al centro (sul computer)
+  const [coachOpen, setCoachOpen] = useState(true);
+  useEffect(() => {
+    const v = stored("ds-vista");
+    if (isView(v)) setView(v);
+    if (stored("ds-coach-aperto") === "0") setCoachOpen(false);
+  }, []);
+  const chooseView = useCallback((v: ViewId) => {
+    setView(v);
+    store("ds-vista", v);
+  }, []);
+  const toggleCoach = () => {
+    setCoachOpen((o) => {
+      store("ds-coach-aperto", o ? "0" : "1");
+      return !o;
+    });
+  };
   const [autoTarget, setAutoTarget] = useState<AutoTarget>("master");
   const [exporting, setExporting] = useState<"no" | "sì" | "errore">("no");
   const [listening, setListening] = useState(false);
@@ -202,12 +247,18 @@ export function Daw({
         togglePlay();
         return;
       }
+      // 1–6: cambia vista (le cifre non sono usate dai pad)
+      const n = Number(e.key);
+      if (Number.isInteger(n) && n >= 1 && n <= VIEWS.length && !e.altKey) {
+        chooseView(VIEWS[n - 1].id);
+        return;
+      }
       const pad = PADS.find((p) => p.key === e.key.toLowerCase());
       if (pad) hitPad(pad.id);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePlay, hitPad]);
+  }, [togglePlay, hitPad, chooseView]);
 
   // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
   const snapshot = useCallback(
@@ -402,7 +453,7 @@ export function Daw({
           : sounding.drums[c][step]));
 
   return (
-    <div className="console">
+    <div className="console" data-coach={coachOpen ? "on" : "off"}>
       {/* ---- pannello superiore: marchio, display, trasporto, manopole ---- */}
       <section className="hw-panel hw-top" aria-label="Trasporto">
         <div className="hw-brand">
@@ -518,91 +569,9 @@ export function Daw({
         </div>
       </section>
 
-      {showVersions && (
-        <VersionsPanel
-          projectId={id}
-          refresh={versionsTick}
-          onSave={async (label) => {
-            await snapshot(label);
-          }}
-          onRestore={restore}
-          onClose={() => setShowVersions(false)}
-        />
-      )}
-
-      {measures && (
-        <section className="hw-panel hw-measures" aria-label="Misure dell'ultimo ascolto">
-          <div className="hw-seq-head">
-            <h2 className="hw-title">Ultimo ascolto del coach</h2>
-            <button type="button" className="hw-btn hw-btn--small" onClick={() => setMeasures(null)}>
-              Chiudi
-            </button>
-          </div>
-          <div className="hw-meas-row">
-            {[
-              ["Loudness", measures.integrated_lufs === null ? "—" : String(measures.integrated_lufs), "LUFS"],
-              ["True peak", String(measures.true_peak_dbtp), "dBTP"],
-              ["Dinamica", String(measures.crest_factor_db), "dB crest"],
-              ["Variazione", measures.lra_lu === null ? "—" : String(measures.lra_lu), "LU"],
-              ["Low end mono", measures.stereo.side_ratio_low <= 0.1 ? "sì" : "no", `side ${measures.stereo.side_ratio_low}`],
-            ].map(([label, value, unit]) => (
-              <div key={label} className="hw-meas">
-                <span className="hw-label">{label}</span>
-                <span className="hw-meas-value">{value}</span>
-                <span className="hw-value">{unit}</span>
-              </div>
-            ))}
-          </div>
-          <div className="hw-meas-bands" aria-label="Bilancio delle frequenze">
-            {Object.entries(measures.bands_db).map(([band, v]) => (
-              <div key={band} className="hw-meas-band" title={`${band}: ${v} dB`}>
-                <span className="hw-meas-bar" style={{ height: `${Math.max(4, Math.min(100, ((v + 40) / 40) * 100))}%` }} />
-                <span className="hw-value">{band.replace("_", " ")}</span>
-                <span className="hw-value">{v}</span>
-              </div>
-            ))}
-          </div>
-          {measures.bars.length > 1 && (
-            <div className="hw-meas-energy" aria-label="Energia per battuta">
-              {measures.bars.map((b) => (
-                <span
-                  key={b.bar}
-                  title={`Battuta ${b.bar} (${b.slot}): ${b.rms_db} dB, brillantezza ${b.above_6k_db} dB`}
-                  style={{ height: `${Math.max(4, Math.min(100, ((b.rms_db + 40) / 40) * 100))}%`, opacity: 0.35 + Math.max(0, Math.min(1, (b.above_6k_db + 40) / 30)) * 0.65 }}
-                />
-              ))}
-            </div>
-          )}
-          {measures.checks.length > 0 && (
-            <p className="hw-hint">Allarmi: {measures.checks.map((c) => c.detail).join(" · ")}</p>
-          )}
-        </section>
-      )}
-
-      {undo && (
-        <div className="hw-toast" role="status">
-          <span>
-            Il coach ha scritto <strong>“{undo.name}”</strong>. Modificalo come vuoi.
-          </span>
-          <button
-            type="button"
-            className="hw-btn hw-btn--small"
-            onClick={() => {
-              setProject(undo.project);
-              setUndo(null);
-            }}
-          >
-            Annulla
-          </button>
-          <button type="button" className="hw-btn hw-btn--small" onClick={() => setUndo(null)}>
-            Tieni
-          </button>
-        </div>
-      )}
-
       <div className="console-body">
-        <div className="console-main">
-          {/* ---- drum pad ---- */}
+        {/* ---- colonna sinistra: kit e pad ---- */}
+        <aside className="console-side">
           <section className="hw-panel hw-pads-panel" aria-label="Drum pad">
             <div className="hw-seq-head">
               <h2 className="hw-title">Pads · Kit {KITS[project.kit].label}</h2>
@@ -656,8 +625,123 @@ export function Daw({
             </p>
           </section>
 
-          {/* ---- step sequencer, colori a gruppi di 4 come una TR-808 ---- */}
-          <section className="hw-panel hw-seq" aria-label="Step sequencer">
+        </aside>
+
+        {/* ---- centro: sul computer una vista alla volta (schede in alto), sul telefono tutto in colonna ---- */}
+        <div className="console-stage" data-view={view}>
+          <nav className="hw-views" aria-label="Viste dello studio">
+            <div className="hw-views-tabs">
+              {VIEWS.map((v, n) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  className="hw-view"
+                  aria-pressed={view === v.id}
+                  title={`${v.label} (tasto ${n + 1})`}
+                  onClick={() => chooseView(v.id)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d={v.icon} />
+                  </svg>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="hw-btn hw-btn--small hw-views-end"
+              aria-pressed={coachOpen}
+              onClick={toggleCoach}
+            >
+              <span className="hw-btn-led" />
+              Coach
+            </button>
+          </nav>
+
+          {showVersions && (
+            <VersionsPanel
+              projectId={id}
+              refresh={versionsTick}
+              onSave={async (label) => {
+                await snapshot(label);
+              }}
+              onRestore={restore}
+              onClose={() => setShowVersions(false)}
+            />
+          )}
+
+          {measures && (
+            <section className="hw-panel hw-measures" aria-label="Misure dell'ultimo ascolto">
+              <div className="hw-seq-head">
+                <h2 className="hw-title">Ultimo ascolto del coach</h2>
+                <button type="button" className="hw-btn hw-btn--small" onClick={() => setMeasures(null)}>
+                  Chiudi
+                </button>
+              </div>
+              <div className="hw-meas-row">
+                {[
+                  ["Loudness", measures.integrated_lufs === null ? "—" : String(measures.integrated_lufs), "LUFS"],
+                  ["True peak", String(measures.true_peak_dbtp), "dBTP"],
+                  ["Dinamica", String(measures.crest_factor_db), "dB crest"],
+                  ["Variazione", measures.lra_lu === null ? "—" : String(measures.lra_lu), "LU"],
+                  ["Low end mono", measures.stereo.side_ratio_low <= 0.1 ? "sì" : "no", `side ${measures.stereo.side_ratio_low}`],
+                ].map(([label, value, unit]) => (
+                  <div key={label} className="hw-meas">
+                    <span className="hw-label">{label}</span>
+                    <span className="hw-meas-value">{value}</span>
+                    <span className="hw-value">{unit}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="hw-meas-bands" aria-label="Bilancio delle frequenze">
+                {Object.entries(measures.bands_db).map(([band, v]) => (
+                  <div key={band} className="hw-meas-band" title={`${band}: ${v} dB`}>
+                    <span className="hw-meas-bar" style={{ height: `${Math.max(4, Math.min(100, ((v + 40) / 40) * 100))}%` }} />
+                    <span className="hw-value">{band.replace("_", " ")}</span>
+                    <span className="hw-value">{v}</span>
+                  </div>
+                ))}
+              </div>
+              {measures.bars.length > 1 && (
+                <div className="hw-meas-energy" aria-label="Energia per battuta">
+                  {measures.bars.map((b) => (
+                    <span
+                      key={b.bar}
+                      title={`Battuta ${b.bar} (${b.slot}): ${b.rms_db} dB, brillantezza ${b.above_6k_db} dB`}
+                      style={{ height: `${Math.max(4, Math.min(100, ((b.rms_db + 40) / 40) * 100))}%`, opacity: 0.35 + Math.max(0, Math.min(1, (b.above_6k_db + 40) / 30)) * 0.65 }}
+                    />
+                  ))}
+                </div>
+              )}
+              {measures.checks.length > 0 && (
+                <p className="hw-hint">Allarmi: {measures.checks.map((c) => c.detail).join(" · ")}</p>
+              )}
+            </section>
+          )}
+
+          {undo && (
+            <div className="hw-toast" role="status">
+              <span>
+                Il coach ha scritto <strong>“{undo.name}”</strong>. Modificalo come vuoi.
+              </span>
+              <button
+                type="button"
+                className="hw-btn hw-btn--small"
+                onClick={() => {
+                  setProject(undo.project);
+                  setUndo(null);
+                }}
+              >
+                Annulla
+              </button>
+              <button type="button" className="hw-btn hw-btn--small" onClick={() => setUndo(null)}>
+                Tieni
+              </button>
+            </div>
+          )}
+
+          {/* ---- step sequencer: ogni riga ha il colore del suo strumento ---- */}
+          <section className="hw-panel hw-seq" data-panel="beat" aria-label="Step sequencer">
             <div className="hw-seq-head">
               <h2 className="hw-title">Step sequencer · Pattern {editing}</h2>
               <div className="hw-patterns" role="group" aria-label="Pattern da modificare">
@@ -685,7 +769,7 @@ export function Daw({
             </div>
             <div className="hw-seq-grid">
               {DRUMS.map(({ id: d, label }) => (
-                <div key={d} className="hw-seq-row">
+                <div key={d} className="hw-seq-row" data-row={d}>
                   <button type="button" className="hw-seq-name" onClick={() => void engine().preview(d)}>
                     {label}
                   </button>
@@ -705,7 +789,7 @@ export function Daw({
                   ))}
                 </div>
               ))}
-              <div className="hw-seq-row">
+              <div className="hw-seq-row" data-row="bass">
                 <button type="button" className="hw-seq-name" onClick={() => void engine().preview("bass")}>
                   Bass
                 </button>
@@ -721,8 +805,12 @@ export function Daw({
                   </span>
                 ))}
               </div>
-              <div className="hw-seq-row">
-                <button type="button" className="hw-seq-name" onClick={() => setRoll("lead")}>
+              <div className="hw-seq-row" data-row="lead">
+                <button type="button" className="hw-seq-name" onClick={() => {
+                    setRoll("lead");
+                    chooseView("roll");
+                  }}
+                >
                   Lead
                 </button>
                 {pat.lead.map((n, i) => (
@@ -747,7 +835,7 @@ export function Daw({
           </section>
 
           {/* ---- accordi del pattern: uno per battito ---- */}
-          <section className="hw-panel hw-chords" aria-label="Accordi">
+          <section className="hw-panel hw-chords" data-panel="chords" aria-label="Accordi">
             <div className="hw-seq-head">
               <h2 className="hw-title">Accordi · Pattern {editing}</h2>
               <span className="hw-value">
@@ -804,7 +892,7 @@ export function Daw({
           </section>
 
           {/* ---- arrangiamento: quale pattern suona in ogni battuta ---- */}
-          <section className="hw-panel hw-song" aria-label="Arrangiamento">
+          <section className="hw-panel hw-song" data-panel="song" aria-label="Arrangiamento">
             <div className="hw-seq-head">
               <h2 className="hw-title">Song · {songLength(project)} battute</h2>
               <div className="hw-patterns" role="group" aria-label="Modalità">
@@ -841,7 +929,7 @@ export function Daw({
           </section>
 
           {/* ---- automazioni dei filtri, battuta per battuta ---- */}
-          <section className="hw-panel hw-auto" aria-label="Automazione">
+          <section className="hw-panel hw-auto" data-panel="auto" aria-label="Automazione">
             <div className="hw-seq-head">
               <h2 className="hw-title">Automazione · filtro</h2>
               <div className="hw-patterns">
@@ -908,7 +996,7 @@ export function Daw({
           </section>
 
           {/* ---- mixer ---- */}
-          <section className="hw-panel hw-mixer" aria-label="Mixer">
+          <section className="hw-panel hw-mixer" data-panel="mixer" aria-label="Mixer">
             <h2 className="hw-title">Mixer</h2>
             <div className="hw-strips">
               {CHANNELS.map(({ id: c, label }) => (
@@ -1123,7 +1211,7 @@ export function Daw({
           </section>
 
           {/* ---- piano roll: basso o melodia ---- */}
-          <section className="hw-panel hw-roll-panel" aria-label={`Piano roll · ${ROLLS[roll].label}`}>
+          <section className="hw-panel hw-roll-panel" data-panel="roll" aria-label={`Piano roll · ${ROLLS[roll].label}`}>
             <div className="hw-seq-head">
               <h2 className="hw-title">
                 Piano roll · {ROLLS[roll].label} · Pattern {editing}
@@ -1161,26 +1249,29 @@ export function Daw({
           </section>
         </div>
 
-        <CoachChat
-          compact
-          endpoint="/api/coach/crea"
-          payload={() => ({
-            projectId: id,
-            project: projectRef.current,
-            title: titleRef.current,
-            editing: playbackRef.current.editing,
-          })}
-          initial={coachMessages}
-          onData={applyFromCoach}
-          ask={ask}
-          suggestions={[
-            "Fammi una traccia deep house con intro, break e drop",
-            "Make me a trap beat",
-            "Fammi un build prima del drop",
-            "Cosa aggiungo adesso?",
-          ]}
-          intro="Sono qui con te. Chiedimi di creare un beat (lo scrivo io nello studio e ti spiego come l'ho fatto) oppure fallo tu e ti do consigli mentre lo cambi."
-        />
+        {/* ---- colonna destra: il coach (sul computer si può chiudere) ---- */}
+        <aside className="console-coach">
+          <CoachChat
+            compact
+            endpoint="/api/coach/crea"
+            payload={() => ({
+              projectId: id,
+              project: projectRef.current,
+              title: titleRef.current,
+              editing: playbackRef.current.editing,
+            })}
+            initial={coachMessages}
+            onData={applyFromCoach}
+            ask={ask}
+            suggestions={[
+              "Fammi una traccia deep house con intro, break e drop",
+              "Make me a trap beat",
+              "Fammi un build prima del drop",
+              "Cosa aggiungo adesso?",
+            ]}
+            intro="Sono qui con te. Chiedimi di creare un beat (lo scrivo io nello studio e ti spiego come l'ho fatto) oppure fallo tu e ti do consigli mentre lo cambi."
+          />
+        </aside>
       </div>
     </div>
   );

@@ -1,43 +1,45 @@
 /*
  * Deep Studio · design tokens
- * Ricostruito il 20 ott 2026. Stile "hardware": moduli scuri come un rack o una
- * groovebox, pad gommosi, LED. Le pagine usano SOLO queste variabili e classi.
+ * Ricostruito il 20 ott 2026; palette "Neon morbido" e font Geist/Chakra Petch dal 10 nov 2026.
+ * Moduli scuri come un rack o una groovebox, LED, colori da club poco saturi. Le pagine usano SOLO queste variabili e classi.
  */
 
 :root {
   color-scheme: dark;
 
-  /* superfici: dal case (piu' scuro) al pannello del modulo */
-  --ds-bg: #0d0e10;
-  --ds-surface: #17191c;
-  --ds-surface-raised: #1f2226;
-  --ds-surface-inset: #0a0b0c;
-  --ds-border: #2c3035;
-  --ds-border-strong: #3c4148;
+  /* palette "Neon morbido" (3A, 10 nov 2026): viola-notte, colori da club ma poco saturi e senza bagliori forti */
+  /* superfici: dal fondo (piu' scuro) al pannello */
+  --ds-bg: #0e0c14;
+  --ds-surface: #13111b;
+  --ds-surface-raised: #1b1826;
+  --ds-surface-inset: #0b0a10;
+  --ds-border: #2c2740;
+  --ds-border-strong: #3b3456;
 
   /* testo */
-  --ds-text: #e8e6e1;
-  --ds-text-muted: #9a9890;
-  --ds-text-faint: #63625d;
+  --ds-text: #d4cfe8;
+  --ds-text-muted: #908aab;
+  --ds-text-faint: #77719a;
 
-  /* accento: arancio da display/LED, piu' teal per "fatto" */
-  --ds-accent: #ff8a2b;
-  --ds-accent-strong: #ffa557;
-  --ds-accent-contrast: #1a0f05;
-  --ds-ok: #3fd6a4;
-  --ds-warn: #ffc94a;
-  --ds-error: #ff5a52;
+  /* accento viola; verde per "fatto" */
+  --ds-accent: #9a74e0;
+  --ds-accent-strong: #b495f0;
+  --ds-accent-contrast: #0f0a18;
+  --ds-ok: #4fcf9b;
+  --ds-warn: #e3c06a;
+  --ds-error: #e2647f;
 
   /* LED */
-  --ds-led-off: #2a2c2f;
+  --ds-led-off: #2a2638;
   --ds-led-on: var(--ds-accent);
   --ds-led-ok: var(--ds-ok);
   --ds-led-error: var(--ds-error);
-  --ds-led-glow: 0 0 6px 1px;
+  --ds-led-glow: 0 0 5px 0;
 
-  /* tipografia */
-  --ds-font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --ds-font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  /* tipografia: Geist (testi), Chakra Petch (etichette, pulsanti), Geist Mono (display e numeri) */
+  --ds-font-sans: var(--font-geist), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ds-font-mono: var(--font-chakra), var(--font-geist-mono), ui-monospace, monospace;
+  --ds-font-num: var(--font-geist-mono), ui-monospace, "Cascadia Mono", Consolas, monospace;
   --ds-text-xs: 0.75rem;
   --ds-text-sm: 0.875rem;
   --ds-text-md: 1rem;
@@ -54,46 +56,55 @@
   --ds-space-6: 32px;
   --ds-space-7: 48px;
 
-  /* forme e profondita' */
+  /* forme e profondita': superfici piatte, ombre leggere */
   --ds-radius-sm: 4px;
   --ds-radius-md: 8px;
-  --ds-radius-lg: 14px;
-  --ds-shadow-module: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
-  --ds-shadow-pad: 0 2px 0 rgba(0, 0, 0, 0.6), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
-  --ds-shadow-pad-pressed: 0 0 0 rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.6) inset;
+  --ds-radius-lg: 12px;
+  --ds-shadow-module: 0 0 0 1px rgba(154, 116, 224, 0.06), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --ds-shadow-pad: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --ds-shadow-pad-pressed: 0 2px 6px rgba(0, 0, 0, 0.5) inset;
   --ds-focus-ring: 0 0 0 2px var(--ds-bg), 0 0 0 4px var(--ds-accent);
 
-  /* console hardware (studio nel browser): metallo, display LCD, tasti TR-808, luci dei pad */
-  --hw-chassis: linear-gradient(180deg, #2a2d31 0%, #1c1e21 100%);
-  --hw-panel: linear-gradient(180deg, #303338 0%, #24272b 55%, #1f2125 100%);
-  --hw-panel-edge: #3d4248;
-  --hw-panel-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 -1px 0 rgba(0, 0, 0, 0.6) inset, 0 14px 30px rgba(0, 0, 0, 0.55);
-  --hw-print: #c9c4b8;
-  --hw-print-faint: #7d7a72;
-  --hw-lcd-bg: #0f1a12;
-  --hw-lcd-text: #9cf5b0;
-  --hw-lcd-dim: #2f5a3a;
-  --hw-lcd-glow: 0 0 8px rgba(156, 245, 176, 0.55);
-  --hw-button: linear-gradient(180deg, #3a3e44 0%, #2a2d32 100%);
-  --hw-button-pressed: linear-gradient(180deg, #24272b 0%, #2c3035 100%);
-  --hw-button-shadow: 0 3px 0 #0b0c0d, 0 4px 8px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.1) inset;
-  --hw-button-shadow-pressed: 0 1px 0 #0b0c0d, 0 1px 3px rgba(0, 0, 0, 0.6) inset;
-  --hw-led-red: #ff3b30;
-  --hw-led-green: #39e07a;
-  --hw-led-amber: #ffb02e;
-  --hw-key-0: #c8402f; /* step 1–4 */
-  --hw-key-1: #e2742a; /* step 5–8 */
-  --hw-key-2: #e8c14a; /* step 9–12 */
-  --hw-key-3: #e9e4d6; /* step 13–16 */
-  --hw-pad: radial-gradient(circle at 50% 35%, #4a4f55 0%, #33373c 60%, #2a2d31 100%);
-  --hw-pad-red: #ff4d3d;
-  --hw-pad-orange: #ff8a2b;
-  --hw-pad-yellow: #ffd23f;
-  --hw-pad-teal: #3fd6c8;
-  --hw-pad-green: #57e389;
-  --hw-pad-purple: #b07cff;
-  --hw-pad-blue: #4da3ff;
-  --hw-knob-cap: radial-gradient(circle at 40% 30%, #5b6068 0%, #2b2e33 70%);
+  /* console (studio nel browser): pannelli piatti, display, tasti, colori degli strumenti */
+  --hw-chassis: #100e17;
+  --hw-panel: #1b1826;
+  --hw-panel-2: #171420;
+  --hw-panel-edge: #2c2740;
+  --hw-panel-shadow: 0 0 0 1px rgba(154, 116, 224, 0.05);
+  --hw-print: #d4cfe8;
+  --hw-print-faint: #908aab;
+  --hw-lcd-bg: #0d1119;
+  --hw-lcd-text: #6cc3dc;
+  --hw-lcd-dim: #1f3340;
+  --hw-lcd-glow: 0 0 6px rgba(108, 195, 220, 0.2);
+  --hw-button: #1f1c2c;
+  --hw-button-hover: #262236;
+  --hw-button-pressed: #2b2442;
+  --hw-button-shadow: none;
+  --hw-button-shadow-pressed: none;
+  --hw-step-off: #221e30;
+  --hw-step-off-alt: #1d1a29; /* gruppi di 4 step alternati */
+  --hw-led-off: #2a2638;
+  --hw-led-red: #e2647f;
+  --hw-led-green: #4fcf9b;
+  --hw-led-amber: #9a74e0; /* il LED "acceso" generico segue l'accento */
+  --hw-glow-amount: 14%; /* quanto bagliore attorno a step e pad accesi */
+  /* pattern A–D (canzone) */
+  --hw-key-0: #d9649f;
+  --hw-key-1: #9a74e0;
+  --hw-key-2: #4fb8d6;
+  --hw-key-3: #4fcf9b;
+  /* strumenti: kick, clap, hat, perc, bass, accordi, lead */
+  --hw-pad: #1f1c2c;
+  --hw-pad-red: #d9649f;
+  --hw-pad-orange: #9a74e0;
+  --hw-pad-yellow: #4fb8d6;
+  --hw-pad-teal: #4fcf9b;
+  --hw-pad-green: #7d8cf0;
+  --hw-pad-purple: #c39be8;
+  --hw-pad-blue: #e8a76a;
+  --hw-knob-cap: #1f1c2c;
+  --hw-knob-top: #2e2942;
 
   --ds-duration: 120ms;
   --ds-max-width: 960px;
@@ -103,10 +114,10 @@
  * Componenti base
  * ------------------------------------------------------------------------- */
 
-/* Modulo: un pannello del rack, con le "viti" negli angoli in alto */
+/* Modulo: un pannello piatto (le "viti" della versione metallo sono spente) */
 .ds-module {
   position: relative;
-  background: linear-gradient(180deg, var(--ds-surface-raised), var(--ds-surface));
+  background: var(--ds-surface-raised);
   border: 1px solid var(--ds-border);
   border-radius: var(--ds-radius-lg);
   box-shadow: var(--ds-shadow-module);
@@ -115,7 +126,7 @@
 }
 .ds-module::before,
 .ds-module::after {
-  content: "";
+  content: none;
   position: absolute;
   top: var(--ds-space-3);
   width: 6px;

@@ -101,3 +101,16 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   coda lunga dell'808 non si accumula (e l'open hat non resta a pieno volume prima del taglio).
 - Il coach sceglie il kit con `scrivi_pattern` (prompt `crea-v9`). Export di prova sullo stesso pattern:
   da -15,1 LUFS (909) a -11,9 LUFS (Trap), true peak sempre sotto -2,2 dBTP, nessun allarme.
+
+## Aggiornamento 10 nov 2026 · nuovo aspetto e console a pagine
+
+- Palette "Neon morbido" (scelta tra 5 anteprime e 2 varianti ammorbidite): fondo viola-notte, accento viola,
+  colori degli strumenti poco saturi (kick rosa, clap viola, hat ciano, perc verde, basso indaco, accordi lavanda,
+  lead ambra), bagliori leggeri. Tutto in `web/design/tokens.css`; stile piatto al posto del metallo.
+- Font (licenza OFL, ospitati dal sito con `next/font`): Geist per i testi, Chakra Petch per etichette e pulsanti,
+  Geist Mono per display e numeri (cifre a larghezza fissa: il display non "balla" durante il play).
+- Computer (da 1200 px): la console occupa lo schermo e non scorre, come FL Studio. Barra in alto (trasporto),
+  pad e kit a sinistra, coach a destra (si chiude), al centro una vista alla volta scelta con le icone
+  Beat, Roll, Accordi, Song, Mixer, Auto (tasti 1–6). La vista e il coach aperto restano scelti nel browser.
+- Telefono: la stessa console in colonna, a scorrimento, come prima. Una sola pagina per entrambi: cambia solo
+  il CSS, quindi le due versioni non possono andare fuori sincrono.

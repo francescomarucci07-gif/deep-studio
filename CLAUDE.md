@@ -51,7 +51,8 @@ analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script 
 db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach,
             0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions)
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
-            unica fonte di colori e stili. Collegamento a Supabase e Vercel: docs/DEPLOY.md
+            unica fonte di colori e stili (palette "Neon morbido"; font Geist, Chakra Petch, Geist Mono
+            caricati in app/layout.tsx con next/font). Collegamento a Supabase e Vercel: docs/DEPLOY.md
 docs/       USER-STORIES-FASE1.md, MOCKUP-P5.md, P6 architettura, LEGGIMI analisi, PROMPT-M1.md
 ```
 

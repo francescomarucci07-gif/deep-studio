@@ -116,6 +116,17 @@ cd web && npm run dev
   limite di 50 MB per file (per gli utenti veri serve il piano Pro, P6).
 - Le soglie dei "checks" nell'analisi sono provvisorie: si tarano sulle note gold (P2).
 
+## Prossimi passi (chiesti da Francesco il 10 nov 2026, da fare alla ripresa)
+
+1. **Punto di partenza del play nella canzone**: oggi in modalità Song si parte sempre dalla battuta 1, così
+   per sentire una modifica alla fine bisogna ascoltare tutto. Serve un modo per scegliere da dove partire
+   (come il marker di inizio nella playlist di FL: clic sul numero della battuta, o una battuta "da qui"),
+   valido anche per l'export? (da decidere: l'export resta dall'inizio).
+2. **Tastiera del computer come tastiera musicale**, tipo FL (Typing keyboard to piano): su Bass, Lead e
+   Chord i tasti suonano note diverse (es. Z S X D C V G B H N J M = una ottava, Q 2 W 3 E… quella sopra),
+   con ottava su/giù; con Rec + Play le note si scrivono nel pattern. Attenzione: oggi Z X C V B N M ,
+   sono i pad della batteria e 1–6 cambiano vista, quindi serve una modalità (pad / tastiera) o tasti diversi.
+
 ## Milestone
 
 - **M1 · Scheletro** (ora): login, upload mix e stem, stato del job in tempo reale, pagina privacy.

@@ -141,3 +141,15 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Coach (prompt `crea-v11`): un pattern per sezione (intro, groove, break, build, drop, variazioni, outro),
   usa gli slot vuoti senza sovrascrivere i pattern pieni; nel testo per il coach i pattern vuoti stanno in
   una riga sola.
+
+## Aggiornamento 10 nov 2026 · limiter sul master
+
+- Il vecchio "limiter" era un DynamicsCompressorNode del browser: ginocchio morbido e guadagno di
+  compensazione automatico, quindi non era un tetto (una canzone dell'utente arrivava a +0,04 dBTP).
+- Nuovo limiter in `web/lib/daw/limiter.ts`, come AudioWorklet (incluso nel browser, nessun pacchetto):
+  lookahead 5 ms, picco stimato anche tra i campioni (interpolazione cubica a 1/4, 1/2, 3/4), tetto -1,3 dB,
+  release 80 ms. Il tetto è garantito per costruzione (minimo su 2·L campioni, poi media su L).
+  Stessa catena nel play e nell'export; finché il worklet non è caricato resta un compressore a ginocchio duro.
+- Export: rete di sicurezza in `render.ts`, se il true peak misurato supera -1,05 dBTP il file viene abbassato.
+- Prove: segnale a +12,5 dBTP → uscita -1,52 dBFS di picco e -0,01 dBTP (onda quadra aliasata, caso estremo);
+  la canzone dell'utente da +0,04 a -1,07 dBTP, -13,8 LUFS, nessun allarme. Spia nella striscia Master.

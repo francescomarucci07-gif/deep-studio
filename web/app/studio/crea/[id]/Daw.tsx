@@ -488,6 +488,8 @@ export function Daw({
       p.song[b] = p.song[b] === brush ? null : brush;
     });
   const shown = visibleSlots(project, editing);
+  // la spia del limiter si aggiorna a ogni step mentre suona
+  const limiterDb = playing && step >= 0 ? (engineRef.current?.limiterDb ?? 0) : 0;
 
   // cosa suona adesso (per accendere pad e meter): il pattern in riproduzione, non quello in modifica
   const sounding = playing && playingSlot ? project.patterns[playingSlot] : null;
@@ -1216,6 +1218,11 @@ export function Daw({
                 />
                 <span className="hw-value">
                   {project.automation.master ? "automatizzato in Song" : "doppio clic: spento"}
+                </span>
+                {/* il limiter tiene il true peak sotto -1 dBTP; la spia si accende quando abbassa */}
+                <span className="hw-limiter" data-on={limiterDb < -0.5}>
+                  <span className="hw-btn-led" />
+                  Limiter {limiterDb < -0.1 ? `${limiterDb.toFixed(1)} dB` : "a riposo"}
                 </span>
               </div>
             </div>

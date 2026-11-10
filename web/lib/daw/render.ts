@@ -1,11 +1,14 @@
 // Export WAV: la stessa catena audio dello studio (graph.ts), suonata in un OfflineAudioContext.
 // Offline il browser calcola l'audio più veloce del tempo reale e senza perdere colpi.
 import { Graph } from "./graph";
+import { loadLimiter } from "./limiter";
+import { truePeak } from "./measure";
 import { STEPS, songLength, type Project, type Slot } from "./project";
 
 export const SAMPLE_RATE = 44100;
 const TAIL_S = 2.5; // coda dopo l'ultima battuta: riverbero e release degli accordi
 const PATTERN_BARS = 4; // in modalità pattern esporto 4 giri del loop
+const EXPORT_TP_MAX = -1.05; // dBTP: il tetto dell'export (lo standard delle piattaforme è -1)
 
 export type RenderWhat = { song: true } | { song: false; slot: Slot };
 
@@ -19,6 +22,7 @@ export async function renderAudio(p: Project, what: RenderWhat): Promise<AudioBu
   const seconds = 0.05 + bars.length * STEPS * stepDur + TAIL_S;
   const ctx = new OfflineAudioContext(2, Math.ceil(seconds * SAMPLE_RATE), SAMPLE_RATE);
   const graph = new Graph(ctx, () => p);
+  if (await loadLimiter(ctx)) graph.useRealLimiter();
   graph.applyMixer(true);
   if (what.song) graph.setAutomating(true);
   bars.forEach((slot, b) => {
@@ -29,7 +33,14 @@ export async function renderAudio(p: Project, what: RenderWhat): Promise<AudioBu
       graph.playStep(p.patterns[slot], s, t, stepDur);
     }
   });
-  return ctx.startRendering();
+  const buf = await ctx.startRendering();
+  // rete di sicurezza: se il true peak (tra un campione e l'altro) supera comunque -1 dBTP, abbasso tutto
+  // il file di quel tanto. Con il limiter vero non dovrebbe servire quasi mai.
+  const ch = Array.from({ length: buf.numberOfChannels }, (_, c) => buf.getChannelData(c));
+  const tp = truePeak(ch);
+  const max = 10 ** (EXPORT_TP_MAX / 20);
+  if (tp > max) for (const c of ch) for (let i = 0; i < c.length; i++) c[i] *= max / tp;
+  return buf;
 }
 
 // WAV PCM a 24 bit, stereo: il formato che FL Studio e l'analisi di Deep Studio leggono

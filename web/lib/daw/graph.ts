@@ -19,6 +19,7 @@ import {
   type Project,
 } from "./project";
 import { KITS } from "./kits";
+import { createFallbackLimiter, createLimiterNode } from "./limiter";
 
 const mtof = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
@@ -45,12 +46,15 @@ export class Graph {
   // "choke": un colpo nuovo taglia la coda di quello prima (hat chiuso → open hat; kick → kick,
   // così la coda lunga dell'808 non si accumula). Un gain a parte, senza toccare l'inviluppo.
   private chokes: { kick: GainNode | null; hat: GainNode | null } = { kick: null, hat: null };
+  private out: GainNode;
+  private limiter: AudioNode;
+  limiterDb = 0; // quanto sta abbassando il limiter adesso (dB, 0 = niente)
 
   constructor(
     readonly ctx: BaseAudioContext,
     private getProject: () => Project,
   ) {
-    // master: un compressore leggero che "incolla" il mix, poi un limiter che evita il clip
+    // master: un compressore leggero che "incolla" il mix, poi il limiter che tiene il true peak sotto -1 dBTP
     const master = ctx.createGain();
     master.gain.value = 0.72; // margine: con filtri risonanti e automazioni il true peak resta sotto -1 dBTP
     const glue = ctx.createDynamicsCompressor();
@@ -58,14 +62,12 @@ export class Graph {
     glue.ratio.value = 2.5;
     glue.attack.value = 0.01;
     glue.release.value = 0.2;
-    const limiter = ctx.createDynamicsCompressor();
-    limiter.threshold.value = -3;
-    limiter.ratio.value = 20;
-    limiter.attack.value = 0.002;
-    limiter.release.value = 0.15;
+    // l'uscita passa dal limiter: quello di riserva subito, quello vero (limiter.ts) appena è caricato
+    this.out = ctx.createGain();
+    this.limiter = createFallbackLimiter(ctx);
     const masterFilter = this.djFilter();
     master.connect(masterFilter.lp);
-    masterFilter.hp.connect(glue).connect(limiter).connect(ctx.destination);
+    masterFilter.hp.connect(glue).connect(this.out).connect(this.limiter).connect(ctx.destination);
 
     // riverbero condiviso: una "stanza" generata, con le basse tagliate per non impastare il low end
     this.reverb = ctx.createConvolver();
@@ -147,6 +149,23 @@ export class Graph {
 
   // Volumi, mute, effetti e tempo del delay: chiamato a ogni modifica, cambia il suono senza scatti.
   // immediate = subito al valore giusto (export offline: niente rampa all'inizio del file)
+  // Mette il limiter vero al posto di quello di riserva (dopo loadLimiter). false se non si può.
+  useRealLimiter(): boolean {
+    try {
+      const node = createLimiterNode(this.ctx);
+      node.port.onmessage = (e: MessageEvent<number>) => {
+        this.limiterDb = e.data;
+      };
+      this.out.disconnect();
+      this.limiter.disconnect();
+      this.out.connect(node).connect(this.ctx.destination);
+      this.limiter = node;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   applyMixer(immediate = false) {
     const p = this.getProject();
     const now = this.ctx.currentTime;

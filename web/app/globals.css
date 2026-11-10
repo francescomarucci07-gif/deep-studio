@@ -1265,6 +1265,25 @@ ol.ds-led-row {
   border-color: color-mix(in srgb, var(--ds-accent) 45%, var(--hw-panel-edge));
 }
 
+/* spia del limiter nella striscia Master */
+.hw-limiter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--hw-print-faint);
+  font: 600 9px var(--ds-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.hw-limiter[data-on="true"] {
+  color: var(--hw-print);
+}
+.hw-limiter[data-on="true"] .hw-btn-led {
+  background: var(--hw-led-red);
+  box-shadow: 0 0 6px var(--hw-led-red);
+}
+
 /* automazione: una colonna per battuta, la curva disegnata sopra */
 /* la striscia è lunga quanto la canzone e scorre in orizzontale; la curva la copre tutta */
 .hw-auto-scroll {

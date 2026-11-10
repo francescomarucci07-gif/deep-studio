@@ -122,7 +122,7 @@ function loudness(ch: Float32Array[], sr: number) {
 }
 
 // True peak: interpolazione x4 con un sinc a finestra (come il resample_poly del Python)
-function truePeak(ch: Float32Array[]) {
+export function truePeak(ch: Float32Array[]) {
   const TAPS = 16;
   const kernels = [0.25, 0.5, 0.75].map((frac) =>
     Array.from({ length: 2 * TAPS }, (_, j) => {

@@ -3,6 +3,7 @@
 // sul tempo dell'AudioContext (setInterval da solo "balla", il clock audio no).
 // I suoni stanno in graph.ts, condivisi con l'export WAV.
 import { Graph } from "./graph";
+import { loadLimiter } from "./limiter";
 import { STEPS, songLength, type ChannelId, type Chord, type Project, type Slot } from "./project";
 
 const LOOKAHEAD_S = 0.1;
@@ -26,6 +27,17 @@ export class Engine {
   ) {
     this.ctx = new AudioContext();
     this.graph = new Graph(this.ctx, getProject);
+    // il limiter vero si carica in sottofondo; play e anteprime lo aspettano (pochi millisecondi)
+    this.ready = loadLimiter(this.ctx).then((ok) => {
+      if (ok) this.graph.useRealLimiter();
+    });
+  }
+
+  private ready: Promise<void>;
+
+  // quanto sta abbassando il limiter del master (dB, 0 = niente): per la spia nel mixer
+  get limiterDb() {
+    return this.graph.limiterDb;
   }
 
   get playing() {
@@ -33,6 +45,7 @@ export class Engine {
   }
 
   async start() {
+    await this.ready;
     await this.ctx.resume();
     this.step = 0;
     this.bar = 0;
@@ -56,6 +69,7 @@ export class Engine {
   }
 
   async preview(id: ChannelId, opts: { note?: number; chord?: Chord } = {}) {
+    await this.ready;
     await this.ctx.resume();
     this.graph.preview(id, this.ctx.currentTime + 0.01, opts);
   }

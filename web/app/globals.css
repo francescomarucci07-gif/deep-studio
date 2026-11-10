@@ -1132,10 +1132,42 @@ ol.ds-led-row {
   color: var(--hw-print);
   cursor: pointer;
 }
-.hw-bar[data-slot="A"] { --slot: var(--hw-key-0); }
-.hw-bar[data-slot="B"] { --slot: var(--hw-key-1); }
-.hw-bar[data-slot="C"] { --slot: var(--hw-key-2); }
-.hw-bar[data-slot="D"] { --slot: var(--hw-key-3); }
+[data-c="0"] { --slot: var(--hw-slot-0); }
+[data-c="1"] { --slot: var(--hw-slot-1); }
+[data-c="2"] { --slot: var(--hw-slot-2); }
+[data-c="3"] { --slot: var(--hw-slot-3); }
+[data-c="4"] { --slot: var(--hw-slot-4); }
+[data-c="5"] { --slot: var(--hw-slot-5); }
+[data-c="6"] { --slot: var(--hw-slot-6); }
+[data-c="7"] { --slot: var(--hw-slot-7); }
+/* il pennello: il pattern che metti sulle battute */
+.hw-brushes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--ds-space-3);
+}
+.hw-brushes .hw-label {
+  margin-right: var(--ds-space-1);
+}
+.hw-brush {
+  min-width: 38px;
+  border-bottom: 3px solid var(--slot);
+  font-size: var(--ds-text-sm);
+}
+.hw-brush[data-empty="true"] {
+  color: var(--hw-print-faint);
+}
+.hw-brush[aria-pressed="true"] {
+  border-color: var(--slot);
+  background: color-mix(in srgb, var(--slot) 30%, var(--hw-button));
+  color: var(--ds-text);
+}
+/* i pulsanti dei pattern nel sequencer hanno una riga del colore del pattern */
+.hw-btn--slot {
+  box-shadow: inset 0 -3px 0 var(--slot, transparent);
+}
 .hw-bar[data-slot="none"] {
   border-color: var(--hw-panel-edge);
   background: var(--ds-surface-inset);

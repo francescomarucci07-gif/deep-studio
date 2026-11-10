@@ -1,4 +1,4 @@
-// Il progetto dello studio nel browser: 4 pattern da una battuta (A–D) con batteria, bassline, accordi
+// Il progetto dello studio nel browser: 16 pattern da una battuta (A–P) con batteria, bassline, accordi
 // e melodia (lead), una canzone (da 16 a 256 battute) che dice quale pattern suona, suoni dei synth, mixer.
 // È anche il JSON salvato in projects.data, quindi ogni campo ha un default (vedi normalize).
 import { isKit, KITS, type KitId } from "./kits";
@@ -48,9 +48,22 @@ const CHORD_SUFFIX: Record<ChordType, string> = {
 // Note MIDI dell'accordo: fondamentale nell'ottava di Do3 (48–59), il resto sopra
 export const chordNotes = (c: Chord) => CHORD_INTERVALS[c.type].map((i) => 48 + c.root + i);
 
-export const SLOTS = ["A", "B", "C", "D"] as const;
+// 16 pattern, da A a P (una traccia da club ha di solito 6–10 sezioni diverse)
+export const SLOTS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P"] as const;
 export type Slot = (typeof SLOTS)[number];
 export const isSlot = (v: unknown): v is Slot => SLOTS.includes(v as Slot);
+// otto colori che si ripetono (A e I hanno lo stesso colore): la lettera sulla battuta li distingue
+export const slotColor = (s: Slot) => SLOTS.indexOf(s) % 8;
+
+// I pattern da mostrare: quelli fino all'ultimo usato (pieno, in modifica o nella canzone), più uno libero
+// per crearne uno nuovo; almeno A–D.
+export function visibleSlots(p: Project, editing: Slot): Slot[] {
+  let last = Math.max(3, SLOTS.indexOf(editing));
+  SLOTS.forEach((s, i) => {
+    if (!isEmptyPattern(p.patterns[s]) || p.song.includes(s)) last = Math.max(last, i);
+  });
+  return SLOTS.slice(0, Math.min(SLOTS.length, last + 2));
+}
 
 // Righe del piano roll del basso, dall'alto in basso: da La2 a La1 (MIDI 45 → 33)
 export const BASS_LOW = 33;
@@ -201,15 +214,13 @@ export function starterProject(): Project {
     bpm: 122,
     swing: 0.1,
     patterns: {
+      ...(Object.fromEntries(SLOTS.map((s) => [s, emptyPattern()])) as Project["patterns"]),
       A: {
         drums: { kick: on(0, 4, 8, 12), clap: on(4, 12), hat: on(2, 6, 10, 14), openhat: on(), perc: on() },
         bass,
         chords: [{ root: 9, type: "min7" }, null, null, null],
         lead: Array(STEPS).fill(null),
       },
-      B: emptyPattern(),
-      C: emptyPattern(),
-      D: emptyPattern(),
     },
     song: ["A", "A", "A", "A", ...Array(MIN_SONG_BARS - 4).fill(null)],
     kit: "house",
@@ -363,12 +374,12 @@ export function describe(p: Project, title: string, editing: Slot) {
     "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti). x = colpo, . = vuoto.",
     `Il producer sta modificando il pattern ${editing}.`,
   ];
+  // i pattern vuoti in una riga sola: con 16 pattern il messaggio resta corto
+  const empty = SLOTS.filter((s) => isEmptyPattern(p.patterns[s]));
+  lines.push(`Pattern (16, da A a P). Vuoti: ${empty.length ? empty.join(" ") : "nessuno"}.`);
   for (const s of SLOTS) {
     const pat = p.patterns[s];
-    if (isEmptyPattern(pat)) {
-      lines.push(`Pattern ${s}: vuoto.`);
-      continue;
-    }
+    if (isEmptyPattern(pat)) continue;
     lines.push(`Pattern ${s}:`);
     for (const { id, label } of DRUMS) lines.push(`  ${label.padEnd(9)} ${pat.drums[id].map((x) => (x ? "x" : ".")).join("")}`);
     const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}`)).filter(Boolean);

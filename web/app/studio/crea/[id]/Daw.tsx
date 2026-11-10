@@ -17,6 +17,8 @@ import {
   LEAD_WAVES,
   NOTE_NAMES,
   SLOTS,
+  slotColor,
+  visibleSlots,
   STEPS,
   emptyPattern,
   isEmptyPattern,
@@ -142,6 +144,8 @@ export function Daw({
   const [save, setSave] = useState<SaveState>("salvato");
   const [undo, setUndo] = useState<{ project: Project; name: string } | null>(null);
   const [editing, setEditing] = useState<Slot>("A"); // il pattern che vedi e modifichi
+  const [brush, setBrush] = useState<Slot>("A"); // il pattern che "dipingi" sulle battute della canzone
+  useEffect(() => setBrush(editing), [editing]); // come in FL: il pattern che apri è anche quello che metti
   const [songMode, setSongMode] = useState(false);
   const [bar, setBar] = useState(-1);
   const [playingSlot, setPlayingSlot] = useState<Slot | null>(null);
@@ -478,11 +482,12 @@ export function Daw({
       p.patterns[editing] = emptyPattern();
     });
   };
-  const cycleBar = (b: number) =>
+  // canzone come la playlist di FL: clic = metti il pattern del pennello, clic sullo stesso = svuota
+  const paintBar = (b: number) =>
     update((p) => {
-      const order: (Slot | null)[] = [...SLOTS, null];
-      p.song[b] = order[(order.indexOf(p.song[b]) + 1) % order.length];
+      p.song[b] = p.song[b] === brush ? null : brush;
     });
+  const shown = visibleSlots(project, editing);
 
   // cosa suona adesso (per accendere pad e meter): il pattern in riproduzione, non quello in modifica
   const sounding = playing && playingSlot ? project.patterns[playingSlot] : null;
@@ -789,10 +794,11 @@ export function Daw({
             <div className="hw-seq-head">
               <h2 className="hw-title">Step sequencer · Pattern {editing}</h2>
               <div className="hw-patterns" role="group" aria-label="Pattern da modificare">
-                {SLOTS.map((s) => (
+                {shown.map((s) => (
                   <button
                     key={s}
                     type="button"
+                    data-c={slotColor(s)}
                     className="hw-btn hw-btn--small hw-btn--slot"
                     aria-pressed={editing === s}
                     data-playing={playingSlot === s}
@@ -1015,6 +1021,23 @@ export function Daw({
                 </button>
               </div>
             </div>
+            <div className="hw-brushes" role="group" aria-label="Pattern da mettere nella canzone">
+              <span className="hw-label">Pennello</span>
+              {shown.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="hw-btn hw-btn--small hw-brush"
+                  data-c={slotColor(s)}
+                  data-empty={isEmptyPattern(project.patterns[s])}
+                  aria-pressed={brush === s}
+                  title={isEmptyPattern(project.patterns[s]) ? `Pattern ${s} (vuoto)` : `Pattern ${s}`}
+                  onClick={() => setBrush(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
             <div className="hw-song-bars">
               {project.song.map((s, b) => (
                 <button
@@ -1022,9 +1045,10 @@ export function Daw({
                   type="button"
                   className="hw-bar"
                   data-slot={s ?? "none"}
+                  data-c={s ? slotColor(s) : undefined}
                   data-now={songMode && playing && b === bar}
-                  aria-label={`Battuta ${b + 1}: ${s ? `pattern ${s}` : "vuota"}. Clic per cambiare`}
-                  onClick={() => cycleBar(b)}
+                  aria-label={`Battuta ${b + 1}: ${s ? `pattern ${s}` : "vuota"}. Clic: ${s === brush ? "svuota" : `metti ${brush}`}`}
+                  onClick={() => paintBar(b)}
                 >
                   <span className="hw-bar-num">{b + 1}</span>
                   <span className="hw-bar-slot">{s ?? "–"}</span>
@@ -1032,7 +1056,8 @@ export function Daw({
               ))}
             </div>
             <p className="hw-hint">
-              Clic su una battuta: A → B → C → D → vuota. <strong>+4</strong> e <strong>+8</strong> allungano la canzone
+              Scegli il <strong>pennello</strong> (un pattern) e clicca le battute per metterlo; un clic su una battuta che ha
+              già quel pattern la svuota. <strong>+4</strong> e <strong>+8</strong> allungano la canzone
               (fino a {MAX_SONG_BARS} battute), <strong>−4</strong> toglie le ultime quattro. In <strong>Song</strong> suona la
               canzone dall&apos;inizio; in <strong>Pattern</strong> solo il pattern che stai modificando, in loop.
             </p>

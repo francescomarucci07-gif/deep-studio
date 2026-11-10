@@ -89,11 +89,15 @@
   --hw-led-green: #4fcf9b;
   --hw-led-amber: #9a74e0; /* il LED "acceso" generico segue l'accento */
   --hw-glow-amount: 14%; /* quanto bagliore attorno a step e pad accesi */
-  /* pattern A–D (canzone) */
-  --hw-key-0: #d9649f;
-  --hw-key-1: #9a74e0;
-  --hw-key-2: #4fb8d6;
-  --hw-key-3: #4fcf9b;
+  /* pattern della canzone: otto colori che si ripetono (A e I uguali, B e J uguali…) */
+  --hw-slot-0: #d9649f;
+  --hw-slot-1: #9a74e0;
+  --hw-slot-2: #4fb8d6;
+  --hw-slot-3: #4fcf9b;
+  --hw-slot-4: #e8a76a;
+  --hw-slot-5: #7d8cf0;
+  --hw-slot-6: #e36f6f;
+  --hw-slot-7: #c9c26a;
   /* strumenti: kick, clap, hat, perc, bass, accordi, lead */
   --hw-pad: #1f1c2c;
   --hw-pad-red: #d9649f;

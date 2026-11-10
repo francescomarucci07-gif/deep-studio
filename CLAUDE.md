@@ -95,7 +95,7 @@ cd web && npm run dev
   (versionate), contesto = analisi compatta + versione precedente. Messaggi e costi in `coach_messages`.
   Serve `ANTHROPIC_API_KEY` tra le variabili di Vercel. Voce in/out con la Web Speech API del browser.
 - **Studio nel browser** (`/studio/crea/[id]`): `web/lib/daw/project.ts` (formato del progetto v2: pattern
-  A–D + canzone di 16 battute; `normalize()` converte i progetti v1; `describe()` per il coach), `web/lib/daw/graph.ts` (suoni sintetizzati, kit di batteria in `kits.ts`, mixer, sidechain: usato
+  A–P + canzone da 16 a 256 battute; `normalize()` converte i progetti v1; `describe()` per il coach), `web/lib/daw/graph.ts` (suoni sintetizzati, kit di batteria in `kits.ts`, mixer, sidechain: usato
   in tempo reale e per l'export), `web/lib/daw/engine.ts` (l'orologio del sequencer, swing, pattern/song), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
   `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone, scrivi_effetti); streaming condiviso in `lib/coach/stream.ts`.

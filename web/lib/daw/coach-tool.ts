@@ -1,4 +1,4 @@
-// Gli strumenti che il coach usa per scrivere nello studio: un pattern (A–D) e la canzone.
+// Gli strumenti che il coach usa per scrivere nello studio: un pattern (A–P), la canzone, effetti e automazioni.
 // Claude manda step da 1 a 16 e note MIDI; qui diventa un Project valido (normalize scarta il resto).
 // Il coach può chiamarli più volte nella stessa risposta: ogni chiamata parte dal risultato della precedente.
 import type Anthropic from "@anthropic-ai/sdk";
@@ -35,7 +35,7 @@ const stepList = (label: string) => ({
 const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_pattern",
   description:
-    "Scrive un pattern (una battuta da 16 step: batteria e bassline) in uno dei 4 slot A, B, C, D dello studio, sostituendo quello che c'era. Può anche cambiare BPM, swing, sidechain e suono del basso, che valgono per tutta la traccia. I volumi del mixer restano. Usalo quando il producer ti chiede di creare, generare o riscrivere un beat. Prima di chiamarlo spiega in poche frasi cosa costruisci e perché.",
+    "Scrive un pattern (una battuta da 16 step: batteria e bassline) in uno dei 16 slot (da A a P) dello studio, sostituendo quello che c'era. Può anche cambiare BPM, swing, sidechain e suono del basso, che valgono per tutta la traccia. I volumi del mixer restano. Usalo quando il producer ti chiede di creare, generare o riscrivere un beat. Prima di chiamarlo spiega in poche frasi cosa costruisci e perché.",
   input_schema: {
     type: "object",
     properties: {
@@ -118,7 +118,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
 
 const SONG_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_canzone",
-  description: `Scrive l'arrangiamento: quale pattern (A, B, C, D) suona in ogni battuta della canzone, in ordine. "-" = battuta vuota (silenzio). La canzone è lunga quanto la lista che mandi (da ${MIN_SONG_BARS} fino a ${MAX_SONG_BARS} battute) e sostituisce quella di prima. Usalo quando il producer ti chiede una traccia intera, una struttura o un arrangiamento (intro, groove, break, drop), insieme a scrivi_pattern per i pattern che servono.`,
+  description: `Scrive l'arrangiamento: quale pattern (da A a P) suona in ogni battuta della canzone, in ordine. "-" = battuta vuota (silenzio). La canzone è lunga quanto la lista che mandi (da ${MIN_SONG_BARS} fino a ${MAX_SONG_BARS} battute) e sostituisce quella di prima. Usalo quando il producer ti chiede una traccia intera, una struttura o un arrangiamento (intro, groove, break, drop), insieme a scrivi_pattern per i pattern che servono.`,
   input_schema: {
     type: "object",
     properties: {

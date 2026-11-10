@@ -131,3 +131,13 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   sezioni da 8/16 battute); un punto di automazione oltre la fine allunga la canzone. Nel testo per il coach
   la canzone va a righe da 16 e le automazioni sono solo i punti (meno token con canzoni lunghe).
 - Le misure del Parere per battuta passano fino a 24.000 caratteri (prima 8.000): bastano per 256 battute.
+
+## Aggiornamento 10 nov 2026 · 16 pattern
+
+- I pattern passano da 4 (A–D) a 16 (A–P); i progetti di prima ricevono 12 pattern vuoti. Nello studio si
+  vedono solo i pattern usati più uno libero; otto colori che si ripetono (la lettera li distingue).
+- Canzone come la playlist di FL: si sceglie il "pennello" (un pattern) e si cliccano le battute; un clic su
+  una battuta con lo stesso pattern la svuota. Il pennello segue il pattern aperto nel sequencer.
+- Coach (prompt `crea-v11`): un pattern per sezione (intro, groove, break, build, drop, variazioni, outro),
+  usa gli slot vuoti senza sovrascrivere i pattern pieni; nel testo per il coach i pattern vuoti stanno in
+  una riga sola.

@@ -145,6 +145,20 @@ export function Daw({
   const [undo, setUndo] = useState<{ project: Project; name: string } | null>(null);
   const [editing, setEditing] = useState<Slot>("A"); // il pattern che vedi e modifichi
   const [brush, setBrush] = useState<Slot>("A"); // il pattern che "dipingi" sulle battute della canzone
+  // il marker di inizio della canzone (battuta da 0), come nella playlist di FL; ricordato nel browser
+  const [startBar, setStartBar] = useState(0);
+  useEffect(() => {
+    const v = Number(stored(`ds-inizio-${id}`));
+    if (Number.isInteger(v) && v > 0) setStartBar(v);
+  }, [id]);
+  const chooseStart = (b: number) => {
+    const next = b === startBar ? 0 : b; // clic sul marker: torna alla battuta 1
+    setStartBar(next);
+    store(`ds-inizio-${id}`, String(next));
+  };
+  const effStart = startBar < songLength(project) ? startBar : 0; // oltre la fine della canzone non vale
+  const startRef = useRef(0);
+  startRef.current = effStart;
   useEffect(() => setBrush(editing), [editing]); // come in FL: il pattern che apri è anche quello che metti
   const [songMode, setSongMode] = useState(false);
   const [bar, setBar] = useState(-1);
@@ -204,7 +218,7 @@ export function Daw({
 
   const play = useCallback(async () => {
     const e = engine();
-    if (!e.playing) await e.start();
+    if (!e.playing) await e.start(playbackRef.current.song ? startRef.current : 0);
     setPlaying(true);
   }, [engine]);
   const stop = useCallback(() => {
@@ -523,7 +537,9 @@ export function Daw({
             <span className="hw-lcd-big">{project.bpm}</span>
             <span className="hw-lcd-unit">BPM</span>
             <span className="hw-lcd-small">
-              {songMode ? `SONG · BAR ${bar >= 0 ? two(bar + 1) : "--"}/${two(songLength(project))}` : `PATTERN ${editing}`}
+              {songMode
+                ? `SONG · BAR ${bar >= 0 ? two(bar + 1) : `▶${two(effStart + 1)}`}/${two(songLength(project))}`
+                : `PATTERN ${editing}`}
               {" · "}
               {playingSlot ? `PAT ${playingSlot}` : "PAT -"}
               <br />
@@ -1042,26 +1058,41 @@ export function Daw({
             </div>
             <div className="hw-song-bars">
               {project.song.map((s, b) => (
-                <button
-                  key={b}
-                  type="button"
-                  className="hw-bar"
-                  data-slot={s ?? "none"}
-                  data-c={s ? slotColor(s) : undefined}
-                  data-now={songMode && playing && b === bar}
-                  aria-label={`Battuta ${b + 1}: ${s ? `pattern ${s}` : "vuota"}. Clic: ${s === brush ? "svuota" : `metti ${brush}`}`}
-                  onClick={() => paintBar(b)}
-                >
-                  <span className="hw-bar-num">{b + 1}</span>
-                  <span className="hw-bar-slot">{s ?? "–"}</span>
-                </button>
+                <div key={b} className="hw-bar-cell" data-start={b === effStart}>
+                  <button
+                    type="button"
+                    className="hw-bar-mark"
+                    aria-pressed={b === effStart}
+                    aria-label={
+                      b === effStart && b > 0
+                        ? `La canzone parte dalla battuta ${b + 1}. Clic per tornare alla 1`
+                        : `Fai partire la canzone dalla battuta ${b + 1}`
+                    }
+                    onClick={() => chooseStart(b)}
+                  >
+                    {b === effStart ? "▶" : ""}
+                    {b + 1}
+                  </button>
+                  <button
+                    type="button"
+                    className="hw-bar"
+                    data-slot={s ?? "none"}
+                    data-c={s ? slotColor(s) : undefined}
+                    data-now={songMode && playing && b === bar}
+                    aria-label={`Battuta ${b + 1}: ${s ? `pattern ${s}` : "vuota"}. Clic: ${s === brush ? "svuota" : `metti ${brush}`}`}
+                    onClick={() => paintBar(b)}
+                  >
+                    <span className="hw-bar-slot">{s ?? "–"}</span>
+                  </button>
+                </div>
               ))}
             </div>
             <p className="hw-hint">
               Scegli il <strong>pennello</strong> (un pattern) e clicca le battute per metterlo; un clic su una battuta che ha
-              già quel pattern la svuota. <strong>+4</strong> e <strong>+8</strong> allungano la canzone
+              già quel pattern la svuota. Clic sul <strong>numero</strong> di una battuta: la canzone parte da lì (▶) e a fine
+              canzone torna lì; clic di nuovo per tornare alla 1. <strong>+4</strong> e <strong>+8</strong> allungano la canzone
               (fino a {MAX_SONG_BARS} battute), <strong>−4</strong> toglie le ultime quattro. In <strong>Song</strong> suona la
-              canzone dall&apos;inizio; in <strong>Pattern</strong> solo il pattern che stai modificando, in loop.
+              canzone dal marker ▶; in <strong>Pattern</strong> solo il pattern che stai modificando, in loop.
             </p>
           </section>
 

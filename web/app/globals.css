@@ -1185,6 +1185,40 @@ ol.ds-led-row {
   font: 10px var(--ds-font-num);
   opacity: 0.7;
 }
+/* ogni battuta della canzone: il numero (marker di inizio) sopra, il pattern sotto */
+.hw-bar-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 36px;
+}
+.hw-bar-cell .hw-bar {
+  justify-content: center;
+  height: 40px;
+}
+.hw-bar-mark {
+  height: 18px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--hw-print-faint);
+  font: 10px var(--ds-font-num);
+  cursor: pointer;
+}
+.hw-bar-mark:hover {
+  border-color: var(--hw-panel-edge);
+  color: var(--hw-print);
+}
+.hw-bar-mark[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--ds-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--ds-accent) 22%, transparent);
+  color: var(--ds-text);
+}
+.hw-bar-mark:focus-visible {
+  outline: 2px solid var(--ds-accent);
+  outline-offset: 1px;
+}
 .hw-bar-slot {
   font: 700 var(--ds-text-md) var(--ds-font-mono);
 }

@@ -19,6 +19,7 @@ export class Engine {
   private step = 0;
   private bar = 0;
   private nextTime = 0;
+  private loopFrom = 0;
 
   constructor(
     private getProject: () => Project,
@@ -44,11 +45,13 @@ export class Engine {
     return this.timer !== null;
   }
 
-  async start() {
+  // fromBar: in modalità song la battuta da cui partire (il marker); a fine canzone si torna lì
+  async start(fromBar = 0) {
     await this.ready;
     await this.ctx.resume();
     this.step = 0;
-    this.bar = 0;
+    this.bar = fromBar;
+    this.loopFrom = fromBar;
     this.nextTime = this.ctx.currentTime + 0.05;
     this.timer = setInterval(() => this.tick(), TICK_MS);
   }
@@ -81,7 +84,9 @@ export class Engine {
     this.graph.setAutomating(song);
     while (this.nextTime < this.ctx.currentTime + LOOKAHEAD_S) {
       const s = this.step;
-      const bar = song ? this.bar % songLength(p) : 0;
+      const len = songLength(p);
+      const back = this.loopFrom < len ? this.loopFrom : 0; // il marker, se è dentro la canzone
+      const bar = song ? (this.bar < len ? this.bar : back) : 0;
       const slot = song ? p.song[bar] : editing;
       // swing: gli step in levare (2, 4, 6… contando da 1) arrivano un po' dopo
       const t = this.nextTime + (s % 2 === 1 ? p.swing * stepDur : 0);
@@ -91,7 +96,7 @@ export class Engine {
       setTimeout(() => this.timer && this.onStep(s, bar, slot), delay);
       this.nextTime += stepDur;
       this.step = (s + 1) % STEPS;
-      if (this.step === 0) this.bar = (bar + 1) % songLength(p);
+      if (this.step === 0) this.bar = bar + 1 < len ? bar + 1 : back;
     }
   }
 }

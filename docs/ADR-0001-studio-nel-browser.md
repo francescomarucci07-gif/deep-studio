@@ -153,3 +153,10 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Export: rete di sicurezza in `render.ts`, se il true peak misurato supera -1,05 dBTP il file viene abbassato.
 - Prove: segnale a +12,5 dBTP → uscita -1,52 dBFS di picco e -0,01 dBTP (onda quadra aliasata, caso estremo);
   la canzone dell'utente da +0,04 a -1,07 dBTP, -13,8 LUFS, nessun allarme. Spia nella striscia Master.
+
+## Aggiornamento 11 nov 2026 · marker di inizio della canzone
+
+- Nella vista Song il numero di ogni battuta è un pulsante: mette il marker ▶ (come nella playlist di FL).
+  Il play in modalità Song parte dal marker e a fine canzone torna al marker (loop sulla parte che si sta
+  lavorando). Un clic sul marker lo riporta alla battuta 1. Il marker è uno stato dell'interfaccia,
+  ricordato nel browser per progetto (non nel progetto: non cambia la musica). L'export resta dall'inizio.

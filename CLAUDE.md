@@ -116,15 +116,22 @@ cd web && npm run dev
   limite di 50 MB per file (per gli utenti veri serve il piano Pro, P6).
 - Le soglie dei "checks" nell'analisi sono provvisorie: si tarano sulle note gold (P2).
 
-## Prossimi passi (chiesti da Francesco il 10 nov 2026, da fare alla ripresa)
+## Prossimi passi (chiesti da Francesco l'11 nov 2026, da fare alla ripresa)
 
-1. ~~Punto di partenza del play nella canzone~~ **fatto l'11 nov**: clic sul numero di una battuta nella vista
-   Song = marker ▶ (ricordato nel browser per progetto); il play in Song parte da lì e a fine canzone torna lì.
-   L'export resta dall'inizio.
-2. ~~Tastiera del computer come tastiera musicale~~ **fatto l'11 nov**: pulsante PAD / TASTIERA nella colonna
-   dei pad e tasto Tab; Z S X D C V G B H N J M (+ Q 2 W 3 E…) suonano Bass, Lead o Chord
-   (`web/lib/daw/keyboard.ts`, posizione fisica dei tasti), ottava ‹ ›, tipo di accordo; con Rec + Play le
-   note si scrivono sullo step che suona. In modalità tastiera i numeri 1–6 non cambiano vista.
+1. **Plugin**: poter aggiungere "plugin" ai canali, come gli slot degli insert nel mixer di FL. Nel browser
+   non si possono caricare VST: vanno costruiti come effetti nostri (Web Audio / AudioWorklet), scelti da un
+   elenco e messi in fila su ogni canale (e sul master). Da decidere insieme quali e come appaiono.
+2. **Tasto REC in alto** (vicino a Play/Stop): oggi fa la stessa cosa di "Registra" vicino alla tastiera
+   (con Play acceso, pad e tastiera scrivono sullo step più vicino), ma non fa partire il Play da solo.
+   Decidere se unirli (un solo comportamento) o dare a REC un altro senso.
+3. **Vista Accordi**: ora che il Roll ha la scheda Chord (con accordi sovrapposti), valutare se toglierla e
+   spostare il Chord synth (pad/stab, filtro) nella scheda Chord del Roll, come Bass e Lead.
+4. **Suoni ed effetti nuovi**: altri suoni (synth, kit) ed effetti per canale, per esempio chorus sul lead e
+   sugli accordi (oltre a filtro, riverbero e delay che ci sono già). Si lega al punto 1.
+
+Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
+registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,
+canzoni fino a 256 battute.
 
 ## Milestone
 

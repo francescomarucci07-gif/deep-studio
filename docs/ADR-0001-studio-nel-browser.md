@@ -170,3 +170,16 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   quello che si sente è quello che si scrive. Su Chord il tasto è la fondamentale, il tipo si sceglie.
 - Con Rec + Play le note (e gli accordi, sul battito) si scrivono sullo step che sta suonando, come i pad.
 - In modalità tastiera i pad non hanno tasti e i numeri non cambiano vista (alcuni sono note).
+
+## Aggiornamento 11 nov 2026 · schermate con tastiera e registrazione
+
+- Vista Roll con tre schede, una per strumento che si suona a note: Bass, Lead e **Chord** (12 righe per la
+  fondamentale, una casella per battito, tipo di accordo scelto in testata). La scheda del Roll e lo strumento
+  della tastiera del computer sono lo stesso stato: cambiare l'una cambia l'altra. La nota suonata si accende
+  sulla tastiera della schermata.
+- Registrazione: pulsante "Registra" vicino alla tastiera (accende Rec e fa partire il Play). Quantizzazione
+  allo step più vicino a quando il tasto è stato premuto: `engine.recordPosition(event.timeStamp)` confronta
+  l'istante della pressione, convertito nell'orologio audio con `getOutputTimestamp()` (latenza compresa), con
+  l'orario degli ultimi 32 step programmati. Vale anche per i pad. Prova sulla build di produzione: 8 note
+  a 2 step di distanza registrate esattamente ogni 2 step, tre volte su tre.
+- Limite noto: ogni nota ha la lunghezza del suono dello strumento (corta o lunga), tenere premuto non la allunga.

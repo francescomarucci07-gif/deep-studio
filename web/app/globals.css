@@ -468,6 +468,23 @@ ol.ds-led-row {
 .daw-roll[data-roll="lead"] .daw-cell[aria-pressed="true"] {
   --note: var(--hw-pad-blue);
 }
+/* accordi: una casella per battito (4 step), con il nome dell'accordo */
+.daw-cell--beat {
+  grid-column: span 4;
+  color: var(--ds-accent-contrast);
+  font: 600 11px var(--ds-font-num);
+}
+.daw-roll[data-roll="chords"] .daw-cell[aria-pressed="true"] {
+  --note: var(--hw-pad-purple);
+}
+/* la nota appena suonata si accende sulla tastiera della schermata */
+.daw-roll-row[data-hit="true"] .daw-key {
+  background: var(--ds-accent);
+  color: var(--ds-accent-contrast);
+}
+.daw-roll-row[data-hit="true"] .daw-cell:not([aria-pressed="true"]) {
+  background: color-mix(in srgb, var(--ds-accent) 14%, var(--ds-surface));
+}
 
 
 
@@ -933,6 +950,15 @@ ol.ds-led-row {
 }
 .hw-keys-last:empty {
   visibility: hidden;
+}
+.hw-keys-rec {
+  width: 100%;
+  flex-direction: row;
+  gap: 6px;
+}
+.hw-keys-rec[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--hw-led-red) 60%, var(--hw-panel-edge));
+  background: color-mix(in srgb, var(--hw-led-red) 16%, var(--hw-button));
 }
 .hw-keys-map {
   margin: 0;

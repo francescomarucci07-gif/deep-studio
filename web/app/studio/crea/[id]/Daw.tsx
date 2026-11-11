@@ -87,11 +87,19 @@ function store(key: string, value: string) {
 
 // righe del piano roll, dall'alto in basso, per ogni strumento con le note
 const rows = (lo: number, hi: number) => Array.from({ length: hi - lo + 1 }, (_, i) => hi - i);
+// Le schermate con la tastiera: una per ogni strumento che si suona a note (come il piano roll di FL)
 const ROLLS = {
   bass: { label: "Bass", rows: rows(BASS_LOW, BASS_HIGH) },
   lead: { label: "Lead", rows: rows(LEAD_LOW, LEAD_HIGH) },
 } as const;
 type RollId = keyof typeof ROLLS;
+type RollTab = KeyInstrument; // bass, lead o chords: è anche lo strumento della tastiera del computer
+const ROLL_TABS: { id: RollTab; label: string }[] = [
+  { id: "bass", label: "Bass" },
+  { id: "lead", label: "Lead" },
+  { id: "chords", label: "Chord" },
+];
+const CHORD_ROOTS = Array.from({ length: 12 }, (_, i) => 11 - i); // Si in alto, Do in basso
 const isSharp = (m: number) => [1, 3, 6, 8, 10].includes(m % 12);
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 const two = (n: number) => String(n).padStart(2, "0");
@@ -167,7 +175,13 @@ export function Daw({
   const [playingSlot, setPlayingSlot] = useState<Slot | null>(null);
   const pat = project.patterns[editing];
   const [showVersions, setShowVersions] = useState(false);
-  const [roll, setRoll] = useState<RollId>("bass");
+  const [roll, setRoll] = useState<RollTab>("bass"); // scheda del Roll = strumento della tastiera
+  // la nota (o la fondamentale dell'accordo) appena suonata si accende sulla tastiera della schermata
+  const [keyHit, setKeyHit] = useState<{ inst: RollTab; value: number } | null>(null);
+  const lightKey = useCallback((inst: RollTab, value: number) => {
+    setKeyHit({ inst, value });
+    setTimeout(() => setKeyHit((h) => (h && h.inst === inst && h.value === value ? null : h)), 180);
+  }, []);
   const [view, setView] = useState<ViewId>("beat"); // la vista al centro (sul computer)
   const [coachOpen, setCoachOpen] = useState(true);
   useEffect(() => {
@@ -197,12 +211,8 @@ export function Daw({
   projectRef.current = project;
   const titleRef = useRef(title);
   titleRef.current = title;
-  const stepRef = useRef(step);
-  stepRef.current = step;
   const playbackRef = useRef({ song: songMode, editing });
   playbackRef.current = { song: songMode, editing };
-  const playingSlotRef = useRef(playingSlot);
-  playingSlotRef.current = playingSlot;
   const engineRef = useRef<Engine | null>(null);
 
   const engine = useCallback(() => {
@@ -246,26 +256,29 @@ export function Daw({
 
   // Tastiera musicale (come la typing keyboard di FL): in modalità "keys" le lettere suonano note
   const [keyMode, setKeyMode] = useState<"pad" | "keys">("pad");
-  const [keyInst, setKeyInst] = useState<KeyInstrument>("bass");
   const [octaves, setOctaves] = useState({ bass: OCTAVES.bass.start, lead: OCTAVES.lead.start });
   const [keyChord, setKeyChord] = useState<ChordType>("min7");
   const [lastKey, setLastKey] = useState("");
+  const keyInst = roll;
   const keysRef = useRef({ keyMode, keyInst, octaves, keyChord });
   keysRef.current = { keyMode, keyInst, octaves, keyChord };
 
   // un tasto della tastiera musicale: suona la nota (o l'accordo) e con REC + Play la scrive sullo step
   const playKey = useCallback(
-    (code: string) => {
+    (code: string, pressedAt?: number) => {
       const k = keysRef.current;
-      const s = stepRef.current;
-      const slot = playbackRef.current.song ? playingSlotRef.current : playbackRef.current.editing;
-      const recording = rec && engineRef.current?.playing && s >= 0 && slot;
+      // registrazione: lo step più vicino a quando hai premuto (in song nel pattern che suona lì)
+      const pos = rec ? engineRef.current?.recordPosition(pressedAt) : null;
+      const s = pos?.step ?? -1;
+      const slot = pos ? (playbackRef.current.song ? pos.slot : playbackRef.current.editing) : null;
+      const recording = pos && s >= 0 && slot;
       if (k.keyInst === "chords") {
         const root = keyRoot(code);
         if (root === null) return false;
         const chord: Chord = { root, type: k.keyChord };
         void engine().preview("chords", { chord });
         setLastKey(chordName(chord));
+        lightKey("chords", root);
         if (recording) {
           update((p) => {
             p.patterns[slot].chords[Math.floor(s / 4)] = chord;
@@ -277,6 +290,7 @@ export function Daw({
         if (note === null) return false;
         void engine().preview(inst, { note });
         setLastKey(noteName(note));
+        lightKey(inst, note);
         if (recording) {
           update((p) => {
             p.patterns[slot][inst][s] = note;
@@ -287,7 +301,7 @@ export function Daw({
       setTimeout(() => setFlash((f) => (f === k.keyInst ? null : f)), 140);
       return true;
     },
-    [engine, rec, update],
+    [engine, rec, update, lightKey],
   );
   const shiftOctave = (d: number) => {
     if (keyInst === "chords") return;
@@ -297,7 +311,7 @@ export function Daw({
 
   // Un colpo sul pad: suona sempre; con REC acceso e Play, scrive il colpo sullo step che sta suonando
   const hitPad = useCallback(
-    (c: ChannelId) => {
+    (c: ChannelId, pressedAt?: number) => {
       const cur = projectRef.current.patterns[playbackRef.current.editing];
       void engine().preview(c, {
         note: c === "lead" ? (cur.lead.find((n) => n !== null) ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
@@ -305,10 +319,11 @@ export function Daw({
       });
       setFlash(c);
       setTimeout(() => setFlash((f) => (f === c ? null : f)), 140);
-      const s = stepRef.current;
-      // in modalità song registra nel pattern che sta suonando, altrimenti in quello che modifichi
-      const slot = playbackRef.current.song ? playingSlotRef.current : playbackRef.current.editing;
-      if (rec && engineRef.current?.playing && s >= 0 && isDrum(c) && slot) {
+      // registrazione sullo step più vicino; in song nel pattern che suona lì, altrimenti in quello che modifichi
+      const pos = rec && isDrum(c) ? engineRef.current?.recordPosition(pressedAt) : null;
+      const s = pos?.step ?? -1;
+      const slot = pos ? (playbackRef.current.song ? pos.slot : playbackRef.current.editing) : null;
+      if (pos && s >= 0 && isDrum(c) && slot) {
         update((p) => {
           p.patterns[slot].drums[c][s] = true;
         });
@@ -343,7 +358,7 @@ export function Daw({
       if (keysRef.current.keyMode === "keys") {
         if (e.code in KEY_NOTES) {
           e.preventDefault();
-          playKey(e.code);
+          playKey(e.code, e.timeStamp);
         }
         return;
       }
@@ -354,7 +369,7 @@ export function Daw({
         return;
       }
       const pad = PADS.find((p) => p.key === e.key.toLowerCase());
-      if (pad) hitPad(pad.id);
+      if (pad) hitPad(pad.id, e.timeStamp);
     };
     // i browser "cliccano" il pulsante col focus quando lo spazio viene rilasciato: lo blocco anche lì
     const onKeyUp = (e: KeyboardEvent) => {
@@ -764,7 +779,7 @@ export function Daw({
                         type="button"
                         className="hw-btn hw-btn--small"
                         aria-pressed={keyInst === k}
-                        onClick={() => setKeyInst(k)}
+                        onClick={() => setRoll(k)}
                       >
                         {k === "bass" ? "Bass" : k === "lead" ? "Lead" : "Chord"}
                       </button>
@@ -817,9 +832,24 @@ export function Daw({
                       {lastKey}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    className="hw-btn hw-btn--small hw-btn--rec hw-keys-rec"
+                    aria-pressed={rec}
+                    title="Accende Rec e fa partire il Play: le note che suoni si scrivono nel pattern"
+                    onClick={() => {
+                      const on = !rec;
+                      setRec(on);
+                      if (on && !engineRef.current?.playing) void play();
+                    }}
+                  >
+                    <span className="hw-btn-led" />
+                    {rec ? "Registro… (clic per smettere)" : "● Registra"}
+                  </button>
                   <p className="hw-keys-map">
-                    Z X C V B N M = Do Re Mi Fa Sol La Si · S D G H J = diesis · Q W E R T Y U = ottava sopra. Con{" "}
-                    <strong>Rec</strong> e <strong>Play</strong> le note si scrivono nel pattern.
+                    Z X C V B N M = Do Re Mi Fa Sol La Si · S D G H J = diesis · Q W E R T Y U = ottava sopra.{" "}
+                    <strong>Registra</strong>: le note vanno sullo step più vicino; in Pattern il loop gira e puoi
+                    aggiungere note a ogni giro.
                   </p>
                 </>
               )}
@@ -834,10 +864,10 @@ export function Daw({
                   data-hit={hitNow(p.id)}
                   onPointerDown={(e) => {
                     e.preventDefault();
-                    hitPad(p.id);
+                    hitPad(p.id, e.timeStamp);
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") hitPad(p.id);
+                    if (e.key === "Enter") hitPad(p.id, e.timeStamp);
                   }}
                 >
                   <span className="hw-pad-name">{p.label}</span>
@@ -1418,42 +1448,138 @@ export function Daw({
             </div>
           </section>
 
-          {/* ---- piano roll: basso o melodia ---- */}
-          <section className="hw-panel hw-roll-panel" data-panel="roll" aria-label={`Piano roll · ${ROLLS[roll].label}`}>
+          {/* ---- piano roll: una schermata con la sua tastiera per Bass, Lead e Chord ---- */}
+          <section
+            className="hw-panel hw-roll-panel"
+            data-panel="roll"
+            aria-label={`Piano roll · ${ROLL_TABS.find((t) => t.id === roll)?.label}`}
+          >
             <div className="hw-seq-head">
               <h2 className="hw-title">
-                Piano roll · {ROLLS[roll].label} · Pattern {editing}
+                Piano roll · {ROLL_TABS.find((t) => t.id === roll)?.label} · Pattern {editing}
               </h2>
               <div className="hw-patterns" role="group" aria-label="Strumento nel piano roll">
-                {(Object.keys(ROLLS) as RollId[]).map((r) => (
-                  <button key={r} type="button" className="hw-btn hw-btn--small" aria-pressed={roll === r} onClick={() => setRoll(r)}>
+                {ROLL_TABS.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className="hw-btn hw-btn--small"
+                    aria-pressed={roll === r.id}
+                    onClick={() => setRoll(r.id)}
+                  >
                     <span className="hw-btn-led" />
-                    {ROLLS[r].label}
+                    {r.label}
                   </button>
                 ))}
+                {roll === "chords" && (
+                  <>
+                    <label className="hw-visually-hidden" htmlFor="roll-chord">
+                      Tipo di accordo
+                    </label>
+                    <select
+                      id="roll-chord"
+                      className="hw-select"
+                      value={keyChord}
+                      onChange={(e) => setKeyChord(e.target.value as ChordType)}
+                    >
+                      {CHORD_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {TYPE_LABEL[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
               </div>
             </div>
-            <div className="daw-roll" data-roll={roll}>
-              {ROLLS[roll].rows.map((note) => (
-                <div key={note} className="daw-roll-row" data-sharp={isSharp(note)}>
-                  <button type="button" className="daw-key" onClick={() => void engine().preview(roll, { note })}>
-                    {noteName(note)}
-                  </button>
-                  {Array.from({ length: STEPS }, (_, i) => (
+            {roll === "chords" ? (
+              // accordi: una riga per fondamentale, una casella per battito (4 step)
+              <div className="daw-roll" data-roll="chords">
+                {CHORD_ROOTS.map((root) => (
+                  <div
+                    key={root}
+                    className="daw-roll-row"
+                    data-sharp={isSharp(root)}
+                    data-hit={keyHit?.inst === "chords" && keyHit.value === root}
+                  >
                     <button
-                      key={i}
                       type="button"
-                      className="daw-cell"
-                      aria-pressed={pat[roll][i] === note}
-                      aria-label={`${noteName(note)} step ${i + 1}`}
-                      data-now={i === step && playingSlot === editing}
-                      data-beat={i % 4 === 0}
-                      onClick={() => setNote(roll, i, note)}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
+                      className="daw-key"
+                      onClick={() => {
+                        void engine().preview("chords", { chord: { root, type: keyChord } });
+                        lightKey("chords", root);
+                      }}
+                    >
+                      {NOTE_NAMES[root]}
+                    </button>
+                    {Array.from({ length: BEATS }, (_, b) => {
+                      const c = pat.chords[b];
+                      const on = c !== null && c.root === root;
+                      return (
+                        <button
+                          key={b}
+                          type="button"
+                          className="daw-cell daw-cell--beat"
+                          aria-pressed={on}
+                          aria-label={`Battito ${b + 1}: ${on && c ? `${chordName(c)}, clic per togliere` : `metti ${chordName({ root, type: keyChord })}`}`}
+                          data-now={Math.floor(step / 4) === b && playingSlot === editing}
+                          onClick={() => {
+                            const next = on ? null : { root, type: keyChord };
+                            update((p) => {
+                              p.patterns[editing].chords[b] = next;
+                            });
+                            if (next && !playing) void engine().preview("chords", { chord: next });
+                          }}
+                        >
+                          {on && c ? chordName(c) : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="daw-roll" data-roll={roll}>
+                {ROLLS[roll].rows.map((note) => (
+                  <div
+                    key={note}
+                    className="daw-roll-row"
+                    data-sharp={isSharp(note)}
+                    data-hit={keyHit?.inst === roll && keyHit.value === note}
+                  >
+                    <button
+                      type="button"
+                      className="daw-key"
+                      onClick={() => {
+                        void engine().preview(roll, { note });
+                        lightKey(roll, note);
+                      }}
+                    >
+                      {noteName(note)}
+                    </button>
+                    {Array.from({ length: STEPS }, (_, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        className="daw-cell"
+                        aria-pressed={pat[roll][i] === note}
+                        aria-label={`${noteName(note)} step ${i + 1}`}
+                        data-now={i === step && playingSlot === editing}
+                        data-beat={i % 4 === 0}
+                        onClick={() => setNote(roll, i, note)}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            {roll === "chords" && (
+              <p className="hw-hint">
+                Clic su una casella: l&apos;accordo con quella fondamentale e il tipo scelto, su quel battito; clic di nuovo per
+                toglierlo. Il suono degli accordi (pad o stab, filtro) è nella vista <strong>Accordi</strong>.
+              </p>
+            )}
+            {roll !== "chords" && (
             <div className="hw-synths">
               {roll === "bass" ? (
                   <div className="hw-strip hw-strip--synth">
@@ -1555,6 +1681,7 @@ export function Daw({
                   </div>
               )}
             </div>
+            )}
           </section>
         </div>
 

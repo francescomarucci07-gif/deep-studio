@@ -20,6 +20,8 @@ export class Engine {
   private bar = 0;
   private nextTime = 0;
   private loopFrom = 0;
+  // gli ultimi step programmati, con il loro orario: servono a registrare sullo step più vicino
+  private recent: { t: number; step: number; slot: Slot | null }[] = [];
 
   constructor(
     private getProject: () => Project,
@@ -50,10 +52,29 @@ export class Engine {
     await this.ready;
     await this.ctx.resume();
     this.step = 0;
+    this.recent = [];
     this.bar = fromBar;
     this.loopFrom = fromBar;
     this.nextTime = this.ctx.currentTime + 0.05;
     this.timer = setInterval(() => this.tick(), TICK_MS);
+  }
+
+  // Dove scrivere una nota suonata adesso (quantizzazione come in FL): lo step il cui suono arriva alle
+  // casse più vicino a questo istante. Conto la latenza dell'uscita audio: suoni su quello che senti.
+  // pressedAt: l'istante in cui il tasto è stato premuto (event.timeStamp), non quello in cui il programma
+  // se ne accorge: se lo studio sta ridisegnando, l'evento arriva qualche decina di ms dopo.
+  recordPosition(pressedAt?: number): { step: number; slot: Slot | null } | null {
+    if (!this.playing || this.recent.length === 0) return null;
+    const ctx = this.ctx;
+    let heard = ctx.currentTime - (ctx.outputLatency || 0) - (ctx.baseLatency || 0);
+    // getOutputTimestamp: quale istante dell'audio esce dalle casse in quel momento (latenza compresa)
+    const out = typeof ctx.getOutputTimestamp === "function" ? ctx.getOutputTimestamp() : null;
+    if (pressedAt !== undefined && out?.contextTime && out.performanceTime) {
+      heard = out.contextTime + (pressedAt - out.performanceTime) / 1000;
+    }
+    let best = this.recent[0];
+    for (const r of this.recent) if (Math.abs(r.t - heard) < Math.abs(best.t - heard)) best = r;
+    return { step: best.step, slot: best.slot };
   }
 
   stop() {
@@ -92,6 +113,8 @@ export class Engine {
       const t = this.nextTime + (s % 2 === 1 ? p.swing * stepDur : 0);
       if (song && s === 0) this.graph.automateBar(bar, this.nextTime, STEPS * stepDur, songLength(p) - 1);
       if (slot) this.graph.playStep(p.patterns[slot], s, t, stepDur);
+      this.recent.push({ t, step: s, slot });
+      if (this.recent.length > 32) this.recent.shift();
       const delay = Math.max(0, (t - this.ctx.currentTime) * 1000);
       setTimeout(() => this.timer && this.onStep(s, bar, slot), delay);
       this.nextTime += stepDur;

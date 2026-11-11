@@ -121,10 +121,10 @@ cd web && npm run dev
 1. ~~Punto di partenza del play nella canzone~~ **fatto l'11 nov**: clic sul numero di una battuta nella vista
    Song = marker ▶ (ricordato nel browser per progetto); il play in Song parte da lì e a fine canzone torna lì.
    L'export resta dall'inizio.
-2. **Tastiera del computer come tastiera musicale**, tipo FL (Typing keyboard to piano): su Bass, Lead e
-   Chord i tasti suonano note diverse (es. Z S X D C V G B H N J M = una ottava, Q 2 W 3 E… quella sopra),
-   con ottava su/giù; con Rec + Play le note si scrivono nel pattern. Attenzione: oggi Z X C V B N M ,
-   sono i pad della batteria e 1–6 cambiano vista, quindi serve una modalità (pad / tastiera) o tasti diversi.
+2. ~~Tastiera del computer come tastiera musicale~~ **fatto l'11 nov**: pulsante PAD / TASTIERA nella colonna
+   dei pad e tasto Tab; Z S X D C V G B H N J M (+ Q 2 W 3 E…) suonano Bass, Lead o Chord
+   (`web/lib/daw/keyboard.ts`, posizione fisica dei tasti), ottava ‹ ›, tipo di accordo; con Rec + Play le
+   note si scrivono sullo step che suona. In modalità tastiera i numeri 1–6 non cambiano vista.
 
 ## Milestone
 

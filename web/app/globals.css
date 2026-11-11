@@ -895,6 +895,55 @@ ol.ds-led-row {
   opacity: 0.6;
 }
 
+/* tastiera del computer: PAD / TASTIERA, strumento, ottava, ultima nota */
+.hw-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--ds-space-3);
+}
+.hw-keys .hw-seg {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.hw-keys .hw-seg .hw-btn {
+  flex: 1;
+  min-width: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.hw-keys-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hw-keys-row .hw-btn {
+  min-width: 32px;
+  padding: 0 6px;
+}
+.hw-keys-last {
+  margin-left: auto;
+  min-width: 52px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: var(--hw-lcd-bg);
+  color: var(--hw-lcd-text);
+  font: 600 12px var(--ds-font-num);
+  text-align: center;
+}
+.hw-keys-last:empty {
+  visibility: hidden;
+}
+.hw-keys-map {
+  margin: 0;
+  color: var(--hw-print-faint);
+  font-size: 10px;
+  line-height: 1.4;
+}
+.hw-pads[data-keys="true"] .hw-pad-key {
+  visibility: hidden;
+}
+
 /* step sequencer: ogni riga ha il colore del suo strumento; i gruppi di 4 si alternano di tono */
 .hw-seq-grid {
   display: flex;
@@ -1661,7 +1710,8 @@ ol.ds-led-row {
     .console-side .hw-panel {
       padding: var(--ds-space-3);
     }
-    .console-side .hw-seg .hw-btn {
+    .console-side .hw-seq-head .hw-seg .hw-btn,
+    .console-side .hw-keys .hw-btn {
       font-size: 10px;
       letter-spacing: 0.02em;
     }
@@ -1729,12 +1779,12 @@ ol.ds-led-row {
     flex-direction: column;
     align-items: stretch;
   }
-  .console-side .hw-seg {
+  .console-side .hw-seq-head .hw-seg {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 4px;
   }
-  .console-side .hw-seg .hw-btn {
+  .console-side .hw-seq-head .hw-seg .hw-btn {
     padding: 4px 0;
   }
   /* centro: le schede delle viste e la vista attiva */

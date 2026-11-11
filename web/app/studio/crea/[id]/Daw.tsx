@@ -36,11 +36,13 @@ import {
   type AutoTarget,
   type ChannelFx,
   type ChannelId,
+  type Chord,
   type ChordType,
   type DrumId,
   type Project,
   type Slot,
 } from "@/lib/daw/project";
+import { KEY_NOTES, keyNote, keyRoot, OCTAVES, type KeyInstrument } from "@/lib/daw/keyboard";
 import { KIT_IDS, KITS } from "@/lib/daw/kits";
 import { measure, type Measures } from "@/lib/daw/measure";
 import { encodeWav, renderAudio, renderPlan, SAMPLE_RATE } from "@/lib/daw/render";
@@ -242,6 +244,57 @@ export function Daw({
     [],
   );
 
+  // Tastiera musicale (come la typing keyboard di FL): in modalità "keys" le lettere suonano note
+  const [keyMode, setKeyMode] = useState<"pad" | "keys">("pad");
+  const [keyInst, setKeyInst] = useState<KeyInstrument>("bass");
+  const [octaves, setOctaves] = useState({ bass: OCTAVES.bass.start, lead: OCTAVES.lead.start });
+  const [keyChord, setKeyChord] = useState<ChordType>("min7");
+  const [lastKey, setLastKey] = useState("");
+  const keysRef = useRef({ keyMode, keyInst, octaves, keyChord });
+  keysRef.current = { keyMode, keyInst, octaves, keyChord };
+
+  // un tasto della tastiera musicale: suona la nota (o l'accordo) e con REC + Play la scrive sullo step
+  const playKey = useCallback(
+    (code: string) => {
+      const k = keysRef.current;
+      const s = stepRef.current;
+      const slot = playbackRef.current.song ? playingSlotRef.current : playbackRef.current.editing;
+      const recording = rec && engineRef.current?.playing && s >= 0 && slot;
+      if (k.keyInst === "chords") {
+        const root = keyRoot(code);
+        if (root === null) return false;
+        const chord: Chord = { root, type: k.keyChord };
+        void engine().preview("chords", { chord });
+        setLastKey(chordName(chord));
+        if (recording) {
+          update((p) => {
+            p.patterns[slot].chords[Math.floor(s / 4)] = chord;
+          });
+        }
+      } else {
+        const inst = k.keyInst;
+        const note = keyNote(code, inst, k.octaves[inst]);
+        if (note === null) return false;
+        void engine().preview(inst, { note });
+        setLastKey(noteName(note));
+        if (recording) {
+          update((p) => {
+            p.patterns[slot][inst][s] = note;
+          });
+        }
+      }
+      setFlash(k.keyInst);
+      setTimeout(() => setFlash((f) => (f === k.keyInst ? null : f)), 140);
+      return true;
+    },
+    [engine, rec, update],
+  );
+  const shiftOctave = (d: number) => {
+    if (keyInst === "chords") return;
+    const r = OCTAVES[keyInst];
+    setOctaves((o) => ({ ...o, [keyInst]: Math.min(r.max, Math.max(r.min, o[keyInst] + d)) }));
+  };
+
   // Un colpo sul pad: suona sempre; con REC acceso e Play, scrive il colpo sullo step che sta suonando
   const hitPad = useCallback(
     (c: ChannelId) => {
@@ -278,8 +331,22 @@ export function Daw({
         if (!e.repeat) togglePlay();
         return;
       }
+      // Tab: PAD ↔ TASTIERA (Maiusc+Tab resta per muoversi tra i comandi)
+      if (e.key === "Tab" && !e.shiftKey && !typing(e.target) && !e.altKey && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        setKeyMode((m) => (m === "pad" ? "keys" : "pad"));
+        return;
+      }
       const tag = (e.target as HTMLElement).tagName;
-      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.metaKey || e.ctrlKey || e.repeat) return;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      // in modalità tastiera le lettere (e alcuni numeri) sono note: niente pad e niente cambio vista
+      if (keysRef.current.keyMode === "keys") {
+        if (e.code in KEY_NOTES) {
+          e.preventDefault();
+          playKey(e.code);
+        }
+        return;
+      }
       // 1–6: cambia vista (le cifre non sono usate dai pad)
       const n = Number(e.key);
       if (Number.isInteger(n) && n >= 1 && n <= VIEWS.length && !e.altKey) {
@@ -299,7 +366,7 @@ export function Daw({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [togglePlay, hitPad, chooseView]);
+  }, [togglePlay, hitPad, chooseView, playKey]);
 
   // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
   const snapshot = useCallback(
@@ -665,7 +732,99 @@ export function Daw({
                 ))}
               </div>
             </div>
-            <div className="hw-pads">
+            <div className="hw-keys" role="group" aria-label="Tastiera del computer">
+              <div className="hw-seg">
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-pressed={keyMode === "pad"}
+                  title="I tasti Z X C V B N M suonano i pad (Tab per cambiare)"
+                  onClick={() => setKeyMode("pad")}
+                >
+                  <span className="hw-btn-led" />
+                  Pad
+                </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-pressed={keyMode === "keys"}
+                  title="I tasti suonano le note, come la typing keyboard di FL (Tab per cambiare)"
+                  onClick={() => setKeyMode("keys")}
+                >
+                  <span className="hw-btn-led" />
+                  Tastiera
+                </button>
+              </div>
+              {keyMode === "keys" && (
+                <>
+                  <div className="hw-seg" role="group" aria-label="Strumento della tastiera">
+                    {(["bass", "lead", "chords"] as const).map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        className="hw-btn hw-btn--small"
+                        aria-pressed={keyInst === k}
+                        onClick={() => setKeyInst(k)}
+                      >
+                        {k === "bass" ? "Bass" : k === "lead" ? "Lead" : "Chord"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="hw-keys-row">
+                    {keyInst === "chords" ? (
+                      <>
+                        <label className="hw-label" htmlFor="key-chord">
+                          Tipo
+                        </label>
+                        <select
+                          id="key-chord"
+                          className="hw-select"
+                          value={keyChord}
+                          onChange={(e) => setKeyChord(e.target.value as ChordType)}
+                        >
+                          {CHORD_TYPES.map((t) => (
+                            <option key={t} value={t}>
+                              {TYPE_LABEL[t]}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    ) : (
+                      <>
+                        <span className="hw-label">Ottava</span>
+                        <button
+                          type="button"
+                          className="hw-btn hw-btn--small"
+                          aria-label="Ottava giù"
+                          disabled={octaves[keyInst] <= OCTAVES[keyInst].min}
+                          onClick={() => shiftOctave(-1)}
+                        >
+                          ‹
+                        </button>
+                        <span className="hw-value">{octaves[keyInst]}</span>
+                        <button
+                          type="button"
+                          className="hw-btn hw-btn--small"
+                          aria-label="Ottava su"
+                          disabled={octaves[keyInst] >= OCTAVES[keyInst].max}
+                          onClick={() => shiftOctave(1)}
+                        >
+                          ›
+                        </button>
+                      </>
+                    )}
+                    <span className="hw-keys-last" aria-live="polite">
+                      {lastKey}
+                    </span>
+                  </div>
+                  <p className="hw-keys-map">
+                    Z X C V B N M = Do Re Mi Fa Sol La Si · S D G H J = diesis · Q W E R T Y U = ottava sopra. Con{" "}
+                    <strong>Rec</strong> e <strong>Play</strong> le note si scrivono nel pattern.
+                  </p>
+                </>
+              )}
+            </div>
+            <div className="hw-pads" data-keys={keyMode === "keys"}>
               {PADS.map((p) => (
                 <button
                   key={p.id}

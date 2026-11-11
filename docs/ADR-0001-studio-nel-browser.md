@@ -160,3 +160,13 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   Il play in modalità Song parte dal marker e a fine canzone torna al marker (loop sulla parte che si sta
   lavorando). Un clic sul marker lo riporta alla battuta 1. Il marker è uno stato dell'interfaccia,
   ricordato nel browser per progetto (non nel progetto: non cambia la musica). L'export resta dall'inizio.
+
+## Aggiornamento 11 nov 2026 · tastiera musicale
+
+- Come la typing keyboard di FL: pulsante PAD / TASTIERA (e tasto Tab; Maiusc+Tab resta per la navigazione).
+  In modalità tastiera la fila Z–M e S D G H J suona un'ottava, Q–P e 2 3 5 6 7 9 0 quella sopra, sullo
+  strumento scelto (Bass, Lead, Chord). Si usa `KeyboardEvent.code` (posizione fisica): funziona con la
+  tastiera italiana. Le note fuori gamma (basso La1–La2, lead Do4–Do6) scendono o salgono di ottava, così
+  quello che si sente è quello che si scrive. Su Chord il tasto è la fondamentale, il tipo si sceglie.
+- Con Rec + Play le note (e gli accordi, sul battito) si scrivono sullo step che sta suonando, come i pad.
+- In modalità tastiera i pad non hanno tasti e i numeri non cambiano vista (alcuni sono note).

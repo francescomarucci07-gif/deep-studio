@@ -183,3 +183,14 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   l'orario degli ultimi 32 step programmati. Vale anche per i pad. Prova sulla build di produzione: 8 note
   a 2 step di distanza registrate esattamente ogni 2 step, tre volte su tre.
 - Limite noto: ogni nota ha la lunghezza del suono dello strumento (corta o lunga), tenere premuto non la allunga.
+
+## Aggiornamento 11 nov 2026 · lead polifonico
+
+- Il lead passa da una nota per step a un elenco di note per step (`lead: number[][]`, fino a 6 voci come un
+  synth a 6 voci). `normalize()` converte i progetti di prima (nota → [nota], null → []). Il basso resta
+  monofonico (in house la bassline è a una voce).
+- Suono: una voce per nota; con più voci ognuna è più piano (1/√n), così un accordo non spinge il limiter.
+  Il legato (note lunghe) segue la nota più bassa.
+- Roll Lead: più note nella stessa colonna; tastiera: più tasti insieme suonano e si registrano sullo stesso step.
+  Coach (prompt `crea-v12`): più voci con lo stesso step in `melodia` = accordo.
+- Corretto: nel piano roll le note sulle righe dei diesis restavano scure (vinceva lo sfondo della riga).

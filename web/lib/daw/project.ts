@@ -75,6 +75,8 @@ export type NoteLength = "corta" | "lunga"; // lunga = la nota tiene fino alla s
 export const LEAD_LOW = 60;
 export const LEAD_HIGH = 84;
 export const LEAD_WAVES = ["sawtooth", "square", "triangle"] as const;
+export const LEAD_VOICES = 6; // il lead è polifonico: fino a 6 note sullo stesso step, come un synth a 6 voci
+export const emptyLead = () => Array.from({ length: STEPS }, () => [] as number[]);
 export type LeadWave = (typeof LEAD_WAVES)[number];
 
 export type Channel = { volume: number; muted: boolean };
@@ -94,7 +96,7 @@ export type Pattern = {
   drums: Record<DrumId, boolean[]>;
   bass: (number | null)[]; // una nota MIDI per step, oppure null
   chords: (Chord | null)[]; // uno per battito; null = continua l'accordo prima (pad) o niente (stab)
-  lead: (number | null)[]; // la melodia: una nota MIDI per step, oppure null
+  lead: number[][]; // la melodia: per ogni step le note MIDI che suonano insieme (vuoto = niente), max 6
 };
 
 export type Project = {
@@ -127,13 +129,13 @@ export function emptyPattern(): Pattern {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, on()])) as Pattern["drums"],
     bass: Array(STEPS).fill(null),
     chords: Array(BEATS).fill(null),
-    lead: Array(STEPS).fill(null),
+    lead: emptyLead(),
   };
 }
 
 export const isEmptyPattern = (p: Pattern) =>
   p.bass.every((n) => n === null) &&
-  p.lead.every((n) => n === null) &&
+  p.lead.every((n) => n.length === 0) &&
   p.chords.every((c) => c === null) &&
   DRUMS.every(({ id }) => p.drums[id].every((s) => !s));
 
@@ -219,7 +221,7 @@ export function starterProject(): Project {
         drums: { kick: on(0, 4, 8, 12), clap: on(4, 12), hat: on(2, 6, 10, 14), openhat: on(), perc: on() },
         bass,
         chords: [{ root: 9, type: "min7" }, null, null, null],
-        lead: Array(STEPS).fill(null),
+        lead: emptyLead(),
       },
     },
     song: ["A", "A", "A", "A", ...Array(MIN_SONG_BARS - 4).fill(null)],
@@ -263,8 +265,18 @@ function normalizePattern(raw: unknown): Pattern {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(r.drums?.[id])])) as Pattern["drums"],
     bass: notes(r.bass, BASS_LOW, BASS_HIGH),
     chords: Array.from({ length: BEATS }, (_, i) => normalizeChord(Array.isArray(r.chords) ? r.chords[i] : null)),
-    lead: notes(r.lead, LEAD_LOW, LEAD_HIGH),
+    lead: leadNotes(r.lead),
   };
+}
+
+// il lead: per ogni step un elenco di note (i progetti di prima avevano una nota o null: diventa [nota] o [])
+function leadNotes(a: unknown): number[][] {
+  return Array.from({ length: STEPS }, (_, i) => {
+    const v = Array.isArray(a) ? a[i] : null;
+    const list = Array.isArray(v) ? v : v === null || v === undefined ? [] : [v];
+    const ok = list.filter((n): n is number => typeof n === "number" && n >= LEAD_LOW && n <= LEAD_HIGH).map(Math.round);
+    return [...new Set(ok)].sort((x, y) => x - y).slice(0, LEAD_VOICES);
+  });
 }
 
 // una nota MIDI per step, dentro l'estensione dello strumento; tutto il resto diventa null
@@ -385,7 +397,7 @@ export function describe(p: Project, title: string, editing: Slot) {
     const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}`)).filter(Boolean);
     lines.push(`  Bass      ${notes.length ? notes.join(" ") : "nessuna nota"}`);
     lines.push(`  Accordi   ${pat.chords.map((c, b) => `battito ${b + 1}: ${c ? chordName(c) : "-"}`).join(", ")}`);
-    const lead = pat.lead.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}`)).filter(Boolean);
+    const lead = pat.lead.map((n, i) => (n.length ? `${i + 1}:${n.map(noteName).join("+")}` : null)).filter(Boolean);
     lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
   }
   // la canzone a righe da 16 battute (le pagine della playlist), più facile da leggere

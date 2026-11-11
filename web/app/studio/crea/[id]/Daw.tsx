@@ -13,6 +13,7 @@ import {
   CHORD_TYPES,
   DRUMS,
   LEAD_HIGH,
+  LEAD_VOICES,
   LEAD_LOW,
   LEAD_WAVES,
   NOTE_NAMES,
@@ -293,7 +294,15 @@ export function Daw({
         lightKey(inst, note);
         if (recording) {
           update((p) => {
-            p.patterns[slot][inst][s] = note;
+            const pp = p.patterns[slot];
+            // lead: la nota si aggiunge a quelle dello step (accordi suonati con più tasti); basso: sostituisce
+            if (inst === "lead") {
+              if (!pp.lead[s].includes(note) && pp.lead[s].length < LEAD_VOICES) {
+                pp.lead[s] = [...pp.lead[s], note].sort((a, b) => a - b);
+              }
+            } else {
+              pp.bass[s] = note;
+            }
           });
         }
       }
@@ -314,7 +323,7 @@ export function Daw({
     (c: ChannelId, pressedAt?: number) => {
       const cur = projectRef.current.patterns[playbackRef.current.editing];
       void engine().preview(c, {
-        note: c === "lead" ? (cur.lead.find((n) => n !== null) ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
+        note: c === "lead" ? (cur.lead.find((n) => n.length)?.[0] ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
         chord: cur.chords.find((x) => x !== null) ?? undefined,
       });
       setFlash(c);
@@ -439,12 +448,20 @@ export function Daw({
   };
 
   // una nota nel piano roll (basso o lead): clic su una nota accesa = la spegne
-  const setNote = (roll: RollId, i: number, note: number) => {
-    const removing = pat[roll][i] === note;
+  // piano roll: sul basso una nota per step (la nuova sostituisce la vecchia), sul lead più note insieme
+  const hasNote = (r: RollId, i: number, note: number) => (r === "lead" ? pat.lead[i].includes(note) : pat.bass[i] === note);
+  const setNote = (r: RollId, i: number, note: number) => {
+    const removing = hasNote(r, i, note);
+    if (r === "lead" && !removing && pat.lead[i].length >= LEAD_VOICES) return; // già 6 voci su questo step
     update((p) => {
-      p.patterns[editing][roll][i] = removing ? null : note;
+      const pp = p.patterns[editing];
+      if (r === "lead") {
+        pp.lead[i] = removing ? pp.lead[i].filter((n) => n !== note) : [...pp.lead[i], note].sort((a, b) => a - b);
+      } else {
+        pp.bass[i] = removing ? null : note;
+      }
     });
-    if (!removing && !playing) void engine().preview(roll, { note });
+    if (!removing && !playing) void engine().preview(r, { note });
   };
 
   // accordo del battito b: nota "" = nessun accordo
@@ -1075,10 +1092,12 @@ export function Daw({
                     key={i}
                     className="hw-key hw-key--note hw-key--lead"
                     data-group={Math.floor(i / 4)}
-                    data-on={n !== null}
+                    data-on={n.length > 0}
                     data-now={i === step && playingSlot === editing}
+                    title={n.map(noteName).join(" + ")}
                   >
-                    {n !== null ? noteName(n).replace(/\d$/, "") : ""}
+                    {/* più note insieme: la più bassa e quante ce ne sono in tutto */}
+                    {n.length ? `${noteName(n[0]).replace(/\d$/, "")}${n.length > 1 ? `+${n.length - 1}` : ""}` : ""}
                   </span>
                 ))}
               </div>
@@ -1562,7 +1581,7 @@ export function Daw({
                         key={i}
                         type="button"
                         className="daw-cell"
-                        aria-pressed={pat[roll][i] === note}
+                        aria-pressed={hasNote(roll, i, note)}
                         aria-label={`${noteName(note)} step ${i + 1}`}
                         data-now={i === step && playingSlot === editing}
                         data-beat={i % 4 === 0}

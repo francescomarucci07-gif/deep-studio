@@ -226,10 +226,13 @@ export class Graph {
       const len = p.bassSound.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
       this.bassNote(t, n, stepDur * len);
     }
-    const m = pat.lead[s];
-    if (m !== null) {
-      const len = p.leadSound.length === "lunga" ? this.stepsToNext(pat.lead, s) - 0.05 : 0.8;
-      this.leadNote(t, m, stepDur * len);
+    const chord = pat.lead[s];
+    if (chord.length) {
+      const line = pat.lead.map((n) => (n.length ? n[0] : null));
+      const len = p.leadSound.length === "lunga" ? this.stepsToNext(line, s) - 0.05 : 0.8;
+      // più voci insieme: ognuna un po' più piano, così un accordo non è 4 volte più forte di una nota
+      const level = 1 / Math.sqrt(chord.length);
+      for (const m of chord) this.leadNote(t, m, stepDur * len, level);
     }
     if (s % 4 === 0) {
       const chord = pat.chords[s / 4];
@@ -463,9 +466,9 @@ export class Graph {
     }
   }
 
-  // Lead: un synth monofonico. Saw = due oscillatori un po' stonati (pieno), square = vuoto e "8 bit",
+  // Lead: un synth polifonico (una voce per nota). Saw = due oscillatori un po' stonati (pieno), square = vuoto e "8 bit",
   // triangle = morbido come un flauto. Il filtro si apre all'attacco; un vibrato leggero dopo un attimo.
-  private leadNote(t: number, midi: number, dur: number) {
+  private leadNote(t: number, midi: number, dur: number, level = 1) {
     const { wave, cutoff } = this.getProject().leadSound;
     const ctx = this.ctx;
     const end = t + Math.max(dur, 0.05);
@@ -474,8 +477,8 @@ export class Graph {
     f.frequency.exponentialRampToValueAtTime(cutoff, t + 0.15);
     const g = ctx.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.32, t + 0.006);
-    g.gain.setValueAtTime(0.32, end - 0.015);
+    g.gain.linearRampToValueAtTime(0.32 * level, t + 0.006);
+    g.gain.setValueAtTime(0.32 * level, end - 0.015);
     g.gain.linearRampToValueAtTime(0, end + 0.06);
     f.connect(g).connect(this.channels.lead);
 

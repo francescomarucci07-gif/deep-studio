@@ -457,10 +457,11 @@ ol.ds-led-row {
 .daw-cell[data-beat="true"] {
   box-shadow: -2px 0 0 var(--ds-border-strong);
 }
-.daw-cell[data-now="true"] {
+/* .daw-roll davanti: queste regole devono vincere sullo sfondo scuro delle righe dei diesis */
+.daw-roll .daw-cell[data-now="true"] {
   background: var(--ds-border-strong);
 }
-.daw-cell[aria-pressed="true"] {
+.daw-roll .daw-cell[aria-pressed="true"] {
   --note: var(--hw-pad-green);
   background: var(--note);
   box-shadow: 0 0 8px color-mix(in srgb, var(--note) var(--hw-glow-amount), transparent);

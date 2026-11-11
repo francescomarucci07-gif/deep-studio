@@ -96,7 +96,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       filtro_accordi: { type: "number", minimum: 300, maximum: 8000, description: "Cutoff degli accordi in Hz: basso = morbido." },
       melodia: {
         type: "array",
-        description: `La melodia (lead): una nota per step, monofonica. MIDI da ${LEAD_LOW} (Do4) a ${LEAD_HIGH} (Do6): 60 Do4, 62 Re4, 64 Mi4, 65 Fa4, 67 Sol4, 69 La4, 71 Si4, 72 Do5, 74 Re5, 76 Mi5, 77 Fa5, 79 Sol5, 81 La5, 83 Si5, 84 Do6 (i diesis sono il numero in mezzo). Lista vuota = niente melodia.`,
+        description: `La melodia (lead), polifonica: più voci con lo stesso step suonano insieme (un accordo, al massimo 6 note), una sola voce = melodia. MIDI da ${LEAD_LOW} (Do4) a ${LEAD_HIGH} (Do6): 60 Do4, 62 Re4, 64 Mi4, 65 Fa4, 67 Sol4, 69 La4, 71 Si4, 72 Do5, 74 Re5, 76 Mi5, 77 Fa5, 79 Sol5, 81 La5, 83 Si5, 84 Do6 (i diesis sono il numero in mezzo). Lista vuota = niente melodia.`,
         items: {
           type: "object",
           properties: {
@@ -235,6 +235,18 @@ export function createStudioWriter(current: Project, editing: Slot) {
     if (name === "scrivi_pattern") {
       const slot: Slot = isSlot(i.slot) ? i.slot : editing;
       // note per step (normalize poi scarta quelle fuori dall'estensione dello strumento)
+      // il lead: tutte le note con lo stesso step suonano insieme (normalize ne tiene al massimo 6)
+      const poly = (list: unknown) => {
+        const out: number[][] = Array.from({ length: STEPS }, () => []);
+        if (Array.isArray(list)) {
+          for (const n of list as { step?: unknown; nota?: unknown }[]) {
+            if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && (n.step as number) >= 1 && (n.step as number) <= STEPS) {
+              out[(n.step as number) - 1].push(n.nota as number);
+            }
+          }
+        }
+        return out;
+      };
       const line = (list: unknown) => {
         const out: (number | null)[] = Array(STEPS).fill(null);
         if (Array.isArray(list)) {
@@ -259,7 +271,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
         drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
         bass,
         chords, // normalize scarta radici e tipi non validi
-        lead: line(i.melodia),
+        lead: poly(i.melodia),
       };
       project = normalize({
         ...project,

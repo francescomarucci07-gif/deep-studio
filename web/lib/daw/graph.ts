@@ -235,10 +235,11 @@ export class Graph {
       for (const m of chord) this.leadNote(t, m, stepDur * len, level);
     }
     if (s % 4 === 0) {
-      const chord = pat.chords[s / 4];
-      if (chord) {
+      const layers = pat.chords[s / 4];
+      if (layers.length) {
         const beats = p.chordSound.style === "pad" ? this.beatsToNextChord(pat, s / 4) : 0.5;
-        this.chord(t, chord, beats * 4 * stepDur);
+        // accordi sovrapposti: ognuno un po' più piano, come per il lead
+        for (const c of layers) this.chord(t, c, beats * 4 * stepDur, 1 / Math.sqrt(layers.length));
       }
     }
   }
@@ -259,7 +260,7 @@ export class Graph {
 
   // il pad tiene fino al prossimo accordo della battuta (o fino alla fine della battuta)
   private beatsToNextChord(pat: Pattern, b: number) {
-    for (let k = b + 1; k < BEATS; k++) if (pat.chords[k]) return k - b;
+    for (let k = b + 1; k < BEATS; k++) if (pat.chords[k].length) return k - b;
     return BEATS - b;
   }
 
@@ -505,13 +506,13 @@ export class Graph {
 
   // Accordo: per ogni nota due oscillatori dente di sega un po' stonati tra loro e aperti a destra
   // e sinistra (il "chorus" dei synth analogici), poi un filtro. Pad = attacco lento; stab = colpo corto.
-  private chord(t: number, c: Chord, dur: number) {
+  private chord(t: number, c: Chord, dur: number, level = 1) {
     const { style, cutoff } = this.getProject().chordSound;
     const ctx = this.ctx;
     const notes = chordNotes(c);
     const f = this.filter("lowpass", cutoff, 0.8);
     const g = ctx.createGain();
-    const peak = 0.3 / Math.sqrt(notes.length);
+    const peak = (0.3 / Math.sqrt(notes.length)) * level;
     const attack = style === "pad" ? 0.18 : 0.004;
     const release = style === "pad" ? 0.35 : 0.12;
     const end = t + Math.max(dur, attack + 0.05);

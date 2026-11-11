@@ -24,6 +24,7 @@ export const BEATS = 4;
 export const CHORD_TYPES = ["min", "maj", "min7", "maj7", "dom7", "min9", "sus2", "sus4"] as const;
 export type ChordType = (typeof CHORD_TYPES)[number];
 export type Chord = { root: number; type: ChordType };
+export const CHORD_LAYERS = 3; // accordi sovrapposti sullo stesso battito, al massimo
 export type ChordStyle = "pad" | "stab";
 const CHORD_INTERVALS: Record<ChordType, number[]> = {
   min: [0, 3, 7],
@@ -95,7 +96,7 @@ export type Lane = (number | null)[];
 export type Pattern = {
   drums: Record<DrumId, boolean[]>;
   bass: (number | null)[]; // una nota MIDI per step, oppure null
-  chords: (Chord | null)[]; // uno per battito; null = continua l'accordo prima (pad) o niente (stab)
+  chords: Chord[][]; // per ogni battito gli accordi che suonano insieme (vuoto = continua quello prima o niente), max 3
   lead: number[][]; // la melodia: per ogni step le note MIDI che suonano insieme (vuoto = niente), max 6
 };
 
@@ -128,7 +129,7 @@ export function emptyPattern(): Pattern {
   return {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, on()])) as Pattern["drums"],
     bass: Array(STEPS).fill(null),
-    chords: Array(BEATS).fill(null),
+    chords: Array.from({ length: BEATS }, () => [] as Chord[]),
     lead: emptyLead(),
   };
 }
@@ -136,7 +137,7 @@ export function emptyPattern(): Pattern {
 export const isEmptyPattern = (p: Pattern) =>
   p.bass.every((n) => n === null) &&
   p.lead.every((n) => n.length === 0) &&
-  p.chords.every((c) => c === null) &&
+  p.chords.every((c) => c.length === 0) &&
   DRUMS.every(({ id }) => p.drums[id].every((s) => !s));
 
 // Valore di una corsia di automazione alla battuta "bar" (anche con la virgola: 4.5 = metà della quinta).
@@ -220,7 +221,7 @@ export function starterProject(): Project {
       A: {
         drums: { kick: on(0, 4, 8, 12), clap: on(4, 12), hat: on(2, 6, 10, 14), openhat: on(), perc: on() },
         bass,
-        chords: [{ root: 9, type: "min7" }, null, null, null],
+        chords: [[{ root: 9, type: "min7" }], [], [], []],
         lead: emptyLead(),
       },
     },
@@ -264,7 +265,7 @@ function normalizePattern(raw: unknown): Pattern {
   return {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(r.drums?.[id])])) as Pattern["drums"],
     bass: notes(r.bass, BASS_LOW, BASS_HIGH),
-    chords: Array.from({ length: BEATS }, (_, i) => normalizeChord(Array.isArray(r.chords) ? r.chords[i] : null)),
+    chords: Array.from({ length: BEATS }, (_, i) => chordLayers(Array.isArray(r.chords) ? r.chords[i] : null)),
     lead: leadNotes(r.lead),
   };
 }
@@ -285,6 +286,13 @@ function notes(a: unknown, lo: number, hi: number) {
     const n = Array.isArray(a) ? a[i] : null;
     return typeof n === "number" && n >= lo && n <= hi ? Math.round(n) : null;
   });
+}
+
+// gli accordi di un battito (i progetti di prima ne avevano uno o null): niente doppioni, al massimo 3
+function chordLayers(raw: unknown): Chord[] {
+  const list = (Array.isArray(raw) ? raw : [raw]).map(normalizeChord).filter((c): c is Chord => c !== null);
+  const seen = new Set<string>();
+  return list.filter((c) => !seen.has(`${c.root}${c.type}`) && seen.add(`${c.root}${c.type}`)).slice(0, CHORD_LAYERS);
 }
 
 function normalizeChord(raw: unknown): Chord | null {
@@ -396,7 +404,7 @@ export function describe(p: Project, title: string, editing: Slot) {
     for (const { id, label } of DRUMS) lines.push(`  ${label.padEnd(9)} ${pat.drums[id].map((x) => (x ? "x" : ".")).join("")}`);
     const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}`)).filter(Boolean);
     lines.push(`  Bass      ${notes.length ? notes.join(" ") : "nessuna nota"}`);
-    lines.push(`  Accordi   ${pat.chords.map((c, b) => `battito ${b + 1}: ${c ? chordName(c) : "-"}`).join(", ")}`);
+    lines.push(`  Accordi   ${pat.chords.map((c, b) => `battito ${b + 1}: ${c.length ? c.map(chordName).join(" + ") : "-"}`).join(", ")}`);
     const lead = pat.lead.map((n, i) => (n.length ? `${i + 1}:${n.map(noteName).join("+")}` : null)).filter(Boolean);
     lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
   }

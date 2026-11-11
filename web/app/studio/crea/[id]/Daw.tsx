@@ -10,6 +10,7 @@ import {
   BASS_HIGH,
   BASS_LOW,
   BEATS,
+  CHORD_LAYERS,
   CHORD_TYPES,
   DRUMS,
   LEAD_HIGH,
@@ -282,7 +283,11 @@ export function Daw({
         lightKey("chords", root);
         if (recording) {
           update((p) => {
-            p.patterns[slot].chords[Math.floor(s / 4)] = chord;
+            // più tasti insieme = accordi sovrapposti sullo stesso battito (al massimo 3)
+            const layers = p.patterns[slot].chords[Math.floor(s / 4)];
+            if (!layers.some((x) => x.root === chord.root && x.type === chord.type) && layers.length < CHORD_LAYERS) {
+              layers.push(chord);
+            }
           });
         }
       } else {
@@ -324,7 +329,7 @@ export function Daw({
       const cur = projectRef.current.patterns[playbackRef.current.editing];
       void engine().preview(c, {
         note: c === "lead" ? (cur.lead.find((n) => n.length)?.[0] ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
-        chord: cur.chords.find((x) => x !== null) ?? undefined,
+        chord: cur.chords.find((x) => x.length)?.[0],
       });
       setFlash(c);
       setTimeout(() => setFlash((f) => (f === c ? null : f)), 140);
@@ -464,12 +469,13 @@ export function Daw({
     if (!removing && !playing) void engine().preview(r, { note });
   };
 
-  // accordo del battito b: nota "" = nessun accordo
+  // l'accordo principale del battito b (gli altri sovrapposti restano): nota "" = nessun accordo
   const setChord = (b: number, root: string, type?: ChordType) => {
-    const prev = pat.chords[b];
+    const prev = pat.chords[b][0];
     const next = root === "" ? null : { root: Number(root), type: type ?? prev?.type ?? "min7" };
     update((p) => {
-      p.patterns[editing].chords[b] = next;
+      const layers = p.patterns[editing].chords[b];
+      p.patterns[editing].chords[b] = next ? [next, ...layers.slice(1)] : [];
     });
     if (next && !playing) void engine().preview("chords", { chord: next });
   };
@@ -613,7 +619,7 @@ export function Daw({
       (c === "bass" || c === "lead"
         ? sounding[c][step] !== null
         : c === "chords"
-          ? step % 4 === 0 && sounding.chords[step / 4] !== null
+          ? step % 4 === 0 && sounding.chords[step / 4].length > 0
           : sounding.drums[c][step]));
 
   return (
@@ -1115,16 +1121,19 @@ export function Daw({
             <div className="hw-seq-head">
               <h2 className="hw-title">Accordi · Pattern {editing}</h2>
               <span className="hw-value">
-                {pat.chords.some(Boolean) ? pat.chords.map((c) => (c ? chordName(c) : "·")).join("  ") : "nessun accordo"}
+                {pat.chords.some((c) => c.length)
+                  ? pat.chords.map((c) => (c.length ? c.map(chordName).join("+") : "·")).join("  ")
+                  : "nessun accordo"}
               </span>
             </div>
             <div className="hw-chord-row">
               {Array.from({ length: BEATS }, (_, b) => {
-                const c = pat.chords[b];
+                const layers = pat.chords[b];
+                const c = layers[0] ?? null; // i menu modificano l'accordo principale
                 return (
                   <div key={b} className="hw-chord" data-on={c !== null} data-now={playingSlot === editing && Math.floor(step / 4) === b}>
                     <span className="hw-label">Battito {b + 1}</span>
-                    <span className="hw-chord-name">{c ? chordName(c) : "–"}</span>
+                    <span className="hw-chord-name">{layers.length ? layers.map(chordName).join(" + ") : "–"}</span>
                     <label className="hw-visually-hidden" htmlFor={`nota-${b}`}>
                       Nota dell&apos;accordo, battito {b + 1}
                     </label>
@@ -1532,25 +1541,31 @@ export function Daw({
                       {NOTE_NAMES[root]}
                     </button>
                     {Array.from({ length: BEATS }, (_, b) => {
-                      const c = pat.chords[b];
-                      const on = c !== null && c.root === root;
+                      // gli accordi del battito con questa fondamentale (di solito uno)
+                      const here = pat.chords[b].filter((x) => x.root === root);
+                      const on = here.length > 0;
+                      const full = !on && pat.chords[b].length >= CHORD_LAYERS;
                       return (
                         <button
                           key={b}
                           type="button"
                           className="daw-cell daw-cell--beat"
                           aria-pressed={on}
-                          aria-label={`Battito ${b + 1}: ${on && c ? `${chordName(c)}, clic per togliere` : `metti ${chordName({ root, type: keyChord })}`}`}
+                          disabled={full}
+                          title={full ? `Già ${CHORD_LAYERS} accordi su questo battito` : undefined}
+                          aria-label={`Battito ${b + 1}: ${on ? `${here.map(chordName).join(" + ")}, clic per togliere` : `aggiungi ${chordName({ root, type: keyChord })}`}`}
                           data-now={Math.floor(step / 4) === b && playingSlot === editing}
                           onClick={() => {
-                            const next = on ? null : { root, type: keyChord };
+                            const next = { root, type: keyChord };
                             update((p) => {
-                              p.patterns[editing].chords[b] = next;
+                              const layers = p.patterns[editing].chords[b];
+                              // clic su una casella accesa: tolgo quell'accordo, gli altri del battito restano
+                              p.patterns[editing].chords[b] = on ? layers.filter((x) => x.root !== root) : [...layers, next];
                             });
-                            if (next && !playing) void engine().preview("chords", { chord: next });
+                            if (!on && !playing) void engine().preview("chords", { chord: next });
                           }}
                         >
-                          {on && c ? chordName(c) : ""}
+                          {on ? here.map(chordName).join(" + ") : ""}
                         </button>
                       );
                     })}
@@ -1594,8 +1609,8 @@ export function Daw({
             )}
             {roll === "chords" && (
               <p className="hw-hint">
-                Clic su una casella: l&apos;accordo con quella fondamentale e il tipo scelto, su quel battito; clic di nuovo per
-                toglierlo. Il suono degli accordi (pad o stab, filtro) è nella vista <strong>Accordi</strong>.
+                Clic su una casella: aggiunge l&apos;accordo con quella fondamentale e il tipo scelto su quel battito (fino a{" "}
+                {CHORD_LAYERS} accordi sovrapposti nella stessa colonna); clic di nuovo per toglierlo. Il suono degli accordi (pad o stab, filtro) è nella vista <strong>Accordi</strong>.
               </p>
             )}
             {roll !== "chords" && (

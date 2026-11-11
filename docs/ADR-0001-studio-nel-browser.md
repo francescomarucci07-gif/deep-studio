@@ -194,3 +194,14 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Roll Lead: più note nella stessa colonna; tastiera: più tasti insieme suonano e si registrano sullo stesso step.
   Coach (prompt `crea-v12`): più voci con lo stesso step in `melodia` = accordo.
 - Corretto: nel piano roll le note sulle righe dei diesis restavano scure (vinceva lo sfondo della riga).
+
+## Aggiornamento 11 nov 2026 · accordi sovrapposti
+
+- Gli accordi passano da uno per battito a un elenco per battito (`chords: Chord[][]`, al massimo 3 sovrapposti).
+  `normalize()` converte i progetti di prima (accordo → [accordo], null → []) e toglie i doppioni.
+- Suono: tutti gli accordi del battito insieme, ognuno a 1/√n del volume; il pad tiene fino al prossimo battito
+  con accordi. Roll Chord: più caselle nella stessa colonna; tastiera: più tasti = accordi sovrapposti anche in
+  registrazione; vista Accordi: i menu modificano l'accordo principale, il riquadro li mostra tutti.
+  Coach (prompt `crea-v13`): più accordi con lo stesso battito.
+- Prova: Mim7 + Do + Sol sul battito 1 (quarta casella disattivata), registrazione La + Mi + Sol con tre tasti,
+  export a -12,1 LUFS e -1,13 dBTP senza allarmi.

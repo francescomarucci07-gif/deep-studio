@@ -77,7 +77,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       accordi: {
         type: "array",
         description:
-          "Accordi del pattern, uno per battito (1–4). radice: 0 Do, 1 Do#, 2 Re, 3 Re#, 4 Mi, 5 Fa, 6 Fa#, 7 Sol, 8 Sol#, 9 La, 10 La#, 11 Si. Un battito senza accordo continua quello prima (pad). Lista vuota = niente accordi.",
+          "Accordi del pattern, sui battiti 1–4. Più accordi con lo stesso battito suonano insieme (sovrapposti, massimo 3), per esempio La m7 grave e Do maggiore sopra. radice: 0 Do, 1 Do#, 2 Re, 3 Re#, 4 Mi, 5 Fa, 6 Fa#, 7 Sol, 8 Sol#, 9 La, 10 La#, 11 Si. Un battito senza accordo continua quello prima (pad). Lista vuota = niente accordi.",
         items: {
           type: "object",
           properties: {
@@ -259,18 +259,19 @@ export function createStudioWriter(current: Project, editing: Slot) {
         return out;
       };
       const bass = line(i.basso);
-      const chords: Pattern["chords"] = Array(BEATS).fill(null);
+      // più accordi con lo stesso battito si sovrappongono (normalize ne tiene al massimo 3)
+      const chords: unknown[][] = Array.from({ length: BEATS }, () => []);
       if (Array.isArray(i.accordi)) {
         for (const c of i.accordi as { battito?: unknown; radice?: unknown; tipo?: unknown }[]) {
           if (Number.isInteger(c?.battito) && (c.battito as number) >= 1 && (c.battito as number) <= BEATS) {
-            chords[(c.battito as number) - 1] = { root: c.radice, type: c.tipo } as Pattern["chords"][number];
+            chords[(c.battito as number) - 1].push({ root: c.radice, type: c.tipo });
           }
         }
       }
       const pattern: Pattern = {
         drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
         bass,
-        chords, // normalize scarta radici e tipi non validi
+        chords: chords as Pattern["chords"], // normalize scarta radici e tipi non validi
         lead: poly(i.melodia),
       };
       project = normalize({

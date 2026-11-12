@@ -124,6 +124,11 @@ cd web && npm run dev
 2. ~~Tasto REC in alto~~ **fatto il 12 nov**: REC e "Registra" sono lo stesso interruttore (fanno partire il Play).
 3. ~~Vista Accordi~~ **tolta il 12 nov**: accordi e Chord synth nella scheda Chord del Roll.
 4. **Suoni ed effetti nuovi**: altri suoni (synth, kit) e altri plugin (vedi punto 1).
+5. **Solo (chiesto il 12 nov, da fare alla ripresa)**: poter ascoltare un canale da solo (solo gli accordi,
+   solo il lead, solo i plugin di un canale…), sia in modalità Pattern sia in Song. Come il pulsante "S"
+   (solo) del mixer di FL: un clic isola il canale, Ctrl/secondo clic ne aggiunge altri, un altro clic torna
+   a tutto. Da decidere: se il solo vale anche per l'export WAV (probabile: no, l'export è sempre il mix) e
+   se mettere il solo anche sui pad e nelle righe del sequencer.
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

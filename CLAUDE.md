@@ -98,7 +98,7 @@ cd web && npm run dev
   A–P + canzone da 16 a 256 battute; lead polifonico, fino a 6 note per step; fino a 3 accordi per battito; `normalize()` converte i progetti v1; `describe()` per il coach), `web/lib/daw/graph.ts` (suoni sintetizzati, kit di batteria in `kits.ts`, mixer, sidechain: usato
   in tempo reale e per l'export), `web/lib/daw/engine.ts` (l'orologio del sequencer, swing, pattern/song), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
-  `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone, scrivi_effetti); streaming condiviso in `lib/coach/stream.ts`.
+  `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone, scrivi_effetti con i plugin); plugin degli insert in `lib/daw/plugins.ts`; streaming condiviso in `lib/coach/stream.ts`.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
   (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
@@ -118,16 +118,12 @@ cd web && npm run dev
 
 ## Prossimi passi (chiesti da Francesco l'11 nov 2026, da fare alla ripresa)
 
-1. **Plugin**: poter aggiungere "plugin" ai canali, come gli slot degli insert nel mixer di FL. Nel browser
-   non si possono caricare VST: vanno costruiti come effetti nostri (Web Audio / AudioWorklet), scelti da un
-   elenco e messi in fila su ogni canale (e sul master). Da decidere insieme quali e come appaiono.
-2. **Tasto REC in alto** (vicino a Play/Stop): oggi fa la stessa cosa di "Registra" vicino alla tastiera
-   (con Play acceso, pad e tastiera scrivono sullo step più vicino), ma non fa partire il Play da solo.
-   Decidere se unirli (un solo comportamento) o dare a REC un altro senso.
-3. **Vista Accordi**: ora che il Roll ha la scheda Chord (con accordi sovrapposti), valutare se toglierla e
-   spostare il Chord synth (pad/stab, filtro) nella scheda Chord del Roll, come Bass e Lead.
-4. **Suoni ed effetti nuovi**: altri suoni (synth, kit) ed effetti per canale, per esempio chorus sul lead e
-   sugli accordi (oltre a filtro, riverbero e delay che ci sono già). Si lega al punto 1.
+1. ~~Plugin~~ **fatto il 12 nov**: 4 slot di insert per canale e master (`web/lib/daw/plugins.ts`), primo
+   plugin Chorus; pulsante FX nel Mixer. Prossimi plugin da scegliere (proposti: EQ 3 bande, compressore,
+   saturazione, poi phaser, bitcrusher, tremolo/auto-pan).
+2. ~~Tasto REC in alto~~ **fatto il 12 nov**: REC e "Registra" sono lo stesso interruttore (fanno partire il Play).
+3. ~~Vista Accordi~~ **tolta il 12 nov**: accordi e Chord synth nella scheda Chord del Roll.
+4. **Suoni ed effetti nuovi**: altri suoni (synth, kit) e altri plugin (vedi punto 1).
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

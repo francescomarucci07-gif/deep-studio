@@ -2,6 +2,7 @@
 // e melodia (lead), una canzone (da 16 a 256 battute) che dice quale pattern suona, suoni dei synth, mixer.
 // È anche il JSON salvato in projects.data, quindi ogni campo ha un default (vedi normalize).
 import { isKit, KITS, type KitId } from "./kits";
+import { INSERT_SLOTS, normalizeSlot, pluginParams, PLUGINS, type PluginSlot } from "./plugins";
 
 export const STEPS = 16;
 // La canzone parte da 16 battute e cresce quanto serve. Il tetto (256 battute: a 124 BPM più di 8 minuti)
@@ -113,6 +114,7 @@ export type Project = {
   fx: Record<ChannelId, ChannelFx>;
   masterFilter: number; // -1…1, come i filtri dei canali
   automation: Partial<Record<AutoTarget, Lane>>;
+  inserts: Record<AutoTarget, (PluginSlot | null)[]>; // i plugin di ogni canale e del master, INSERT_SLOTS slot
   sidechain: boolean; // il kick abbassa il basso
   mixer: Record<ChannelId, Channel>;
 };
@@ -175,6 +177,11 @@ export function filterLabel(v: number) {
 }
 
 // La canzone dura fino all'ultima battuta usata (almeno 1)
+// nessun plugin: ogni canale e il master con INSERT_SLOTS slot vuoti
+export function emptyInserts(): Project["inserts"] {
+  return Object.fromEntries(AUTO_TARGETS.map((t) => [t, Array(INSERT_SLOTS).fill(null)])) as Project["inserts"];
+}
+
 // quante battute ha la fila della canzone: almeno 16, al massimo 256
 export function songSize(n: number) {
   return Math.min(MAX_SONG_BARS, Math.max(MIN_SONG_BARS, Math.ceil(Number.isFinite(n) ? n : 0)));
@@ -242,6 +249,7 @@ export function starterProject(): Project {
     },
     masterFilter: 0,
     automation: {},
+    inserts: emptyInserts(),
     sidechain: true,
     mixer: {
       kick: { volume: 0.9, muted: false },
@@ -364,6 +372,9 @@ export function normalize(raw: unknown): Project {
         return clean.some((v) => v !== null) ? [[t, clean]] : [];
       }),
     ),
+    inserts: Object.fromEntries(
+      AUTO_TARGETS.map((t) => [t, Array.from({ length: INSERT_SLOTS }, (_, i) => normalizeSlot(r.inserts?.[t]?.[i]))]),
+    ) as Project["inserts"],
     sidechain: typeof r.sidechain === "boolean" ? r.sidechain : d.sidechain,
     mixer: Object.fromEntries(
       (Object.keys(d.mixer) as ChannelId[]).map((id) => [
@@ -428,5 +439,18 @@ export function describe(p: Project, title: string, editing: Slot) {
           .join("; ")}`
       : "Automazioni: nessuna.",
   );
+  // i plugin negli slot (solo quelli pieni)
+  const plugins = AUTO_TARGETS.flatMap((t) =>
+    p.inserts[t].flatMap((slot, i) =>
+      slot
+        ? [
+            `${t} slot ${i + 1}: ${PLUGINS[slot.type].label}${slot.on ? "" : " (spento)"} ${pluginParams(slot.type)
+              .map((q) => `${q.id} ${q.format(slot.params[q.id])}`)
+              .join(", ")}`,
+          ]
+        : [],
+    ),
+  );
+  lines.push(plugins.length ? `Plugin negli insert: ${plugins.join("; ")}` : "Plugin negli insert: nessuno.");
   return lines.join("\n");
 }

@@ -44,6 +44,7 @@ import {
   type Project,
   type Slot,
 } from "@/lib/daw/project";
+import { defaultSlot, INSERT_SLOTS, isPluginType, pluginParams, PLUGIN_TYPES, PLUGINS, type PluginSlot } from "@/lib/daw/plugins";
 import { KEY_NOTES, keyNote, keyRoot, OCTAVES, type KeyInstrument } from "@/lib/daw/keyboard";
 import { KIT_IDS, KITS } from "@/lib/daw/kits";
 import { measure, type Measures } from "@/lib/daw/measure";
@@ -250,7 +251,7 @@ export function Daw({
   useEffect(() => () => engineRef.current?.close(), []);
   useEffect(() => {
     engineRef.current?.applyMixer();
-  }, [project.mixer, project.bpm, project.fx, project.masterFilter, project.automation]);
+  }, [project.mixer, project.bpm, project.fx, project.masterFilter, project.automation, project.inserts]);
 
   const update = useCallback(
     (fn: (p: Project) => void) =>
@@ -514,6 +515,30 @@ export function Daw({
   const clearLane = () =>
     update((p) => {
       delete p.automation[autoTarget];
+    });
+
+  // plugin negli insert: il canale di cui vedi il rack e le modifiche agli slot
+  const [fxTarget, setFxTarget] = useState<AutoTarget>("lead");
+  const [fxOpen, setFxOpen] = useState(false); // il rack si apre con FX e si chiude con ✕ (come in FL)
+  const openFx = (t: AutoTarget) => {
+    const closing = fxOpen && fxTarget === t;
+    setFxTarget(t);
+    setFxOpen(!closing);
+  };
+  const fxLabel = (t: AutoTarget) => (t === "master" ? "Master" : (CHANNELS.find((c) => c.id === t)?.label ?? t));
+  const setSlot = (t: AutoTarget, i: number, slot: PluginSlot | null) =>
+    update((p) => {
+      p.inserts[t][i] = slot;
+    });
+  const setSlotParam = (t: AutoTarget, i: number, id: string, v: number) =>
+    update((p) => {
+      const slot = p.inserts[t][i];
+      if (slot) slot.params[id] = v;
+    });
+  const moveSlot = (t: AutoTarget, i: number, d: -1 | 1) =>
+    update((p) => {
+      const row = p.inserts[t];
+      [row[i], row[i + d]] = [row[i + d], row[i]];
     });
 
   const setChannel = (c: ChannelId, patch: Partial<Project["mixer"][ChannelId]>) =>
@@ -1288,7 +1313,7 @@ export function Daw({
           </section>
 
           {/* ---- mixer ---- */}
-          <section className="hw-panel hw-mixer" data-panel="mixer" aria-label="Mixer">
+          <section className="hw-panel hw-mixer" data-panel="mixer" data-rack={fxOpen} aria-label="Mixer">
             <h2 className="hw-title">Mixer</h2>
             <div className="hw-strips">
               {CHANNELS.map(({ id: c, label }) => (
@@ -1305,15 +1330,26 @@ export function Daw({
                     onChange={(e) => setChannel(c, { volume: Number(e.target.value) })}
                   />
                   <span className="hw-value">{pct(project.mixer[c].volume)}</span>
-                  <button
-                    type="button"
-                    className="hw-btn hw-btn--small hw-btn--mute"
-                    aria-pressed={project.mixer[c].muted}
-                    aria-label={`Mute ${label}`}
-                    onClick={() => setChannel(c, { muted: !project.mixer[c].muted })}
-                  >
-                    <span className="hw-btn-led" />M
-                  </button>
+                  <div className="hw-strip-btns">
+                    <button
+                      type="button"
+                      className="hw-btn hw-btn--small hw-btn--mute"
+                      aria-pressed={project.mixer[c].muted}
+                      aria-label={`Mute ${label}`}
+                      onClick={() => setChannel(c, { muted: !project.mixer[c].muted })}
+                    >
+                      <span className="hw-btn-led" />M
+                    </button>
+                    <button
+                      type="button"
+                      className="hw-btn hw-btn--small hw-fx-btn"
+                      aria-pressed={fxOpen && fxTarget === c}
+                      aria-label={`Plugin di ${label}`}
+                      onClick={() => openFx(c)}
+                    >
+                      FX{project.inserts[c].some(Boolean) ? ` ${project.inserts[c].filter(Boolean).length}` : ""}
+                    </button>
+                  </div>
                   <div className="hw-strip-fx">
                     <Knob
                       size={30}
@@ -1351,6 +1387,15 @@ export function Daw({
               ))}
               <div className="hw-strip hw-strip--master">
                 <span className="hw-label">Master</span>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small hw-fx-btn"
+                  aria-pressed={fxOpen && fxTarget === "master"}
+                  aria-label="Plugin del master"
+                  onClick={() => openFx("master")}
+                >
+                  FX{project.inserts.master.some(Boolean) ? ` ${project.inserts.master.filter(Boolean).length}` : ""}
+                </button>
                 <Knob
                   label="Filter"
                   value={project.masterFilter}
@@ -1374,6 +1419,100 @@ export function Daw({
                 </span>
               </div>
             </div>
+            {/* ---- il rack dei plugin del canale scelto (come gli slot degli insert di FL) ---- */}
+            {fxOpen && (
+            <div className="hw-rack" role="group" aria-label={`Plugin · ${fxLabel(fxTarget)}`}>
+              <div className="hw-seq-head">
+                <h3 className="hw-title">Insert · {fxLabel(fxTarget)}</h3>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-label="Chiudi i plugin"
+                  onClick={() => setFxOpen(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="hw-rack-slots">
+                {project.inserts[fxTarget].map((slot, i) => (
+                  <div key={i} className="hw-slot" data-full={slot !== null} data-on={slot?.on ?? false}>
+                    <div className="hw-slot-head">
+                      <span className="hw-label">Slot {i + 1}</span>
+                      <label className="hw-visually-hidden" htmlFor={`slot-${i}`}>
+                        Plugin nello slot {i + 1}
+                      </label>
+                      <select
+                        id={`slot-${i}`}
+                        className="hw-select"
+                        value={slot?.type ?? ""}
+                        onChange={(e) => setSlot(fxTarget, i, isPluginType(e.target.value) ? defaultSlot(e.target.value) : null)}
+                      >
+                        <option value="">vuoto</option>
+                        {PLUGIN_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {PLUGINS[t].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {slot && (
+                      <>
+                        <div className="hw-slot-tools">
+                          <button
+                            type="button"
+                            className="hw-btn hw-btn--small"
+                            aria-pressed={slot.on}
+                            title={slot.on ? "Acceso: clic per escluderlo (bypass)" : "Escluso: clic per riaccenderlo"}
+                            onClick={() => setSlot(fxTarget, i, { ...slot, on: !slot.on })}
+                          >
+                            <span className="hw-btn-led" />
+                            {slot.on ? "On" : "Off"}
+                          </button>
+                          <button
+                            type="button"
+                            className="hw-btn hw-btn--small"
+                            aria-label="Sposta prima"
+                            disabled={i === 0}
+                            onClick={() => moveSlot(fxTarget, i, -1)}
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className="hw-btn hw-btn--small"
+                            aria-label="Sposta dopo"
+                            disabled={i === INSERT_SLOTS - 1}
+                            onClick={() => moveSlot(fxTarget, i, 1)}
+                          >
+                            ↓
+                          </button>
+                        </div>
+                        <div className="hw-slot-knobs">
+                          {pluginParams(slot.type).map((q) => (
+                            <Knob
+                              key={q.id}
+                              size={26}
+                              label={q.label}
+                              value={slot.params[q.id]}
+                              min={q.min}
+                              max={q.max}
+                              defaultValue={q.default}
+                              display={q.format(slot.params[q.id])}
+                              onChange={(v) => setSlotParam(fxTarget, i, q.id, v)}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="hw-hint">
+                Il suono passa dagli slot in ordine, dall&apos;1 al {INSERT_SLOTS}. <strong>Off</strong> esclude un plugin senza
+                toglierlo (bypass). {PLUGINS.chorus.label}: {PLUGINS.chorus.hint}.
+              </p>
+            </div>
+            )}
           </section>
 
           {/* ---- piano roll: una schermata con la sua tastiera per Bass, Lead e Chord ---- */}

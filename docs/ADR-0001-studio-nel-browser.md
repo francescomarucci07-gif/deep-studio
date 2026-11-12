@@ -212,3 +212,19 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   è fermo, fanno partire il Play.
 - Tolta la vista Accordi: gli accordi si scrivono nella scheda Chord del Roll (con accordi sovrapposti) e il
   Chord synth (pad/stab, filtro) sta lì, come Bass e Lead. Le viste sono cinque (tasti 1–5).
+
+## Aggiornamento 12 nov 2026 · plugin negli insert (primo: Chorus)
+
+- Come gli slot degli insert del mixer di FL: ogni canale e il master hanno 4 slot (`project.inserts`). In ogni
+  slot un plugin, acceso o in bypass, con le sue manopole; ordine modificabile. Nel browser non si caricano VST:
+  i plugin sono nostri, costruiti con i nodi Web Audio in `web/lib/daw/plugins.ts`. Aggiungerne uno = una voce
+  in `PLUGINS` (nome, manopole, costruzione); slot, salvataggio, export e coach funzionano da soli.
+- Posizione nella catena: sui canali dopo il fader e prima di filtro DJ e send (riverbero e delay ricevono il
+  suono già trattato); sul master tra filtro DJ e colla, così il limiter resta l'ultimo anello. La fila si
+  ricollega solo quando cambia (plugin aggiunto, tolto, acceso/spento); le manopole si aggiornano al volo.
+- Chorus: due ritardi di 14 e 17 ms modulati da un LFO in controfase, a sinistra e a destra; Rate, Depth, Mix.
+  Prova sul lead isolato (analisi Python): correlazione L/R da 0,99 a 0,89, perdita in mono 0,2 dB; in bypass
+  torna 0,99.
+- Interfaccia: pulsante FX su ogni striscia del Mixer; il rack si apre sotto e si chiude con ✕. Con il rack
+  aperto, sul computer, le strisce nascondono le manopole Filter/Rev/Dly per stare nella schermata.
+- Coach (prompt `crea-v14`): campo `plugin` in `scrivi_effetti`; chorus su lead, accordi, perc, mai su kick e basso.

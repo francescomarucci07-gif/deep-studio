@@ -3,6 +3,7 @@
 // Il coach può chiamarli più volte nella stessa risposta: ogni chiamata parte dal risultato della precedente.
 import type Anthropic from "@anthropic-ai/sdk";
 import { KIT_IDS } from "./kits";
+import { defaultSlot, INSERT_SLOTS, isPluginType, normalizeSlot, pluginParams, PLUGIN_TYPES, PLUGINS } from "./plugins";
 import {
   AUTO_TARGETS,
   CHANNEL_IDS,
@@ -138,7 +139,7 @@ const SONG_TOOL: Anthropic.Beta.BetaTool = {
 const FX_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_effetti",
   description:
-    "Imposta volume ed effetti dei canali (volume del fader, filtro DJ, riverbero, delay a 3/16) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
+    "Imposta volume ed effetti dei canali (volume del fader, filtro DJ, riverbero, delay a 3/16), i plugin negli insert (per esempio un chorus sul lead) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
   input_schema: {
     type: "object",
     properties: {
@@ -184,6 +185,21 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
             },
           },
           required: ["bersaglio", "punti"],
+        },
+      },
+      plugin: {
+        type: "array",
+        description: `Plugin negli insert (come gli slot del mixer di FL), ${INSERT_SLOTS} slot per canale e per il master, in fila dal primo all'ultimo. tipo "nessuno" svuota lo slot. Plugin disponibili: ${PLUGIN_TYPES.map((t) => `${t} (${PLUGINS[t].hint}; manopole: ${pluginParams(t).map((q) => `${q.id} ${q.min}–${q.max}`).join(", ")})`).join("; ")}.`,
+        items: {
+          type: "object",
+          properties: {
+            bersaglio: { type: "string", enum: [...AUTO_TARGETS] },
+            slot: { type: "integer", minimum: 1, maximum: INSERT_SLOTS },
+            tipo: { type: "string", enum: [...PLUGIN_TYPES, "nessuno"] },
+            acceso: { type: "boolean", description: "false = in bypass (resta nello slot ma non suona)." },
+            manopole: { type: "object", description: "Le manopole del plugin, per nome (quelle che mancano restano al valore di base)." },
+          },
+          required: ["bersaglio", "slot", "tipo"],
         },
       },
     },
@@ -302,7 +318,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
       return `Pattern ${n} scritto nello studio`;
     }
     if (name === "scrivi_effetti") {
-      const raw = i as { effetti?: unknown; automazioni?: unknown; nome?: unknown };
+      const raw = i as { effetti?: unknown; automazioni?: unknown; plugin?: unknown; nome?: unknown };
       const fx = structuredClone(project.fx);
       const mixer = structuredClone(project.mixer);
       let masterFilter = project.masterFilter;
@@ -349,9 +365,23 @@ export function createStudioWriter(current: Project, editing: Slot) {
         }
       }
       const song = Array.from({ length: size }, (_, k) => project.song[k] ?? null);
-      project = normalize({ ...project, song, fx, mixer, masterFilter, automation });
+      // plugin: lo slot scelto diventa quel plugin (con le manopole date) o si svuota
+      const inserts = structuredClone(project.inserts);
+      let plugins = 0;
+      if (Array.isArray(raw.plugin)) {
+        for (const pl of raw.plugin as { bersaglio?: unknown; slot?: unknown; tipo?: unknown; acceso?: unknown; manopole?: unknown }[]) {
+          const t = pl?.bersaglio as (typeof AUTO_TARGETS)[number];
+          const k = Number(pl?.slot) - 1;
+          if (!AUTO_TARGETS.includes(t) || !Number.isInteger(k) || k < 0 || k >= INSERT_SLOTS) continue;
+          inserts[t][k] = isPluginType(pl.tipo)
+            ? normalizeSlot({ type: pl.tipo, on: pl.acceso !== false, params: { ...defaultSlot(pl.tipo).params, ...(pl.manopole as object) } })
+            : null;
+          plugins++;
+        }
+      }
+      project = normalize({ ...project, song, fx, mixer, masterFilter, automation, inserts });
       names.push(label(raw.nome, "effetti"));
-      return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}: ${label(raw.nome, "effetti")}`;
+      return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}${plugins ? ` (${plugins} plugin)` : ""}: ${label(raw.nome, "effetti")}`;
     }
     if (name === "scrivi_canzone" && Array.isArray(i.battute)) {
       const list = i.battute as unknown[];

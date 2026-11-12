@@ -1338,6 +1338,82 @@ ol.ds-led-row {
   border-color: color-mix(in srgb, var(--ds-accent) 45%, var(--hw-panel-edge));
 }
 
+/* plugin: il pulsante FX sulle strisce e il rack con gli slot del canale scelto */
+.hw-fx-btn {
+  min-width: 40px;
+  min-height: 26px;
+  padding: 2px 6px;
+  font-size: 10px;
+}
+.hw-rack {
+  margin-top: var(--ds-space-3);
+  padding-top: var(--ds-space-3);
+  border-top: 1px solid var(--hw-panel-edge);
+}
+.hw-rack-slots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--ds-space-2);
+}
+@media (max-width: 760px) {
+  .hw-rack-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.hw-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--ds-space-2);
+  border: 1px dashed var(--hw-panel-edge);
+  border-radius: 8px;
+  background: var(--hw-panel-2);
+}
+.hw-slot[data-full="true"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--ds-accent) 45%, var(--hw-panel-edge));
+}
+.hw-slot[data-full="true"][data-on="false"] .hw-slot-knobs {
+  opacity: 0.45;
+}
+.hw-slot-head,
+.hw-slot-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.hw-slot-head .hw-select {
+  flex: 1;
+  min-width: 0;
+}
+.hw-slot-tools .hw-btn {
+  min-width: 0;
+  min-height: 28px;
+  padding: 2px 8px;
+  flex-direction: row;
+  gap: 5px;
+}
+.hw-slot-knobs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  gap: 2px;
+}
+.hw-slot-knobs .hw-knob {
+  width: auto !important; /* la manopola si stringe: tre stanno su una riga anche negli slot stretti */
+}
+/* mute e FX sulla stessa riga nelle strisce del mixer */
+.hw-strip-btns {
+  display: flex;
+  gap: 4px;
+}
+.hw-strip-btns .hw-btn {
+  min-width: 0;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
 /* spia del limiter nella striscia Master */
 .hw-limiter {
   display: inline-flex;
@@ -1954,6 +2030,18 @@ ol.ds-led-row {
   }
   .console-stage .hw-fader {
     height: clamp(44px, calc(100dvh - 560px), 140px);
+  }
+  /* rack dei plugin aperto: le strisce tengono fader, mute e FX, le manopole tornano chiudendolo */
+  .console-stage .hw-mixer[data-rack="true"] .hw-strip-fx,
+  .console-stage .hw-rack .hw-hint,
+  .console-stage .hw-mixer[data-rack="true"] .hw-strip--master .hw-value {
+    display: none;
+  }
+  .console-stage .hw-slot-knobs {
+    flex-wrap: nowrap;
+  }
+  .console-stage .hw-mixer[data-rack="true"] .hw-fader {
+    height: clamp(44px, calc(100dvh - 600px), 110px);
   }
 }
 

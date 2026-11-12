@@ -20,6 +20,7 @@ import {
 } from "./project";
 import { KITS } from "./kits";
 import { createFallbackLimiter, createLimiterNode } from "./limiter";
+import { INSERT_SLOTS, PLUGINS, type PluginInstance } from "./plugins";
 
 const mtof = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
@@ -49,6 +50,11 @@ export class Graph {
   private out: GainNode;
   private limiter: AudioNode;
   limiterDb = 0; // quanto sta abbassando il limiter adesso (dB, 0 = niente)
+  private chains: Record<AutoTarget, { from: AudioNode; to: AudioNode }>;
+  // i plugin vivi di ogni fila, e com'era la fila l'ultima volta (per ricollegarla solo se cambia)
+  private inserts: Partial<Record<AutoTarget, (PluginInstance | null)[]>> = {};
+  private insertTypes: Partial<Record<AutoTarget, string[]>> = {};
+  private insertWiring: Partial<Record<AutoTarget, string>> = {};
 
   constructor(
     readonly ctx: BaseAudioContext,
@@ -67,7 +73,12 @@ export class Graph {
     this.limiter = createFallbackLimiter(ctx);
     const masterFilter = this.djFilter();
     master.connect(masterFilter.lp);
-    masterFilter.hp.connect(glue).connect(this.out).connect(this.limiter).connect(ctx.destination);
+    masterFilter.hp.connect(glue);
+    glue.connect(this.out).connect(this.limiter).connect(ctx.destination);
+    // la fila dei plugin del master sta tra il filtro DJ e la colla (il limiter resta l'ultimo anello)
+    const chains: Partial<Record<AutoTarget, { from: AudioNode; to: AudioNode }>> = {
+      master: { from: masterFilter.hp, to: glue },
+    };
 
     // riverbero condiviso: una "stanza" generata, con le basse tagliate per non impastare il low end
     this.reverb = ctx.createConvolver();
@@ -99,6 +110,7 @@ export class Graph {
       const pan = ctx.createStereoPanner();
       pan.pan.value = PAN[id];
       g.connect(f.lp);
+      chains[id] = { from: g, to: f.lp }; // la fila dei plugin: dopo il fader, prima del filtro e dei send
       f.hp.connect(pan).connect(to);
       const reverb = ctx.createGain();
       const delay = ctx.createGain();
@@ -115,6 +127,7 @@ export class Graph {
       lead: make("lead", master),
     };
     this.filters = filters as Record<AutoTarget, DjFilter>;
+    this.chains = chains as Record<AutoTarget, { from: AudioNode; to: AudioNode }>;
     this.sends = sends as Record<ChannelId, { reverb: GainNode; delay: GainNode }>;
 
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -178,10 +191,46 @@ export class Graph {
       set(this.sends[id].delay.gain, p.fx[id].delay * DELAY_MAX);
     }
     set(this.delay.delayTime, (60 / p.bpm / 4) * 3);
+    this.applyInserts(immediate);
     // i filtri con un'automazione, in modalità song, li muove automateBar
     for (const t of AUTO_TARGETS) {
       if (this.automating && p.automation[t]) continue;
       this.setFilter(this.filters[t], t === "master" ? p.masterFilter : p.fx[t].filter, immediate);
+    }
+  }
+
+  // I plugin degli insert: creo quelli nuovi, chiudo quelli tolti, aggiorno le manopole e, se è cambiato
+  // qualcosa nella fila (un plugin in più o in meno, acceso o spento), la ricollego.
+  private applyInserts(immediate: boolean) {
+    const p = this.getProject();
+    for (const t of AUTO_TARGETS) {
+      const slots = p.inserts[t];
+      const live = (this.inserts[t] ??= Array(INSERT_SLOTS).fill(null));
+      const types = (this.insertTypes[t] ??= Array(INSERT_SLOTS).fill(""));
+      slots.forEach((slot, i) => {
+        const type = slot?.type ?? "";
+        if (types[i] !== type) {
+          live[i]?.dispose();
+          live[i] = slot ? PLUGINS[slot.type].build(this.ctx) : null;
+          types[i] = type;
+          this.insertWiring[t] = undefined; // la fila va ricollegata
+        }
+        if (slot && live[i]) live[i].set(slot.params, immediate);
+      });
+      const wiring = slots.map((s) => (s ? `${s.type}${s.on ? 1 : 0}` : "-")).join(",");
+      if (this.insertWiring[t] === wiring) continue;
+      this.insertWiring[t] = wiring;
+      const { from, to } = this.chains[t];
+      from.disconnect();
+      for (const inst of live) inst?.output.disconnect();
+      let prev: AudioNode = from;
+      slots.forEach((slot, i) => {
+        const inst = live[i];
+        if (!slot?.on || !inst) return; // slot vuoto o spento (bypass): il suono lo salta
+        prev.connect(inst.input);
+        prev = inst.output;
+      });
+      prev.connect(to);
     }
   }
 

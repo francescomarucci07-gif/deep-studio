@@ -1299,43 +1299,6 @@ ol.ds-led-row {
   font: 700 var(--ds-text-md) var(--ds-font-mono);
 }
 
-/* accordi: un riquadro per battito */
-.hw-chord-row {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--ds-space-3);
-}
-@media (max-width: 640px) {
-  .hw-chord-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-.hw-chord {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: var(--ds-space-3);
-  border: 1px solid var(--hw-panel-edge);
-  border-radius: 8px;
-  background: var(--hw-panel-2);
-}
-.hw-chord[data-on="true"] {
-  border-color: color-mix(in srgb, var(--hw-pad-purple) 55%, var(--hw-panel-edge));
-}
-.hw-chord[data-now="true"] {
-  box-shadow: 0 0 0 2px var(--ds-text) inset;
-}
-.hw-chord .hw-label {
-  text-align: left;
-}
-.hw-chord-name {
-  padding: 4px 8px;
-  border-radius: 4px;
-  background: var(--hw-lcd-bg);
-  color: var(--hw-lcd-text);
-  font: 600 var(--ds-text-lg) var(--ds-font-num);
-  text-shadow: var(--hw-lcd-glow);
-}
 .hw-select {
   min-height: 34px;
   padding: 0 6px;
@@ -1885,7 +1848,6 @@ ol.ds-led-row {
   }
   .console-stage[data-view="beat"] > [data-panel="beat"],
   .console-stage[data-view="roll"] > [data-panel="roll"],
-  .console-stage[data-view="chords"] > [data-panel="chords"],
   .console-stage[data-view="song"] > [data-panel="song"],
   .console-stage[data-view="mixer"] > [data-panel="mixer"],
   .console-stage[data-view="auto"] > [data-panel="auto"] {

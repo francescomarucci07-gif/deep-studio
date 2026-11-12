@@ -205,3 +205,10 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   Coach (prompt `crea-v13`): più accordi con lo stesso battito.
 - Prova: Mim7 + Do + Sol sul battito 1 (quarta casella disattivata), registrazione La + Mi + Sol con tre tasti,
   export a -12,1 LUFS e -1,13 dBTP senza allarmi.
+
+## Aggiornamento 12 nov 2026 · REC unico, niente vista Accordi
+
+- REC in alto e "Registra" vicino alla tastiera sono lo stesso interruttore: accendono la registrazione e, se
+  è fermo, fanno partire il Play.
+- Tolta la vista Accordi: gli accordi si scrivono nella scheda Chord del Roll (con accordi sovrapposti) e il
+  Chord synth (pad/stab, filtro) sta lì, come Bass e Lead. Le viste sono cinque (tasti 1–5).

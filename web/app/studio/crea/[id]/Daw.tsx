@@ -64,7 +64,6 @@ const clock = (seconds: number) => {
 const VIEWS = [
   { id: "beat", label: "Beat", icon: "M4 6h4v4H4zM10 6h4v4h-4zM16 6h4v4h-4zM4 14h4v4H4zM16 14h4v4h-4z" },
   { id: "roll", label: "Roll", icon: "M3 6h7M8 11h9M5 16h6M14 19h7" },
-  { id: "chords", label: "Accordi", icon: "M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3zm0 0V6l11-2v12m0 0a3 3 0 1 1-3-3 3 3 0 0 1 3 3z" },
   { id: "song", label: "Song", icon: "M3 5h7v4H3zM12 5h9v4h-9zM6 11h9v4H6zM3 17h12v3H3z" },
   { id: "mixer", label: "Mixer", icon: "M6 3v18M12 3v18M18 3v18M4 14h4M10 8h4M16 16h4" },
   { id: "auto", label: "Auto", icon: "M3 18c4 0 4-12 9-12s5 8 9 8" },
@@ -240,6 +239,13 @@ export function Daw({
     setPlaying(false);
   }, []);
   const togglePlay = useCallback(() => (engineRef.current?.playing ? stop() : void play()), [play, stop]);
+  // REC in alto e "Registra" vicino alla tastiera sono lo stesso interruttore: accendono la registrazione
+  // e, se è fermo, fanno partire il Play
+  const toggleRec = () => {
+    const on = !rec;
+    setRec(on);
+    if (on && !engineRef.current?.playing) void play();
+  };
 
   useEffect(() => () => engineRef.current?.close(), []);
   useEffect(() => {
@@ -469,17 +475,6 @@ export function Daw({
     if (!removing && !playing) void engine().preview(r, { note });
   };
 
-  // l'accordo principale del battito b (gli altri sovrapposti restano): nota "" = nessun accordo
-  const setChord = (b: number, root: string, type?: ChordType) => {
-    const prev = pat.chords[b][0];
-    const next = root === "" ? null : { root: Number(root), type: type ?? prev?.type ?? "min7" };
-    update((p) => {
-      const layers = p.patterns[editing].chords[b];
-      p.patterns[editing].chords[b] = next ? [next, ...layers.slice(1)] : [];
-    });
-    if (next && !playing) void engine().preview("chords", { chord: next });
-  };
-
   const setFx = (c: ChannelId, patch: Partial<ChannelFx>) =>
     update((p) => {
       p.fx[c] = { ...p.fx[c], ...patch };
@@ -666,7 +661,13 @@ export function Daw({
           <button type="button" className="hw-btn" onClick={stop}>
             <span className="hw-btn-led" />■ Stop
           </button>
-          <button type="button" className="hw-btn hw-btn--rec" aria-pressed={rec} onClick={() => setRec(!rec)}>
+          <button
+            type="button"
+            className="hw-btn hw-btn--rec"
+            aria-pressed={rec}
+            title="Registra: pad e tastiera scrivono nel pattern sullo step più vicino (fa partire il Play)"
+            onClick={toggleRec}
+          >
             <span className="hw-btn-led" />● Rec
           </button>
           <button type="button" className="hw-btn" aria-pressed={showVersions} onClick={() => setShowVersions(!showVersions)}>
@@ -860,11 +861,7 @@ export function Daw({
                     className="hw-btn hw-btn--small hw-btn--rec hw-keys-rec"
                     aria-pressed={rec}
                     title="Accende Rec e fa partire il Play: le note che suoni si scrivono nel pattern"
-                    onClick={() => {
-                      const on = !rec;
-                      setRec(on);
-                      if (on && !engineRef.current?.playing) void play();
-                    }}
+                    onClick={toggleRec}
                   >
                     <span className="hw-btn-led" />
                     {rec ? "Registro… (clic per smettere)" : "● Registra"}
@@ -1112,103 +1109,6 @@ export function Daw({
                 {Array.from({ length: STEPS }, (_, i) => (
                   <span key={i}>{i + 1}</span>
                 ))}
-              </div>
-            </div>
-          </section>
-
-          {/* ---- accordi del pattern: uno per battito ---- */}
-          <section className="hw-panel hw-chords" data-panel="chords" aria-label="Accordi">
-            <div className="hw-seq-head">
-              <h2 className="hw-title">Accordi · Pattern {editing}</h2>
-              <span className="hw-value">
-                {pat.chords.some((c) => c.length)
-                  ? pat.chords.map((c) => (c.length ? c.map(chordName).join("+") : "·")).join("  ")
-                  : "nessun accordo"}
-              </span>
-            </div>
-            <div className="hw-chord-row">
-              {Array.from({ length: BEATS }, (_, b) => {
-                const layers = pat.chords[b];
-                const c = layers[0] ?? null; // i menu modificano l'accordo principale
-                return (
-                  <div key={b} className="hw-chord" data-on={c !== null} data-now={playingSlot === editing && Math.floor(step / 4) === b}>
-                    <span className="hw-label">Battito {b + 1}</span>
-                    <span className="hw-chord-name">{layers.length ? layers.map(chordName).join(" + ") : "–"}</span>
-                    <label className="hw-visually-hidden" htmlFor={`nota-${b}`}>
-                      Nota dell&apos;accordo, battito {b + 1}
-                    </label>
-                    <select
-                      id={`nota-${b}`}
-                      className="hw-select"
-                      value={c ? String(c.root) : ""}
-                      onChange={(e) => setChord(b, e.target.value)}
-                    >
-                      <option value="">{b === 0 ? "nessuno" : "tiene il prima"}</option>
-                      {NOTE_NAMES.map((n, i) => (
-                        <option key={n} value={i}>
-                          {n}
-                        </option>
-                      ))}
-                    </select>
-                    <label className="hw-visually-hidden" htmlFor={`tipo-${b}`}>
-                      Tipo di accordo, battito {b + 1}
-                    </label>
-                    <select
-                      id={`tipo-${b}`}
-                      className="hw-select"
-                      value={c?.type ?? "min7"}
-                      disabled={!c}
-                      onChange={(e) => c && setChord(b, String(c.root), e.target.value as ChordType)}
-                    >
-                      {CHORD_TYPES.map((t) => (
-                        <option key={t} value={t}>
-                          {TYPE_LABEL[t]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="hw-hint">
-              Un accordo per battito. In <strong>Pad</strong> un accordo tiene finché non arriva il successivo; in{" "}
-              <strong>Stab</strong> è un colpo corto sul battito. Per la deep house prova La m7 → Fa maj7 → Do maj7 → Sol.
-            </p>
-            <div className="hw-synths">
-              <div className="hw-strip hw-strip--synth hw-strip--chords">
-                <span className="hw-label">Chord synth</span>
-                <div className="hw-seg">
-                  {(["pad", "stab"] as const).map((st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      className="hw-btn hw-btn--small"
-                      aria-pressed={project.chordSound.style === st}
-                      onClick={() =>
-                        update((p) => {
-                          p.chordSound.style = st;
-                        })
-                      }
-                    >
-                      <span className="hw-btn-led" />
-                      {st === "pad" ? "Pad" : "Stab"}
-                    </button>
-                  ))}
-                </div>
-                <Knob
-                  label="Cutoff"
-                  value={project.chordSound.cutoff}
-                  min={300}
-                  max={8000}
-                  step={10}
-                  defaultValue={1800}
-                  display={`${Math.round(project.chordSound.cutoff)} Hz`}
-                  onChange={(v) =>
-                    update((p) => {
-                      p.chordSound.cutoff = v;
-                    })
-                  }
-                />
               </div>
             </div>
           </section>
@@ -1608,10 +1508,50 @@ export function Daw({
               </div>
             )}
             {roll === "chords" && (
-              <p className="hw-hint">
-                Clic su una casella: aggiunge l&apos;accordo con quella fondamentale e il tipo scelto su quel battito (fino a{" "}
-                {CHORD_LAYERS} accordi sovrapposti nella stessa colonna); clic di nuovo per toglierlo. Il suono degli accordi (pad o stab, filtro) è nella vista <strong>Accordi</strong>.
-              </p>
+              <>
+                <p className="hw-hint">
+                  Clic su una casella: aggiunge l&apos;accordo con quella fondamentale e il tipo scelto su quel battito (fino a{" "}
+                  {CHORD_LAYERS} accordi sovrapposti nella stessa colonna); clic di nuovo per toglierlo. In <strong>Pad</strong> un
+                  accordo tiene finché non arriva il successivo; in <strong>Stab</strong> è un colpo corto sul battito.
+                </p>
+            <div className="hw-synths">
+              <div className="hw-strip hw-strip--synth hw-strip--chords">
+                <span className="hw-label">Chord synth</span>
+                <div className="hw-seg">
+                  {(["pad", "stab"] as const).map((st) => (
+                    <button
+                      key={st}
+                      type="button"
+                      className="hw-btn hw-btn--small"
+                      aria-pressed={project.chordSound.style === st}
+                      onClick={() =>
+                        update((p) => {
+                          p.chordSound.style = st;
+                        })
+                      }
+                    >
+                      <span className="hw-btn-led" />
+                      {st === "pad" ? "Pad" : "Stab"}
+                    </button>
+                  ))}
+                </div>
+                <Knob
+                  label="Cutoff"
+                  value={project.chordSound.cutoff}
+                  min={300}
+                  max={8000}
+                  step={10}
+                  defaultValue={1800}
+                  display={`${Math.round(project.chordSound.cutoff)} Hz`}
+                  onChange={(v) =>
+                    update((p) => {
+                      p.chordSound.cutoff = v;
+                    })
+                  }
+                />
+              </div>
+            </div>
+              </>
             )}
             {roll !== "chords" && (
             <div className="hw-synths">

@@ -228,3 +228,16 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Interfaccia: pulsante FX su ogni striscia del Mixer; il rack si apre sotto e si chiude con ✕. Con il rack
   aperto, sul computer, le strisce nascondono le manopole Filter/Rev/Dly per stare nella schermata.
 - Coach (prompt `crea-v14`): campo `plugin` in `scrivi_effetti`; chorus su lead, accordi, perc, mai su kick e basso.
+
+## Aggiornamento 12 nov 2026 · 12 plugin e 8 slot
+
+- Slot per canale e master da 4 a 8 (i progetti di prima si allargano da soli). Il rack mostra gli slot usati
+  più uno libero, come schede compatte; le manopole sono solo quelle dello slot selezionato (come in FL).
+- 12 plugin in 4 famiglie: EQ e dinamica (EQ 3 bande, Compressore), Colore (Saturazione, Lo-fi), Modulazione
+  (Chorus, Phaser, Auto filter, Tremolo, Auto-pan), Spazio (Delay ping-pong a tempo, Riverbero, Stereo).
+  I plugin ricevono il BPM (delay a tempo).
+- Livelli verificati offline sullo stesso segnale: nessun valore rotto; Saturazione con compensazione del
+  livello (più drive non vuol dire più forte); Saturazione e Lo-fi con Mix a crossfade. Il compressore del
+  browser aggiunge un guadagno automatico (makeup = (1/guadagno a 0 dBFS)^0,6 dalle specifiche, più ~1 dB di
+  ginocchio): lo togliamo, così un tono sotto la soglia esce identico (entro 0,2 dB) e "Guadagno" è vero.
+- Coach (prompt `crea-v15`): quando e dove usare ogni plugin in house, ordine tipico della fila.

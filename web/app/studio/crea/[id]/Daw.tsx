@@ -44,7 +44,16 @@ import {
   type Project,
   type Slot,
 } from "@/lib/daw/project";
-import { defaultSlot, INSERT_SLOTS, isPluginType, pluginParams, PLUGIN_TYPES, PLUGINS, type PluginSlot } from "@/lib/daw/plugins";
+import {
+  defaultSlot,
+  INSERT_SLOTS,
+  isPluginType,
+  PLUGIN_GROUPS,
+  pluginParams,
+  PLUGIN_TYPES,
+  PLUGINS,
+  type PluginSlot,
+} from "@/lib/daw/plugins";
 import { KEY_NOTES, keyNote, keyRoot, OCTAVES, type KeyInstrument } from "@/lib/daw/keyboard";
 import { KIT_IDS, KITS } from "@/lib/daw/kits";
 import { measure, type Measures } from "@/lib/daw/measure";
@@ -520,10 +529,12 @@ export function Daw({
   // plugin negli insert: il canale di cui vedi il rack e le modifiche agli slot
   const [fxTarget, setFxTarget] = useState<AutoTarget>("lead");
   const [fxOpen, setFxOpen] = useState(false); // il rack si apre con FX e si chiude con ✕ (come in FL)
+  const [selSlot, setSelSlot] = useState(0); // lo slot di cui vedi le manopole
   const openFx = (t: AutoTarget) => {
     const closing = fxOpen && fxTarget === t;
     setFxTarget(t);
     setFxOpen(!closing);
+    setSelSlot(Math.max(0, project.inserts[t].findIndex(Boolean)));
   };
   const fxLabel = (t: AutoTarget) => (t === "master" ? "Master" : (CHANNELS.find((c) => c.id === t)?.label ?? t));
   const setSlot = (t: AutoTarget, i: number, slot: PluginSlot | null) =>
@@ -535,6 +546,11 @@ export function Daw({
       const slot = p.inserts[t][i];
       if (slot) slot.params[id] = v;
     });
+  // quanti slot mostrare: fino all'ultimo pieno, più uno vuoto (almeno uno)
+  const shownSlots = (t: AutoTarget) => {
+    const last = project.inserts[t].reduce((acc, s, i) => (s ? i : acc), -1);
+    return Math.min(INSERT_SLOTS, last + 2);
+  };
   const moveSlot = (t: AutoTarget, i: number, d: -1 | 1) =>
     update((p) => {
       const row = p.inserts[t];
@@ -1433,83 +1449,116 @@ export function Daw({
                   ✕
                 </button>
               </div>
+              {/* come in FL: la fila degli slot è compatta, le manopole sono solo quelle dello slot scelto */}
               <div className="hw-rack-slots">
-                {project.inserts[fxTarget].map((slot, i) => (
-                  <div key={i} className="hw-slot" data-full={slot !== null} data-on={slot?.on ?? false}>
-                    <div className="hw-slot-head">
-                      <span className="hw-label">Slot {i + 1}</span>
-                      <label className="hw-visually-hidden" htmlFor={`slot-${i}`}>
-                        Plugin nello slot {i + 1}
-                      </label>
-                      <select
-                        id={`slot-${i}`}
-                        className="hw-select"
-                        value={slot?.type ?? ""}
-                        onChange={(e) => setSlot(fxTarget, i, isPluginType(e.target.value) ? defaultSlot(e.target.value) : null)}
-                      >
-                        <option value="">vuoto</option>
-                        {PLUGIN_TYPES.map((t) => (
-                          <option key={t} value={t}>
-                            {PLUGINS[t].label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {slot && (
-                      <>
-                        <div className="hw-slot-tools">
-                          <button
-                            type="button"
-                            className="hw-btn hw-btn--small"
-                            aria-pressed={slot.on}
-                            title={slot.on ? "Acceso: clic per escluderlo (bypass)" : "Escluso: clic per riaccenderlo"}
-                            onClick={() => setSlot(fxTarget, i, { ...slot, on: !slot.on })}
-                          >
-                            <span className="hw-btn-led" />
-                            {slot.on ? "On" : "Off"}
-                          </button>
-                          <button
-                            type="button"
-                            className="hw-btn hw-btn--small"
-                            aria-label="Sposta prima"
-                            disabled={i === 0}
-                            onClick={() => moveSlot(fxTarget, i, -1)}
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            className="hw-btn hw-btn--small"
-                            aria-label="Sposta dopo"
-                            disabled={i === INSERT_SLOTS - 1}
-                            onClick={() => moveSlot(fxTarget, i, 1)}
-                          >
-                            ↓
-                          </button>
-                        </div>
-                        <div className="hw-slot-knobs">
-                          {pluginParams(slot.type).map((q) => (
-                            <Knob
-                              key={q.id}
-                              size={26}
-                              label={q.label}
-                              value={slot.params[q.id]}
-                              min={q.min}
-                              max={q.max}
-                              defaultValue={q.default}
-                              display={q.format(slot.params[q.id])}
-                              onChange={(v) => setSlotParam(fxTarget, i, q.id, v)}
-                            />
+                {project.inserts[fxTarget].slice(0, shownSlots(fxTarget)).map((slot, i) => (
+                  <div
+                    key={i}
+                    className="hw-slot"
+                    data-full={slot !== null}
+                    data-on={slot?.on ?? false}
+                    data-selected={slot !== null && i === selSlot}
+                    onClick={() => slot && setSelSlot(i)}
+                  >
+                    <span className="hw-slot-num">{i + 1}</span>
+                    <label className="hw-visually-hidden" htmlFor={`slot-${i}`}>
+                      Plugin nello slot {i + 1}
+                    </label>
+                    <select
+                      id={`slot-${i}`}
+                      className="hw-select"
+                      value={slot?.type ?? ""}
+                      onChange={(e) => {
+                        setSlot(fxTarget, i, isPluginType(e.target.value) ? defaultSlot(e.target.value) : null);
+                        if (isPluginType(e.target.value)) setSelSlot(i);
+                      }}
+                    >
+                      <option value="">{slot ? "— togli —" : "+ aggiungi plugin"}</option>
+                      {PLUGIN_GROUPS.map((g) => (
+                        <optgroup key={g} label={g}>
+                          {PLUGIN_TYPES.filter((t) => PLUGINS[t].group === g).map((t) => (
+                            <option key={t} value={t}>
+                              {PLUGINS[t].label}
+                            </option>
                           ))}
-                        </div>
-                      </>
+                        </optgroup>
+                      ))}
+                    </select>
+                    {slot && (
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small hw-slot-power"
+                        aria-pressed={slot.on}
+                        aria-label={slot.on ? `Escludi lo slot ${i + 1} (bypass)` : `Riaccendi lo slot ${i + 1}`}
+                        title={slot.on ? "Acceso: clic per escluderlo (bypass)" : "Escluso: clic per riaccenderlo"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSlot(fxTarget, i, { ...slot, on: !slot.on });
+                        }}
+                      >
+                        <span className="hw-btn-led" />
+                      </button>
                     )}
                   </div>
                 ))}
               </div>
+              {(() => {
+                const slot = project.inserts[fxTarget][selSlot];
+                if (!slot) return null;
+                return (
+                  <div className="hw-rack-detail" data-on={slot.on}>
+                    <div className="hw-rack-detail-head">
+                      <span className="hw-label">
+                        Slot {selSlot + 1} · {PLUGINS[slot.type].label}
+                        {slot.on ? "" : " (escluso)"}
+                      </span>
+                      <span className="hw-value">{PLUGINS[slot.type].hint}</span>
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small"
+                        aria-label="Sposta prima"
+                        disabled={selSlot === 0}
+                        onClick={() => {
+                          moveSlot(fxTarget, selSlot, -1);
+                          setSelSlot(selSlot - 1);
+                        }}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small"
+                        aria-label="Sposta dopo"
+                        disabled={selSlot === INSERT_SLOTS - 1}
+                        onClick={() => {
+                          moveSlot(fxTarget, selSlot, 1);
+                          setSelSlot(selSlot + 1);
+                        }}
+                      >
+                        ↓
+                      </button>
+                    </div>
+                    <div className="hw-slot-knobs">
+                      {pluginParams(slot.type).map((q) => (
+                        <Knob
+                          key={q.id}
+                          size={30}
+                          label={q.label}
+                          value={slot.params[q.id]}
+                          min={q.min}
+                          max={q.max}
+                          defaultValue={q.default}
+                          display={q.format(slot.params[q.id])}
+                          onChange={(v) => setSlotParam(fxTarget, selSlot, q.id, v)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               <p className="hw-hint">
-                Il suono passa dagli slot in ordine, dall&apos;1 al {INSERT_SLOTS}. <strong>Off</strong> esclude un plugin senza
-                toglierlo (bypass). {PLUGINS.chorus.label}: {PLUGINS.chorus.hint}.
+                Il suono passa dagli slot in ordine (fino a {INSERT_SLOTS}). Clic su uno slot per le sue manopole; il LED lo
+                accende o lo esclude (bypass) senza toglierlo.
               </p>
             </div>
             )}

@@ -215,7 +215,7 @@ export class Graph {
           types[i] = type;
           this.insertWiring[t] = undefined; // la fila va ricollegata
         }
-        if (slot && live[i]) live[i].set(slot.params, immediate);
+        if (slot && live[i]) live[i].set(slot.params, immediate, { bpm: p.bpm });
       });
       const wiring = slots.map((s) => (s ? `${s.type}${s.on ? 1 : 0}` : "-")).join(",");
       if (this.insertWiring[t] === wiring) continue;

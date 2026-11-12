@@ -118,9 +118,9 @@ cd web && npm run dev
 
 ## Prossimi passi (chiesti da Francesco l'11 nov 2026, da fare alla ripresa)
 
-1. ~~Plugin~~ **fatto il 12 nov**: 4 slot di insert per canale e master (`web/lib/daw/plugins.ts`), primo
-   plugin Chorus; pulsante FX nel Mixer. Prossimi plugin da scegliere (proposti: EQ 3 bande, compressore,
-   saturazione, poi phaser, bitcrusher, tremolo/auto-pan).
+1. ~~Plugin~~ **fatto il 12 nov**: 8 slot di insert per canale e master (`web/lib/daw/plugins.ts`), 12 plugin
+   (EQ, Compressore, Saturazione, Lo-fi, Chorus, Phaser, Auto filter, Tremolo, Auto-pan, Delay, Riverbero,
+   Stereo); pulsante FX nel Mixer.
 2. ~~Tasto REC in alto~~ **fatto il 12 nov**: REC e "Registra" sono lo stesso interruttore (fanno partire il Play).
 3. ~~Vista Accordi~~ **tolta il 12 nov**: accordi e Chord synth nella scheda Chord del Roll.
 4. **Suoni ed effetti nuovi**: altri suoni (synth, kit) e altri plugin (vedi punto 1).

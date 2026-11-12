@@ -1352,53 +1352,91 @@ ol.ds-led-row {
 }
 .hw-rack-slots {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--ds-space-2);
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 6px;
 }
-@media (max-width: 760px) {
-  .hw-rack-slots {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
+/* uno slot: numero, plugin, LED acceso/escluso; clic per vedere le sue manopole */
 .hw-slot {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
-  padding: var(--ds-space-2);
+  padding: 4px 6px;
   border: 1px dashed var(--hw-panel-edge);
   border-radius: 8px;
   background: var(--hw-panel-2);
+  cursor: pointer;
 }
 .hw-slot[data-full="true"] {
   border-style: solid;
-  border-color: color-mix(in srgb, var(--ds-accent) 45%, var(--hw-panel-edge));
 }
-.hw-slot[data-full="true"][data-on="false"] .hw-slot-knobs {
-  opacity: 0.45;
+.hw-slot[data-full="true"][data-on="false"] {
+  opacity: 0.6;
 }
-.hw-slot-head,
-.hw-slot-tools {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.hw-slot[data-selected="true"] {
+  border-color: var(--ds-accent);
+  background: color-mix(in srgb, var(--ds-accent) 12%, var(--hw-panel-2));
 }
-.hw-slot-head .hw-select {
+.hw-slot-num {
+  color: var(--hw-print-faint);
+  font: 600 10px var(--ds-font-num);
+}
+.hw-slot .hw-select {
   flex: 1;
   min-width: 0;
+  min-height: 30px;
 }
-.hw-slot-tools .hw-btn {
+.hw-slot-power {
   min-width: 0;
-  min-height: 28px;
-  padding: 2px 8px;
-  flex-direction: row;
-  gap: 5px;
+  min-height: 30px;
+  padding: 0 8px;
+}
+/* le manopole dello slot scelto */
+.hw-rack-detail {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--ds-accent) 40%, var(--hw-panel-edge));
+  border-radius: 8px;
+  background: var(--hw-panel-2);
+}
+.hw-rack-detail[data-on="false"] .hw-slot-knobs {
+  opacity: 0.45;
+}
+.hw-rack-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hw-rack-detail-head .hw-label {
+  text-align: left;
+  white-space: nowrap;
+}
+.hw-rack-detail-head .hw-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hw-rack-detail-head .hw-btn {
+  min-width: 30px;
+  min-height: 26px;
+  padding: 0 6px;
 }
 .hw-slot-knobs {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-around;
+  opacity: 0.45;
+}
+.hw-slot-knobs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 72px));
+  justify-content: start;
+  justify-items: center;
   gap: 2px;
+}
+.hw-slot-knobs .hw-label {
+  font-size: 9px;
+  letter-spacing: 0.06em;
 }
 .hw-slot-knobs .hw-knob {
   width: auto !important; /* la manopola si stringe: tre stanno su una riga anche negli slot stretti */
@@ -2037,9 +2075,7 @@ ol.ds-led-row {
   .console-stage .hw-mixer[data-rack="true"] .hw-strip--master .hw-value {
     display: none;
   }
-  .console-stage .hw-slot-knobs {
-    flex-wrap: nowrap;
-  }
+
   .console-stage .hw-mixer[data-rack="true"] .hw-fader {
     height: clamp(44px, calc(100dvh - 600px), 110px);
   }

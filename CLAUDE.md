@@ -131,6 +131,11 @@ cd web && npm run dev
 6. ~~Suono per pattern~~ **fatto il 13 nov**: interruttore Tutti / Solo X nei synth del Roll (`patterns.X.sounds`,
    `soundOf()` in `project.ts`); pulsanti dei pattern anche nel Roll.
 
+**Per il 14 nov (chiesto da Francesco il 13 nov):**
+- Controllo generale dello studio con Francesco (tutte le viste, suoni, Solo, plugin, export, coach).
+- Un link da girare ad amici che provano lo studio e segnalano problemi (serve il login: decidere come
+  entrano e come ci mandano i problemi).
+
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,
 canzoni fino a 256 battute.

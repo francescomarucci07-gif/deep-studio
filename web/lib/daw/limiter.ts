@@ -12,14 +12,14 @@
 // Il picco non è solo quello dei campioni: stimo anche tre punti tra un campione e l'altro (interpolazione
 // cubica, come il sovracampionamento ×4 del true peak). Per questo l'uscita ritarda 2 campioni in più.
 
-export const LIMITER_CEILING_DB = -1.3; // tetto, anche tra un campione e l'altro: il true peak resta sotto -1 dBTP
+export const LIMITER_CEILING_DB = -1.6; // tetto: la stima dei picchi tra i campioni sbaglia fino a ~0,4 dB, così il true peak resta sotto -1,05 dBTP
 
 const PROCESSOR = /* js */ `
 class DsLimiter extends AudioWorkletProcessor {
   constructor(options) {
     super();
     const o = (options && options.processorOptions) || {};
-    this.ceiling = Math.pow(10, (o.ceilingDb ?? -1.3) / 20);
+    this.ceiling = Math.pow(10, (o.ceilingDb ?? -1.6) / 20);
     this.L = Math.max(1, Math.round((o.lookahead ?? 0.005) * sampleRate));
     this.rel = 1 - Math.exp(-1 / ((o.release ?? 0.08) * sampleRate));
     const H = 2 * this.L;

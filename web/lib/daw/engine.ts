@@ -92,6 +92,11 @@ export class Engine {
     this.graph.applyMixer();
   }
 
+  // i canali da ascoltare da soli (vuoto = tutti)
+  setSolo(ids: Iterable<ChannelId>) {
+    this.graph.setSolo(ids);
+  }
+
   async preview(id: ChannelId, opts: { note?: number; chord?: Chord } = {}) {
     await this.ready;
     await this.ctx.resume();

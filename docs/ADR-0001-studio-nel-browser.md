@@ -241,3 +241,14 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   browser aggiunge un guadagno automatico (makeup = (1/guadagno a 0 dBFS)^0,6 dalle specifiche, più ~1 dB di
   ginocchio): lo togliamo, così un tono sotto la soglia esce identico (entro 0,2 dB) e "Guadagno" è vero.
 - Coach (prompt `crea-v15`): quando e dove usare ogni plugin in house, ordine tipico della fila.
+
+## Aggiornamento 13 nov 2026 · Solo dei canali
+
+- Pulsante S (solo) come nel mixer di FL: nel Mixer, sulle righe del sequencer (Beat) e nel Roll (strumento
+  aperto). Clic = solo quel canale (di nuovo = tutti), Ctrl/Maiusc + clic = aggiungi o togli. Vale in Pattern e
+  in Song; un avviso "Solo: …" nella barra delle viste lo azzera. È solo ascolto: non si salva nel progetto e
+  l'export WAV resta sempre il mix completo. Nel motore i canali fuori dal solo vanno a volume zero dopo il fader,
+  quindi tacciono anche i loro send. Prova offline: solo = mute di tutti gli altri (stesso volume entro 0,1 dB).
+- Limiter: tetto da -1,3 a -1,6 dB. Con -1,3 la stima dei picchi tra i campioni lasciava passare fino a ~0,4 dB
+  e in 3 export su 8 la rete di sicurezza abbassava tutto il file (lo stesso export cambiava di 0,2–0,6 LU).
+  Con -1,6 il caso peggiore su 8 export è -1,04 dBTP: gli export della stessa canzone escono uguali.

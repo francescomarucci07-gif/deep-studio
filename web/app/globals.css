@@ -982,7 +982,7 @@ ol.ds-led-row {
 .hw-seq-row {
   --key: var(--ds-accent);
   display: grid;
-  grid-template-columns: 88px repeat(16, minmax(28px, 1fr));
+  grid-template-columns: 112px repeat(16, minmax(28px, 1fr));
   gap: 5px;
   align-items: center;
   min-width: max-content;
@@ -1441,6 +1441,52 @@ ol.ds-led-row {
 .hw-slot-knobs .hw-knob {
   width: auto !important; /* la manopola si stringe: tre stanno su una riga anche negli slot stretti */
 }
+/* solo: LED giallo come in FL, e l'avviso nella barra delle viste */
+.hw-btn--solo[aria-pressed="true"] .hw-btn-led {
+  background: var(--ds-warn);
+  box-shadow: 0 0 6px var(--ds-warn);
+}
+.hw-btn--solo[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--ds-warn) 55%, var(--hw-panel-edge));
+}
+.hw-solo-chip {
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--ds-warn) 60%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ds-warn) 14%, transparent);
+  color: var(--ds-text);
+  font: 600 11px var(--ds-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* righe del sequencer: nome dello strumento e solo */
+.hw-seq-label {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.hw-seq-label .hw-seq-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.hw-seq-label .hw-btn--solo {
+  flex: none;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0 5px;
+  flex-direction: row;
+  gap: 3px;
+  font-size: 9px;
+}
+.hw-seq-label .hw-btn--solo .hw-btn-led {
+  width: 5px;
+  height: 5px;
+}
+
 /* mute e FX sulla stessa riga nelle strisce del mixer */
 .hw-strip-btns {
   display: flex;
@@ -1448,8 +1494,8 @@ ol.ds-led-row {
 }
 .hw-strip-btns .hw-btn {
   min-width: 0;
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
 }
 
 /* spia del limiter nella striscia Master */
@@ -1674,7 +1720,7 @@ ol.ds-led-row {
     justify-content: space-around;
   }
   .hw-seq-row {
-    grid-template-columns: 92px repeat(16, 28px);
+    grid-template-columns: 112px repeat(16, 28px);
   }
   .daw-roll-row {
     grid-template-columns: 48px repeat(16, 28px);
@@ -1837,7 +1883,7 @@ ol.ds-led-row {
       padding: var(--ds-space-3);
     }
     .console-stage .hw-seq-row {
-      grid-template-columns: 80px repeat(16, minmax(22px, 1fr));
+      grid-template-columns: 100px repeat(16, minmax(22px, 1fr));
       gap: 4px;
     }
     .console-stage .hw-seq-name {
@@ -1969,7 +2015,7 @@ ol.ds-led-row {
   }
   /* nella vista Beat gli step sono più grandi: c'è tutto lo schermo */
   .console-stage .hw-seq-row {
-    grid-template-columns: 92px repeat(16, minmax(26px, 1fr));
+    grid-template-columns: 112px repeat(16, minmax(26px, 1fr));
     gap: 5px;
   }
   .console-stage .hw-seq-grid {

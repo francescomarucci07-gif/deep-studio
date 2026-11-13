@@ -227,15 +227,18 @@ export function Daw({
   const engineRef = useRef<Engine | null>(null);
 
   const engine = useCallback(() => {
-    engineRef.current ??= new Engine(
-      () => projectRef.current,
-      () => playbackRef.current,
-      (s, b, slot) => {
-        setStep(s);
-        setBar(b);
-        setPlayingSlot(slot);
-      },
-    );
+    if (!engineRef.current) {
+      engineRef.current = new Engine(
+        () => projectRef.current,
+        () => playbackRef.current,
+        (s, b, slot) => {
+          setStep(s);
+          setBar(b);
+          setPlayingSlot(slot);
+        },
+      );
+      engineRef.current.setSolo(soloRef.current); // il motore nasce al primo suono: parte con il solo già scelto
+    }
     return engineRef.current;
   }, []);
 
@@ -527,6 +530,36 @@ export function Daw({
     });
 
   // plugin negli insert: il canale di cui vedi il rack e le modifiche agli slot
+  // solo: i canali da ascoltare da soli (vuoto = tutti). Solo ascolto: non si salva e l'export lo ignora.
+  const [solo, setSolo] = useState<ChannelId[]>([]);
+  const soloRef = useRef<ChannelId[]>([]);
+  soloRef.current = solo;
+  useEffect(() => {
+    engineRef.current?.setSolo(solo);
+  }, [solo]);
+  // clic = solo quel canale (di nuovo = tutti); Ctrl o Maiusc + clic = aggiungi o togli dal solo
+  const toggleSolo = (c: ChannelId, additive: boolean) =>
+    setSolo((cur) =>
+      additive
+        ? cur.includes(c)
+          ? cur.filter((x) => x !== c)
+          : [...cur, c]
+        : cur.length === 1 && cur[0] === c
+          ? []
+          : [c],
+    );
+  const soloButton = (c: ChannelId, label: string) => (
+    <button
+      type="button"
+      className="hw-btn hw-btn--small hw-btn--solo"
+      aria-pressed={solo.includes(c)}
+      aria-label={`Solo ${label}`}
+      title="Solo: senti solo questo canale (Ctrl+clic per aggiungerne altri; di nuovo per tornare a tutto)"
+      onClick={(e) => toggleSolo(c, e.ctrlKey || e.metaKey || e.shiftKey)}
+    >
+      <span className="hw-btn-led" />S
+    </button>
+  );
   const [fxTarget, setFxTarget] = useState<AutoTarget>("lead");
   const [fxOpen, setFxOpen] = useState(false); // il rack si apre con FX e si chiude con ✕ (come in FL)
   const [selSlot, setSelSlot] = useState(0); // lo slot di cui vedi le manopole
@@ -964,6 +997,16 @@ export function Daw({
                 </button>
               ))}
             </div>
+            {solo.length > 0 && (
+              <button
+                type="button"
+                className="hw-solo-chip"
+                title="Clic per tornare a sentire tutti i canali"
+                onClick={() => setSolo([])}
+              >
+                Solo: {solo.map((c) => CHANNELS.find((x) => x.id === c)?.label ?? c).join(", ")} ✕
+              </button>
+            )}
             <button
               type="button"
               className="hw-btn hw-btn--small hw-views-end"
@@ -1088,9 +1131,12 @@ export function Daw({
             <div className="hw-seq-grid">
               {DRUMS.map(({ id: d, label }) => (
                 <div key={d} className="hw-seq-row" data-row={d}>
-                  <button type="button" className="hw-seq-name" onClick={() => void engine().preview(d)}>
-                    {label}
-                  </button>
+                  <div className="hw-seq-label">
+                    <button type="button" className="hw-seq-name" onClick={() => void engine().preview(d)}>
+                      {label}
+                    </button>
+                    {soloButton(d, label)}
+                  </div>
                   {pat.drums[d].map((on, i) => (
                     <button
                       key={i}
@@ -1108,9 +1154,12 @@ export function Daw({
                 </div>
               ))}
               <div className="hw-seq-row" data-row="bass">
-                <button type="button" className="hw-seq-name" onClick={() => void engine().preview("bass")}>
-                  Bass
-                </button>
+                <div className="hw-seq-label">
+                  <button type="button" className="hw-seq-name" onClick={() => void engine().preview("bass")}>
+                    Bass
+                  </button>
+                  {soloButton("bass", "Bass")}
+                </div>
                 {pat.bass.map((n, i) => (
                   <span
                     key={i}
@@ -1124,13 +1173,19 @@ export function Daw({
                 ))}
               </div>
               <div className="hw-seq-row" data-row="lead">
-                <button type="button" className="hw-seq-name" onClick={() => {
-                    setRoll("lead");
-                    chooseView("roll");
-                  }}
-                >
-                  Lead
-                </button>
+                <div className="hw-seq-label">
+                  <button
+                    type="button"
+                    className="hw-seq-name"
+                    onClick={() => {
+                      setRoll("lead");
+                      chooseView("roll");
+                    }}
+                  >
+                    Lead
+                  </button>
+                  {soloButton("lead", "Lead")}
+                </div>
                 {pat.lead.map((n, i) => (
                   <span
                     key={i}
@@ -1334,7 +1389,11 @@ export function Daw({
             <div className="hw-strips">
               {CHANNELS.map(({ id: c, label }) => (
                 <div key={c} className="hw-strip">
-                  <span className="hw-meter" data-hit={hitNow(c) && !project.mixer[c].muted} aria-hidden="true" />
+                  <span
+                    className="hw-meter"
+                    data-hit={hitNow(c) && !project.mixer[c].muted && (solo.length === 0 || solo.includes(c))}
+                    aria-hidden="true"
+                  />
                   <input
                     className="hw-fader"
                     type="range"
@@ -1356,6 +1415,7 @@ export function Daw({
                     >
                       <span className="hw-btn-led" />M
                     </button>
+                    {soloButton(c, label)}
                     <button
                       type="button"
                       className="hw-btn hw-btn--small hw-fx-btn"
@@ -1587,6 +1647,7 @@ export function Daw({
                     {r.label}
                   </button>
                 ))}
+                {soloButton(roll, ROLL_TABS.find((t) => t.id === roll)?.label ?? roll)}
                 {roll === "chords" && (
                   <>
                     <label className="hw-visually-hidden" htmlFor="roll-chord">

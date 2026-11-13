@@ -50,6 +50,12 @@ export class Graph {
   private out: GainNode;
   private limiter: AudioNode;
   limiterDb = 0; // quanto sta abbassando il limiter adesso (dB, 0 = niente)
+  // i canali in solo (vuoto = tutti suonano). Solo per l'ascolto: l'export non lo usa mai.
+  private solo = new Set<ChannelId>();
+  setSolo(ids: Iterable<ChannelId>) {
+    this.solo = new Set(ids);
+    this.applyMixer();
+  }
   private chains: Record<AutoTarget, { from: AudioNode; to: AudioNode }>;
   // i plugin vivi di ogni fila, e com'era la fila l'ultima volta (per ricollegarla solo se cambia)
   private inserts: Partial<Record<AutoTarget, (PluginInstance | null)[]>> = {};
@@ -186,7 +192,9 @@ export class Graph {
       immediate ? param.setValueAtTime(v, now) : param.setTargetAtTime(v, now, 0.01);
     for (const id of CHANNEL_IDS) {
       const c = p.mixer[id];
-      set(this.channels[id].gain, c.muted ? 0 : c.volume);
+      // solo: se qualche canale è in solo, gli altri tacciono (anche i loro send, che partono dopo il fader)
+      const silenced = c.muted || (this.solo.size > 0 && !this.solo.has(id));
+      set(this.channels[id].gain, silenced ? 0 : c.volume);
       set(this.sends[id].reverb.gain, p.fx[id].reverb);
       set(this.sends[id].delay.gain, p.fx[id].delay * DELAY_MAX);
     }

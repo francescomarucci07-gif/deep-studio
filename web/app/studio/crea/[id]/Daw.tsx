@@ -276,7 +276,17 @@ export function Daw({
   );
 
   // Tastiera musicale (come la typing keyboard di FL): in modalità "keys" le lettere suonano note
-  const [keyMode, setKeyMode] = useState<"pad" | "keys">("pad");
+  // niente interruttore: con il Roll aperto (su un computer) le lettere suonano le note dello strumento,
+  // nelle altre viste suonano i pad. I pad sullo schermo restano cliccabili sempre.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1000px)");
+    const on = () => setWide(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  const keyMode: "pad" | "keys" = wide && view === "roll" ? "keys" : "pad";
   const [octaves, setOctaves] = useState({ bass: OCTAVES.bass.start, lead: OCTAVES.lead.start });
   const [keyChord, setKeyChord] = useState<ChordType>("min7");
   const [lastKey, setLastKey] = useState("");
@@ -379,15 +389,9 @@ export function Daw({
         if (!e.repeat) togglePlay();
         return;
       }
-      // Tab: PAD ↔ TASTIERA (Maiusc+Tab resta per muoversi tra i comandi)
-      if (e.key === "Tab" && !e.shiftKey && !typing(e.target) && !e.altKey && !e.metaKey && !e.ctrlKey) {
-        e.preventDefault();
-        setKeyMode((m) => (m === "pad" ? "keys" : "pad"));
-        return;
-      }
       const tag = (e.target as HTMLElement).tagName;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
-      // in modalità tastiera le lettere (e alcuni numeri) sono note: niente pad e niente cambio vista
+      // con il Roll aperto le lettere (e alcuni numeri) sono note: niente pad e niente cambio vista
       if (keysRef.current.keyMode === "keys") {
         if (e.code in KEY_NOTES) {
           e.preventDefault();
@@ -846,107 +850,93 @@ export function Daw({
               </div>
             </div>
             <div className="hw-keys" role="group" aria-label="Tastiera del computer">
-              <div className="hw-seg">
-                <button
-                  type="button"
-                  className="hw-btn hw-btn--small"
-                  aria-pressed={keyMode === "pad"}
-                  title="I tasti Z X C V B N M suonano i pad (Tab per cambiare)"
-                  onClick={() => setKeyMode("pad")}
-                >
-                  <span className="hw-btn-led" />
-                  Pad
-                </button>
-                <button
-                  type="button"
-                  className="hw-btn hw-btn--small"
-                  aria-pressed={keyMode === "keys"}
-                  title="I tasti suonano le note, come la typing keyboard di FL (Tab per cambiare)"
-                  onClick={() => setKeyMode("keys")}
-                >
-                  <span className="hw-btn-led" />
-                  Tastiera
-                </button>
+              {/* un clic apre il Roll di quello strumento: da lì la tastiera suona le sue note */}
+              <div className="hw-seg" role="group" aria-label="Strumento della tastiera">
+                {(["bass", "lead", "chords"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className="hw-btn hw-btn--small"
+                    aria-pressed={keyMode === "keys" && keyInst === k}
+                    title={`Apre il Roll di ${k === "chords" ? "Chord" : k === "bass" ? "Bass" : "Lead"}: la tastiera ne suona le note`}
+                    onClick={() => {
+                      setRoll(k);
+                      chooseView("roll");
+                    }}
+                  >
+                    {k === "bass" ? "Bass" : k === "lead" ? "Lead" : "Chord"}
+                  </button>
+                ))}
               </div>
               {keyMode === "keys" && (
-                <>
-                  <div className="hw-seg" role="group" aria-label="Strumento della tastiera">
-                    {(["bass", "lead", "chords"] as const).map((k) => (
+                <div className="hw-keys-row">
+                  {keyInst === "chords" ? (
+                    <>
+                      <label className="hw-label" htmlFor="key-chord">
+                        Tipo
+                      </label>
+                      <select
+                        id="key-chord"
+                        className="hw-select"
+                        value={keyChord}
+                        onChange={(e) => setKeyChord(e.target.value as ChordType)}
+                      >
+                        {CHORD_TYPES.map((t) => (
+                          <option key={t} value={t}>
+                            {TYPE_LABEL[t]}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <span className="hw-label">Ottava</span>
                       <button
-                        key={k}
                         type="button"
                         className="hw-btn hw-btn--small"
-                        aria-pressed={keyInst === k}
-                        onClick={() => setRoll(k)}
+                        aria-label="Ottava giù"
+                        disabled={octaves[keyInst] <= OCTAVES[keyInst].min}
+                        onClick={() => shiftOctave(-1)}
                       >
-                        {k === "bass" ? "Bass" : k === "lead" ? "Lead" : "Chord"}
+                        ‹
                       </button>
-                    ))}
-                  </div>
-                  <div className="hw-keys-row">
-                    {keyInst === "chords" ? (
-                      <>
-                        <label className="hw-label" htmlFor="key-chord">
-                          Tipo
-                        </label>
-                        <select
-                          id="key-chord"
-                          className="hw-select"
-                          value={keyChord}
-                          onChange={(e) => setKeyChord(e.target.value as ChordType)}
-                        >
-                          {CHORD_TYPES.map((t) => (
-                            <option key={t} value={t}>
-                              {TYPE_LABEL[t]}
-                            </option>
-                          ))}
-                        </select>
-                      </>
-                    ) : (
-                      <>
-                        <span className="hw-label">Ottava</span>
-                        <button
-                          type="button"
-                          className="hw-btn hw-btn--small"
-                          aria-label="Ottava giù"
-                          disabled={octaves[keyInst] <= OCTAVES[keyInst].min}
-                          onClick={() => shiftOctave(-1)}
-                        >
-                          ‹
-                        </button>
-                        <span className="hw-value">{octaves[keyInst]}</span>
-                        <button
-                          type="button"
-                          className="hw-btn hw-btn--small"
-                          aria-label="Ottava su"
-                          disabled={octaves[keyInst] >= OCTAVES[keyInst].max}
-                          onClick={() => shiftOctave(1)}
-                        >
-                          ›
-                        </button>
-                      </>
-                    )}
-                    <span className="hw-keys-last" aria-live="polite">
-                      {lastKey}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    className="hw-btn hw-btn--small hw-btn--rec hw-keys-rec"
-                    aria-pressed={rec}
-                    title="Accende Rec e fa partire il Play: le note che suoni si scrivono nel pattern"
-                    onClick={toggleRec}
-                  >
-                    <span className="hw-btn-led" />
-                    {rec ? "Registro… (clic per smettere)" : "● Registra"}
-                  </button>
-                  <p className="hw-keys-map">
-                    Z X C V B N M = Do Re Mi Fa Sol La Si · S D G H J = diesis · Q W E R T Y U = ottava sopra.{" "}
-                    <strong>Registra</strong>: le note vanno sullo step più vicino; in Pattern il loop gira e puoi
-                    aggiungere note a ogni giro.
-                  </p>
-                </>
+                      <span className="hw-value">{octaves[keyInst]}</span>
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small"
+                        aria-label="Ottava su"
+                        disabled={octaves[keyInst] >= OCTAVES[keyInst].max}
+                        onClick={() => shiftOctave(1)}
+                      >
+                        ›
+                      </button>
+                    </>
+                  )}
+                  <span className="hw-keys-last" aria-live="polite">
+                    {lastKey}
+                  </span>
+                </div>
               )}
+              <button
+                type="button"
+                className="hw-btn hw-btn--small hw-btn--rec hw-keys-rec"
+                aria-pressed={rec}
+                title="Accende Rec e fa partire il Play: pad e note che suoni si scrivono nel pattern"
+                onClick={toggleRec}
+              >
+                <span className="hw-btn-led" />
+                {rec ? "Registro… (clic per smettere)" : "● Registra"}
+              </button>
+              <p className="hw-keys-map">
+                {keyMode === "keys" ? (
+                  <>
+                    Tastiera = note: Z X C V B N M = Do Re Mi Fa Sol La Si · S D G H J = diesis · Q W E R T Y U = ottava
+                    sopra. I pad si suonano con il mouse.
+                  </>
+                ) : (
+                  <>Tastiera = pad (Z X C V B N M). Apri il Roll (o Bass, Lead, Chord qui sopra) per suonare le note.</>
+                )}
+              </p>
             </div>
             <div className="hw-pads" data-keys={keyMode === "keys"}>
               {PADS.map((p) => (

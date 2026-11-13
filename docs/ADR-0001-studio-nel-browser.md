@@ -252,3 +252,9 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Limiter: tetto da -1,3 a -1,6 dB. Con -1,3 la stima dei picchi tra i campioni lasciava passare fino a ~0,4 dB
   e in 3 export su 8 la rete di sicurezza abbassava tutto il file (lo stesso export cambiava di 0,2–0,6 LU).
   Con -1,6 il caso peggiore su 8 export è -1,04 dBTP: gli export della stessa canzone escono uguali.
+
+## Aggiornamento 13 nov 2026 · tastiera senza interruttore
+
+- Tolto PAD / TASTIERA (e il tasto Tab): con il Roll aperto (da 1000 px) le lettere suonano le note dello strumento
+  del Roll, nelle altre viste suonano i pad; i pad sullo schermo restano cliccabili sempre. I pulsanti Bass /
+  Lead / Chord nella colonna dei pad aprono il Roll di quello strumento. Registra sempre visibile.

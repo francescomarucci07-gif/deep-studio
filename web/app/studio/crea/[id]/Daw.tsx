@@ -17,6 +17,9 @@ import {
   LEAD_VOICES,
   LEAD_LOW,
   LEAD_WAVES,
+  LEAD_SOUNDS,
+  BASS_WAVES,
+  CHORD_STYLES,
   NOTE_NAMES,
   SLOTS,
   slotColor,
@@ -39,7 +42,9 @@ import {
   type ChannelFx,
   type ChannelId,
   type Chord,
+  type ChordStyle,
   type ChordType,
+  type Wave,
   type DrumId,
   type Project,
   type Slot,
@@ -133,7 +138,6 @@ const CHANNELS: { id: ChannelId; label: string }[] = [
   { id: "lead", label: "Lead" },
 ];
 const isDrum = (c: ChannelId): c is DrumId => c !== "bass" && c !== "chords" && c !== "lead";
-const WAVE_LABEL: Record<(typeof LEAD_WAVES)[number], string> = { sawtooth: "Saw", square: "Sqr", triangle: "Tri" };
 const TYPE_LABEL: Record<ChordType, string> = {
   min: "minore",
   maj: "maggiore",
@@ -346,6 +350,8 @@ export function Daw({
     },
     [engine, rec, update, lightKey],
   );
+  // scegli un suono e lo senti subito (dopo che React ha aggiornato il progetto che il motore legge)
+  const tryOut = (c: "bass" | "lead" | "chords") => setTimeout(() => !engineRef.current?.playing && hitPad(c), 30);
   const shiftOctave = (d: number) => {
     if (keyInst === "chords") return;
     const r = OCTAVES[keyInst];
@@ -858,7 +864,7 @@ export function Daw({
                     type="button"
                     className="hw-btn hw-btn--small"
                     aria-pressed={keyMode === "keys" && keyInst === k}
-                    title={`Apre il Roll di ${k === "chords" ? "Chord" : k === "bass" ? "Bass" : "Lead"}: la tastiera ne suona le note`}
+                    title={`Apre il Roll di ${k === "chords" ? "Chord" : k === "bass" ? "Bass" : "Lead"}: la tastiera ne suona le note (Z X C V B N M = Do Re Mi Fa Sol La Si, S D G H J = diesis, Q W E R T Y U = ottava sopra)`}
                     onClick={() => {
                       setRoll(k);
                       chooseView("roll");
@@ -1757,20 +1763,22 @@ export function Daw({
               <div className="hw-strip hw-strip--synth hw-strip--chords">
                 <span className="hw-label">Chord synth</span>
                 <div className="hw-seg">
-                  {(["pad", "stab"] as const).map((st) => (
+                  {(Object.keys(CHORD_STYLES) as ChordStyle[]).map((st) => (
                     <button
                       key={st}
                       type="button"
                       className="hw-btn hw-btn--small"
                       aria-pressed={project.chordSound.style === st}
-                      onClick={() =>
+                      title={CHORD_STYLES[st].hint}
+                      onClick={() => {
                         update((p) => {
                           p.chordSound.style = st;
-                        })
-                      }
+                        });
+                        tryOut("chords");
+                      }}
                     >
                       <span className="hw-btn-led" />
-                      {st === "pad" ? "Pad" : "Stab"}
+                      {CHORD_STYLES[st].label}
                     </button>
                   ))}
                 </div>
@@ -1798,20 +1806,22 @@ export function Daw({
                   <div className="hw-strip hw-strip--synth">
                     <span className="hw-label">Bass synth</span>
                     <div className="hw-seg">
-                      {(["sawtooth", "square"] as const).map((w) => (
+                      {(Object.keys(BASS_WAVES) as Wave[]).map((w) => (
                         <button
                           key={w}
                           type="button"
                           className="hw-btn hw-btn--small"
                           aria-pressed={project.bassSound.wave === w}
-                          onClick={() =>
+                          title={BASS_WAVES[w].hint}
+                          onClick={() => {
                             update((p) => {
                               p.bassSound.wave = w;
-                            })
-                          }
+                            });
+                            tryOut("bass");
+                          }}
                         >
                           <span className="hw-btn-led" />
-                          {w === "sawtooth" ? "Saw" : "Sqr"}
+                          {BASS_WAVES[w].label}
                         </button>
                       ))}
                     </div>
@@ -1853,14 +1863,16 @@ export function Daw({
                           type="button"
                           className="hw-btn hw-btn--small"
                           aria-pressed={project.leadSound.wave === w}
-                          onClick={() =>
+                          title={LEAD_SOUNDS[w].hint}
+                          onClick={() => {
                             update((p) => {
                               p.leadSound.wave = w;
-                            })
-                          }
+                            });
+                            tryOut("lead");
+                          }}
                         >
                           <span className="hw-btn-led" />
-                          {WAVE_LABEL[w]}
+                          {LEAD_SOUNDS[w].label}
                         </button>
                       ))}
                     </div>

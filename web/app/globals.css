@@ -1931,7 +1931,7 @@ ol.ds-led-row {
   }
   .console-side .hw-seq-head .hw-seg {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 4px;
   }
   .console-side .hw-seq-head .hw-seg .hw-btn {
@@ -2092,7 +2092,11 @@ ol.ds-led-row {
   }
   .console-side .hw-pad {
     aspect-ratio: auto;
-    min-height: clamp(40px, calc((100dvh - 430px) / 3), 92px);
+    min-height: clamp(36px, calc((100dvh - 520px) / 3), 92px);
+  }
+  /* sul computer la spiegazione dei tasti è nel tooltip dei pulsanti: la colonna resta corta */
+  .console-side .hw-keys-map {
+    display: none;
   }
   .console-side .hw-pad[data-color="purple"],
   .console-side .hw-pad[data-color="blue"] {

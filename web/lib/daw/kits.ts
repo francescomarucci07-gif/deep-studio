@@ -1,7 +1,7 @@
 // I kit di batteria: stessi quattro strumenti (kick, clap, hat, perc), timbri diversi.
 // Tutto sintetizzato come prima: ogni kit è solo una tabella di numeri che graph.ts legge a ogni colpo.
 
-export const KIT_IDS = ["house", "909", "808", "trap"] as const;
+export const KIT_IDS = ["house", "909", "808", "trap", "deep", "techno"] as const;
 export type KitId = (typeof KIT_IDS)[number];
 
 export type Kit = {
@@ -61,6 +61,22 @@ export const KITS: Record<KitId, Kit> = {
     kick: { start: 180, knee: 50, end: 41, sweep: 0.04, decay: 1.4, click: 0.2 },
     clap: { tone: 1800, tail: 0.18, body: 0.6 },
     hat: { closed: 0.03, open: 0.26, center: 10500, cut: 8000, level: 0.8 },
+    perc: "rim",
+  },
+  deep: {
+    label: "Deep",
+    hint: "kick morbido e caldo, hat soffici, conga: deep house notturna",
+    kick: { start: 170, knee: 50, end: 42, sweep: 0.05, decay: 0.5, click: 0.12 },
+    clap: { tone: 1250, tail: 0.38, body: 0 },
+    hat: { closed: 0.05, open: 0.42, center: 8800, cut: 6200, level: 0.7 },
+    perc: "conga",
+  },
+  techno: {
+    label: "Techno",
+    hint: "kick duro e lungo, clap secco, hat brillanti, rim",
+    kick: { start: 280, knee: 58, end: 46, sweep: 0.03, decay: 0.6, click: 0.45 },
+    clap: { tone: 1650, tail: 0.2, body: 0.3 },
+    hat: { closed: 0.03, open: 0.25, center: 12000, cut: 9500, level: 0.85 },
     perc: "rim",
   },
 };

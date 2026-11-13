@@ -258,3 +258,15 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Tolto PAD / TASTIERA (e il tasto Tab): con il Roll aperto (da 1000 px) le lettere suonano le note dello strumento
   del Roll, nelle altre viste suonano i pad; i pad sullo schermo restano cliccabili sempre. I pulsanti Bass /
   Lead / Chord nella colonna dei pad aprono il Roll di quello strumento. Registra sempre visibile.
+
+## Aggiornamento 13 nov 2026 · suoni nuovi
+
+- Basso (7): Saw, Square, Sub, Reese, Acid, Organ, Pluck. Accordi (6): Pad, Stab, Strings, Organ, E-piano, Pluck
+  (Pad, Strings, Organ ed E-piano tengono fino all'accordo dopo). Lead (8): Saw, Square, Tri, Supersaw, Pluck,
+  Bell, E-piano, Organ. Kit (6): House, 909, 808, Trap, Deep, Techno. Tutto sintetizzato; Bell ed E-piano in FM
+  (un oscillatore che modula la frequenza di un altro, come il DX7).
+- Formato: si estendono i campi di prima (`bassSound.wave`, `chordSound.style`, `leadSound.wave`, `kit`), con nome
+  e descrizione in `BASS_WAVES`, `CHORD_STYLES`, `LEAD_SOUNDS`, `KITS`: i progetti di prima restano uguali.
+  Scegliendo un suono lo si sente subito. Coach (prompt `crea-v16`): quale suono per quale genere.
+- Prova offline: tutti i suoni suonano, nessun valore rotto, picchi sotto -3,5 dB; i Pluck alzati di ~4 dB perché
+  il colpo d'attacco arrivi al livello degli altri suoni dello stesso strumento.

@@ -123,7 +123,9 @@ cd web && npm run dev
    Stereo); pulsante FX nel Mixer.
 2. ~~Tasto REC in alto~~ **fatto il 12 nov**: REC e "Registra" sono lo stesso interruttore (fanno partire il Play).
 3. ~~Vista Accordi~~ **tolta il 12 nov**: accordi e Chord synth nella scheda Chord del Roll.
-4. **Suoni ed effetti nuovi**: altri suoni (synth, kit) e altri plugin (vedi punto 1).
+4. ~~Suoni nuovi~~ **fatti il 13 nov**: basso 7 suoni, accordi 6, lead 8, kit 6 (nomi e descrizioni in
+   `project.ts`: `BASS_WAVES`, `CHORD_STYLES`, `LEAD_SOUNDS`; kit in `kits.ts`). Tastiera senza interruttore:
+   nel Roll suona le note, altrove i pad.
 5. ~~Solo~~ **fatto il 13 nov**: pulsante S nel Mixer, nelle righe del Beat e nel Roll; Ctrl+clic per più canali;
    vale in Pattern e Song, non si salva e non entra nell'export.
 

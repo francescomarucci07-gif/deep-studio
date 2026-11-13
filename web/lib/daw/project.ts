@@ -26,7 +26,16 @@ export const CHORD_TYPES = ["min", "maj", "min7", "maj7", "dom7", "min9", "sus2"
 export type ChordType = (typeof CHORD_TYPES)[number];
 export type Chord = { root: number; type: ChordType };
 export const CHORD_LAYERS = 3; // accordi sovrapposti sullo stesso battito, al massimo
-export type ChordStyle = "pad" | "stab";
+// I suoni degli accordi. "hold" = tiene fino all'accordo dopo (tappeto); gli altri sono colpi o note che si spengono.
+export const CHORD_STYLES = {
+  pad: { label: "Pad", hint: "tappeto lungo e morbido (deep house)", hold: true },
+  stab: { label: "Stab", hint: "colpo corto sul battito (house, tech house)", hold: false },
+  strings: { label: "Strings", hint: "archi lenti e larghi", hold: true },
+  organ: { label: "Organ", hint: "l'organo della house classica anni '90", hold: true },
+  epiano: { label: "E-piano", hint: "piano elettrico tipo Rhodes, caldo", hold: true },
+  pluck: { label: "Pluck", hint: "accordo pizzicato che si spegne subito", hold: false },
+} as const;
+export type ChordStyle = keyof typeof CHORD_STYLES;
 const CHORD_INTERVALS: Record<ChordType, number[]> = {
   min: [0, 3, 7],
   maj: [0, 4, 7],
@@ -70,13 +79,34 @@ export function visibleSlots(p: Project, editing: Slot): Slot[] {
 // Righe del piano roll del basso, dall'alto in basso: da La2 a La1 (MIDI 45 → 33)
 export const BASS_LOW = 33;
 export const BASS_HIGH = 45;
-export type Wave = "sawtooth" | "square";
+// I suoni del basso (il campo si chiama ancora "wave": i progetti di prima avevano solo sawtooth e square)
+export const BASS_WAVES = {
+  sawtooth: { label: "Saw", hint: "dente di sega con filtro: pieno, classico" },
+  square: { label: "Square", hint: "quadra: vuoto e rotondo" },
+  sub: { label: "Sub", hint: "sinusoide pura: solo peso, profondo" },
+  reese: { label: "Reese", hint: "due seghe stonate che girano (deep, tech, dnb)" },
+  acid: { label: "Acid", hint: "filtro risonante che schiocca, stile 303" },
+  organ: { label: "Organ", hint: "basso d'organo della house anni '90" },
+  pluck: { label: "Pluck", hint: "corto e pizzicato" },
+} as const;
+export type Wave = keyof typeof BASS_WAVES;
 export type NoteLength = "corta" | "lunga"; // lunga = la nota tiene fino alla successiva, come un 808
 
 // Melodia (lead): due ottave, da Do4 a Do6 (MIDI 60 → 84)
 export const LEAD_LOW = 60;
 export const LEAD_HIGH = 84;
-export const LEAD_WAVES = ["sawtooth", "square", "triangle"] as const;
+// I suoni del lead
+export const LEAD_SOUNDS = {
+  sawtooth: { label: "Saw", hint: "pieno e brillante" },
+  square: { label: "Square", hint: "vuoto, 8 bit" },
+  triangle: { label: "Tri", hint: "morbido come un flauto" },
+  supersaw: { label: "Supersaw", hint: "7 seghe stonate, larghissimo (progressive)" },
+  pluck: { label: "Pluck", hint: "nota pizzicata che si spegne" },
+  bell: { label: "Bell", hint: "campana metallica (FM)" },
+  epiano: { label: "E-piano", hint: "piano elettrico tipo Rhodes (FM)" },
+  organ: { label: "Organ", hint: "organo, note piene" },
+} as const;
+export const LEAD_WAVES = Object.keys(LEAD_SOUNDS) as (keyof typeof LEAD_SOUNDS)[];
 export const LEAD_VOICES = 6; // il lead è polifonico: fino a 6 note sullo stesso step, come un synth a 6 voci
 export const emptyLead = () => Array.from({ length: STEPS }, () => [] as number[]);
 export type LeadWave = (typeof LEAD_WAVES)[number];
@@ -332,12 +362,12 @@ export function normalize(raw: unknown): Project {
     song,
     kit: isKit(r.kit) ? r.kit : d.kit, // i progetti di prima suonano come prima: house
     bassSound: {
-      wave: r.bassSound?.wave === "square" ? "square" : "sawtooth",
+      wave: (r.bassSound?.wave as string) in BASS_WAVES ? (r.bassSound?.wave as Wave) : "sawtooth",
       cutoff: clamp(r.bassSound?.cutoff, 150, 4000, d.bassSound.cutoff),
       length: r.bassSound?.length === "lunga" ? "lunga" : "corta",
     },
     chordSound: {
-      style: r.chordSound?.style === "stab" ? "stab" : "pad",
+      style: (r.chordSound?.style as string) in CHORD_STYLES ? (r.chordSound?.style as ChordStyle) : "pad",
       cutoff: clamp(r.chordSound?.cutoff, 300, 8000, d.chordSound.cutoff),
     },
     leadSound: {
@@ -396,12 +426,12 @@ export function describe(p: Project, title: string, editing: Slot) {
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
     `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}.`,
     `Kit di batteria: ${KITS[p.kit].label} (${KITS[p.kit].hint}).`,
-    `Accordi: suono ${p.chordSound.style === "pad" ? "pad (tiene fino all'accordo dopo)" : "stab (colpo corto sul battito)"}, filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
-    `Lead: onda ${p.leadSound.wave}, filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}.`,
+    `Accordi: suono ${CHORD_STYLES[p.chordSound.style].label} (${CHORD_STYLES[p.chordSound.style].hint}), filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
+    `Lead: suono ${LEAD_SOUNDS[p.leadSound.wave].label} (${LEAD_SOUNDS[p.leadSound.wave].hint}), filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}.`,
     `Effetti (filtro DJ -1…1: negativo = passa-basso, positivo = passa-alto; riverbero e delay 0…1): ${CHANNEL_IDS.map(
       (id) => `${id} filtro ${p.fx[id].filter.toFixed(2)} (${filterLabel(p.fx[id].filter)}) rev ${p.fx[id].reverb.toFixed(2)} dly ${p.fx[id].delay.toFixed(2)}`,
     ).join("; ")}; master filtro ${p.masterFilter.toFixed(2)} (${filterLabel(p.masterFilter)}).`,
-    `Basso: onda ${p.bassSound.wave === "sawtooth" ? "dente di sega" : "quadra"}, filtro ${Math.round(p.bassSound.cutoff)} Hz, note ${p.bassSound.length === "lunga" ? "lunghe (808)" : "corte"}.`,
+    `Basso: suono ${BASS_WAVES[p.bassSound.wave].label} (${BASS_WAVES[p.bassSound.wave].hint}), filtro ${Math.round(p.bassSound.cutoff)} Hz, note ${p.bassSound.length === "lunga" ? "lunghe (808)" : "corte"}.`,
     "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti). x = colpo, . = vuoto.",
     `Il producer sta modificando il pattern ${editing}.`,
   ];

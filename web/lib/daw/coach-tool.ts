@@ -2,7 +2,7 @@
 // Claude manda step da 1 a 16 e note MIDI; qui diventa un Project valido (normalize scarta il resto).
 // Il coach può chiamarli più volte nella stessa risposta: ogni chiamata parte dal risultato della precedente.
 import type Anthropic from "@anthropic-ai/sdk";
-import { KIT_IDS } from "./kits";
+import { KIT_IDS, KITS } from "./kits";
 import { defaultSlot, INSERT_SLOTS, isPluginType, normalizeSlot, pluginParams, PLUGIN_TYPES, PLUGINS } from "./plugins";
 import {
   AUTO_TARGETS,
@@ -21,6 +21,9 @@ import {
   LEAD_HIGH,
   LEAD_LOW,
   LEAD_WAVES,
+  LEAD_SOUNDS,
+  BASS_WAVES,
+  CHORD_STYLES,
   normalize,
   type Pattern,
   type Project,
@@ -65,10 +68,13 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       kit: {
         type: "string",
         enum: [...KIT_IDS],
-        description:
-          "Kit di batteria (vale per tutto il progetto): house = kick rotondo, clap largo, conga; 909 = kick secco, hat brillanti, rim (tech house, techno); 808 = kick lungo e morbido, cowbell; trap = 808 profondo e lungo, rullante con corpo, hat secchi.",
+        description: `Kit di batteria (vale per tutto il progetto): ${KIT_IDS.map((k) => `${k} = ${KITS[k].hint}`).join("; ")}.`,
       },
-      onda: { type: "string", enum: ["sawtooth", "square"], description: "Timbro del basso." },
+      onda: {
+        type: "string",
+        enum: Object.keys(BASS_WAVES),
+        description: `Suono del basso: ${Object.entries(BASS_WAVES).map(([k, v]) => `${k} = ${v.hint}`).join("; ")}.`,
+      },
       filtro: { type: "number", minimum: 150, maximum: 4000, description: "Cutoff del basso in Hz: basso = scuro e caldo." },
       durata: {
         type: "string",
@@ -91,8 +97,8 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       },
       stile_accordi: {
         type: "string",
-        enum: ["pad", "stab"],
-        description: "pad = tappeto lungo (deep house); stab = colpo corto sul battito (house, tech house).",
+        enum: Object.keys(CHORD_STYLES),
+        description: `Suono degli accordi: ${Object.entries(CHORD_STYLES).map(([k, v]) => `${k} = ${v.hint}`).join("; ")}.`,
       },
       filtro_accordi: { type: "number", minimum: 300, maximum: 8000, description: "Cutoff degli accordi in Hz: basso = morbido." },
       melodia: {
@@ -107,7 +113,11 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
           required: ["step", "nota"],
         },
       },
-      onda_lead: { type: "string", enum: [...LEAD_WAVES], description: "sawtooth = pieno, square = vuoto/8 bit, triangle = morbido." },
+      onda_lead: {
+        type: "string",
+        enum: [...LEAD_WAVES],
+        description: `Suono del lead: ${Object.entries(LEAD_SOUNDS).map(([k, v]) => `${k} = ${v.hint}`).join("; ")}.`,
+      },
       filtro_lead: { type: "number", minimum: 300, maximum: 9000 },
       durata_lead: { type: "string", enum: ["corta", "lunga"], description: "corta = note staccate; lunga = legate." },
 

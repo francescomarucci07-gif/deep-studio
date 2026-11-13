@@ -6,6 +6,7 @@ import {
   AUTO_TARGETS,
   BEATS,
   CHANNEL_IDS,
+  CHORD_STYLES,
   DRUMS,
   STEPS,
   chordNotes,
@@ -294,7 +295,7 @@ export class Graph {
     if (s % 4 === 0) {
       const layers = pat.chords[s / 4];
       if (layers.length) {
-        const beats = p.chordSound.style === "pad" ? this.beatsToNextChord(pat, s / 4) : 0.5;
+        const beats = CHORD_STYLES[p.chordSound.style].hold ? this.beatsToNextChord(pat, s / 4) : 0.5;
         // accordi sovrapposti: ognuno un po' più piano, come per il lead
         for (const c of layers) this.chord(t, c, beats * 4 * stepDur, 1 / Math.sqrt(layers.length));
       }
@@ -485,84 +486,174 @@ export class Graph {
     }
   }
 
+  // un oscillatore che parte a t e si ferma a stop (accorcia il codice dei synth)
+  private osc(type: OscillatorType, freq: number, t: number, stop: number, detune = 0) {
+    const o = this.ctx.createOscillator();
+    o.type = type;
+    o.frequency.value = freq;
+    o.detune.value = detune;
+    o.start(t);
+    o.stop(stop);
+    return o;
+  }
+
+  // FM come un DX7: un oscillatore (modulatore) fa vibrare la frequenza di un altro (portante).
+  // Più "indice" = più armonici metallici; l'indice che scende fa la campana o il "tine" del Rhodes.
+  private fm(freq: number, ratio: number, index: number, decay: number, t: number, stop: number) {
+    const carrier = this.osc("sine", freq, t, stop);
+    const mod = this.osc("sine", freq * ratio, t, stop);
+    const amount = this.ctx.createGain();
+    amount.gain.setValueAtTime(freq * index, t);
+    amount.gain.exponentialRampToValueAtTime(Math.max(0.01, freq * index * 0.05), t + decay);
+    mod.connect(amount).connect(carrier.frequency);
+    return carrier;
+  }
+
+  // Basso: un suono a scelta (BASS_WAVES), sempre monofonico. "lunga" = 808: parte più alto e scende sulla nota.
   private bassNote(t: number, midi: number, dur: number) {
     const { wave, cutoff, length } = this.getProject().bassSound;
     const ctx = this.ctx;
     const freq = mtof(midi);
     const end = t + Math.max(dur, 0.04);
+    const stop = end + 0.03;
     const g = ctx.createGain();
+    const plucked = wave === "pluck";
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(0.5, t + 0.005);
-    g.gain.setValueAtTime(0.5, t + (end - t) * 0.85);
+    if (plucked) {
+      g.gain.exponentialRampToValueAtTime(0.02, Math.min(end, t + 0.35)); // si spegne da solo
+    } else {
+      g.gain.setValueAtTime(0.5, t + (end - t) * 0.85);
+    }
     g.gain.linearRampToValueAtTime(0, end);
     g.connect(this.shaper()).connect(this.channels.bass);
 
-    // timbro: dente di sega o quadra nel filtro, che si apre e si chiude a ogni nota
-    const o = ctx.createOscillator();
-    o.type = wave;
-    const f = this.filter("lowpass", cutoff, 5);
-    f.frequency.setValueAtTime(cutoff * 3, t);
-    f.frequency.exponentialRampToValueAtTime(cutoff, t + 0.09);
-    o.connect(f).connect(g);
-
-    // sub: una sinusoide sulla stessa nota, fuori dal filtro, per il peso sulle casse grandi
-    const sub = ctx.createOscillator();
-    const subGain = ctx.createGain();
-    subGain.gain.value = 0.55;
-    sub.connect(subGain).connect(g);
-
-    for (const osc of [o, sub]) {
-      // l'808 "lungo" parte un po' più alto e scende sulla nota: il colpo tipico della trap
-      if (length === "lunga") {
-        osc.frequency.setValueAtTime(freq * 1.5, t);
-        osc.frequency.exponentialRampToValueAtTime(freq, t + 0.04);
-      } else {
-        osc.frequency.value = freq;
+    const oscs: OscillatorNode[] = [];
+    const add = (o: OscillatorNode, gain: number, to: AudioNode = g) => {
+      const v = ctx.createGain();
+      v.gain.value = gain;
+      o.connect(v).connect(to);
+      oscs.push(o);
+    };
+    // filtro che si apre e chiude a ogni nota (quanto e quanto in fretta dipende dal suono)
+    const envFilter = (q: number, from: number, to: number, time: number) => {
+      const f = this.filter("lowpass", cutoff, q);
+      f.frequency.setValueAtTime(Math.min(18000, from), t);
+      f.frequency.exponentialRampToValueAtTime(Math.max(40, to), t + time);
+      f.connect(g);
+      return f;
+    };
+    if (wave === "sawtooth" || wave === "square") {
+      add(this.osc(wave, freq, t, stop), 1, envFilter(5, cutoff * 3, cutoff, 0.09));
+      add(this.osc("sine", freq, t, stop), 0.55); // sub sotto, fuori dal filtro
+    } else if (wave === "sub") {
+      add(this.osc("sine", freq, t, stop), 1);
+      add(this.osc("sine", freq * 2, t, stop), 0.12); // un filo di seconda armonica: si sente anche sulle casse piccole
+    } else if (wave === "reese") {
+      const f = envFilter(1.5, cutoff * 1.4, cutoff, 0.2);
+      add(this.osc("sawtooth", freq, t, stop, -14), 0.6, f);
+      add(this.osc("sawtooth", freq, t, stop, 14), 0.6, f);
+      add(this.osc("sine", freq, t, stop), 0.5);
+    } else if (wave === "acid") {
+      add(this.osc("sawtooth", freq, t, stop), 0.9, envFilter(14, cutoff * 6, cutoff * 0.8, 0.16));
+      add(this.osc("sine", freq, t, stop), 0.25);
+    } else if (wave === "organ") {
+      // registri d'organo: fondamentale, ottava e quinta sopra, con un piccolo "click" d'attacco
+      const f = envFilter(0.7, cutoff * 2.5, cutoff * 2, 0.05);
+      add(this.osc("sine", freq, t, stop), 0.7, f);
+      add(this.osc("sine", freq * 2, t, stop), 0.35, f);
+      add(this.osc("sine", freq * 3, t, stop), 0.18, f);
+      add(this.osc("square", freq * 4, t, t + 0.012), 0.06, f);
+    } else {
+      // pluck
+      add(this.osc("sawtooth", freq, t, stop), 0.9, envFilter(3, cutoff * 4, cutoff * 0.5, 0.12));
+      add(this.osc("sine", freq, t, stop), 0.45);
+    }
+    if (length === "lunga") {
+      for (const o of oscs) {
+        const f0 = o.frequency.value;
+        o.frequency.setValueAtTime(f0 * 1.5, t);
+        o.frequency.exponentialRampToValueAtTime(f0, t + 0.04);
       }
-      osc.start(t);
-      osc.stop(end + 0.02);
     }
   }
 
-  // Lead: un synth polifonico (una voce per nota). Saw = due oscillatori un po' stonati (pieno), square = vuoto e "8 bit",
-  // triangle = morbido come un flauto. Il filtro si apre all'attacco; un vibrato leggero dopo un attimo.
+  // Lead: polifonico, una voce per nota, un suono a scelta (LEAD_SOUNDS). Il filtro si apre all'attacco;
+  // vibrato leggero sulle note lunghe.
   private leadNote(t: number, midi: number, dur: number, level = 1) {
     const { wave, cutoff } = this.getProject().leadSound;
     const ctx = this.ctx;
+    const freq = mtof(midi);
     const end = t + Math.max(dur, 0.05);
-    const f = this.filter("lowpass", cutoff, 2);
-    f.frequency.setValueAtTime(Math.min(16000, cutoff * 2.2), t);
-    f.frequency.exponentialRampToValueAtTime(cutoff, t + 0.15);
+    const decaying = wave === "pluck" || wave === "bell" || wave === "epiano";
+    const tail = wave === "bell" ? 1.4 : wave === "epiano" ? 0.9 : 0.06; // campane e piani suonano oltre la nota
+    const stop = end + tail + 0.1;
+    const f = this.filter("lowpass", cutoff, wave === "pluck" ? 4 : 2);
+    if (wave === "pluck") {
+      f.frequency.setValueAtTime(Math.min(16000, cutoff * 4), t);
+      f.frequency.exponentialRampToValueAtTime(Math.max(200, cutoff * 0.5), t + 0.18);
+    } else {
+      f.frequency.setValueAtTime(Math.min(16000, cutoff * 2.2), t);
+      f.frequency.exponentialRampToValueAtTime(cutoff, t + 0.15);
+    }
     const g = ctx.createGain();
+    const peak = 0.32 * level;
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.32 * level, t + 0.006);
-    g.gain.setValueAtTime(0.32 * level, end - 0.015);
-    g.gain.linearRampToValueAtTime(0, end + 0.06);
+    g.gain.linearRampToValueAtTime(peak, t + (wave === "organ" ? 0.01 : 0.006));
+    if (decaying) {
+      const half = wave === "pluck" ? 0.25 : wave === "bell" ? 1.2 : 0.8;
+      g.gain.exponentialRampToValueAtTime(peak * 0.02, t + half);
+      g.gain.linearRampToValueAtTime(0, Math.max(t + half, end + tail));
+    } else {
+      g.gain.setValueAtTime(peak, end - 0.015);
+      g.gain.linearRampToValueAtTime(0, end + tail);
+    }
     f.connect(g).connect(this.channels.lead);
 
     const vibrato = ctx.createOscillator();
     vibrato.frequency.value = 5.5;
     const depth = ctx.createGain();
     depth.gain.setValueAtTime(0, t);
-    depth.gain.linearRampToValueAtTime(dur > 0.3 ? 9 : 0, t + 0.25); // cent: solo sulle note lunghe
+    depth.gain.linearRampToValueAtTime(dur > 0.3 && !decaying ? 9 : 0, t + 0.25); // cent: solo sulle note lunghe
     vibrato.connect(depth);
     vibrato.start(t);
-    vibrato.stop(end + 0.1);
+    vibrato.stop(stop);
 
-    for (const detune of wave === "sawtooth" ? [-6, 6] : [0]) {
-      const o = ctx.createOscillator();
-      o.type = wave;
-      o.frequency.value = mtof(midi);
-      o.detune.value = detune;
+    const voice = (o: OscillatorNode, gain: number, pan = 0) => {
+      const v = ctx.createGain();
+      v.gain.value = gain;
       depth.connect(o.detune);
-      o.connect(f);
-      o.start(t);
-      o.stop(end + 0.1);
+      if (pan) {
+        const p = ctx.createStereoPanner();
+        p.pan.value = pan;
+        o.connect(v).connect(p).connect(f);
+      } else o.connect(v).connect(f);
+    };
+    if (wave === "sawtooth") {
+      for (const d of [-6, 6]) voice(this.osc("sawtooth", freq, t, stop, d), 0.7);
+    } else if (wave === "square" || wave === "triangle") {
+      voice(this.osc(wave, freq, t, stop), 1);
+    } else if (wave === "supersaw") {
+      // 7 seghe stonate e aperte nello stereo: il muro dei lead progressive e trance
+      [-25, -15, -7, 0, 7, 15, 25].forEach((d, i) => voice(this.osc("sawtooth", freq, t, stop, d), 0.38, (i - 3) / 4));
+    } else if (wave === "pluck") {
+      // un colpo corto: più voce all'attacco, così il picco arriva al livello degli altri suoni
+      voice(this.osc("sawtooth", freq, t, stop), 1.3);
+      voice(this.osc("square", freq * 2, t, stop), 0.25);
+    } else if (wave === "bell") {
+      voice(this.fm(freq, 3.5, 4, 1.2, t, stop), 0.9);
+    } else if (wave === "epiano") {
+      voice(this.fm(freq, 1, 2.2, 0.5, t, stop), 0.9);
+      voice(this.fm(freq, 14, 0.35, 0.06, t, stop), 0.25); // il "tine": un tocco metallico all'attacco
+    } else {
+      // organ
+      voice(this.osc("sine", freq, t, stop), 0.6);
+      voice(this.osc("sine", freq * 2, t, stop), 0.35);
+      voice(this.osc("sine", freq * 4, t, stop), 0.15);
     }
   }
 
-  // Accordo: per ogni nota due oscillatori dente di sega un po' stonati tra loro e aperti a destra
-  // e sinistra (il "chorus" dei synth analogici), poi un filtro. Pad = attacco lento; stab = colpo corto.
+  // Accordo: un suono a scelta (CHORD_STYLES) per tutte le note. I suoni "hold" tengono fino al prossimo accordo.
   private chord(t: number, c: Chord, dur: number, level = 1) {
     const { style, cutoff } = this.getProject().chordSound;
     const ctx = this.ctx;
@@ -570,33 +661,50 @@ export class Graph {
     const f = this.filter("lowpass", cutoff, 0.8);
     const g = ctx.createGain();
     const peak = (0.3 / Math.sqrt(notes.length)) * level;
-    const attack = style === "pad" ? 0.18 : 0.004;
-    const release = style === "pad" ? 0.35 : 0.12;
+    const attack = style === "pad" ? 0.18 : style === "strings" ? 0.35 : style === "organ" ? 0.008 : 0.004;
+    const release = style === "pad" ? 0.35 : style === "strings" ? 0.6 : style === "epiano" ? 0.4 : 0.12;
     const end = t + Math.max(dur, attack + 0.05);
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(peak, t + attack);
-    if (style === "pad") {
+    if (style === "stab" || style === "pluck") {
+      // lo stab "si chiude": il filtro scende subito, come un accordo pizzicato
+      f.frequency.setValueAtTime(cutoff * (style === "pluck" ? 4 : 2.5), t);
+      f.frequency.exponentialRampToValueAtTime(Math.max(200, cutoff * (style === "pluck" ? 0.4 : 0.6)), t + 0.18);
+      g.gain.exponentialRampToValueAtTime(peak * (style === "pluck" ? 0.05 : 0.25), end - 0.01);
+    } else if (style === "epiano") {
+      f.frequency.setValueAtTime(cutoff * 1.5, t);
+      g.gain.exponentialRampToValueAtTime(peak * 0.15, Math.max(t + 0.1, Math.min(end, t + 2.5))); // si spegne piano
+    } else {
       f.frequency.setValueAtTime(cutoff, t);
       g.gain.setValueAtTime(peak, end - 0.02);
-    } else {
-      // lo stab "si chiude": il filtro scende subito, come un accordo pizzicato
-      f.frequency.setValueAtTime(cutoff * 2.5, t);
-      f.frequency.exponentialRampToValueAtTime(Math.max(200, cutoff * 0.6), t + 0.18);
-      g.gain.exponentialRampToValueAtTime(peak * 0.25, end - 0.01);
     }
     g.gain.linearRampToValueAtTime(0, end + release);
     f.connect(g).connect(this.channels.chords);
+    const stop = end + release + 0.05;
     for (const n of notes) {
-      for (const side of [-1, 1]) {
-        const o = ctx.createOscillator();
-        o.type = "sawtooth";
-        o.frequency.value = mtof(n);
-        o.detune.value = 7 * side;
-        const pan = ctx.createStereoPanner();
-        pan.pan.value = 0.35 * side;
-        o.connect(pan).connect(f);
-        o.start(t);
-        o.stop(end + release + 0.05);
+      const freq = mtof(n);
+      const voice = (o: OscillatorNode, gain: number, pan = 0) => {
+        const v = ctx.createGain();
+        v.gain.value = gain;
+        const p = ctx.createStereoPanner();
+        p.pan.value = pan;
+        o.connect(v).connect(p).connect(f);
+      };
+      if (style === "pad" || style === "stab") {
+        // due seghe un po' stonate e aperte a destra e sinistra (il "chorus" dei synth analogici)
+        for (const side of [-1, 1]) voice(this.osc("sawtooth", freq, t, stop, 7 * side), 1, 0.35 * side);
+      } else if (style === "strings") {
+        for (const [d, pan] of [[-11, -0.5], [0, 0], [11, 0.5]]) voice(this.osc("sawtooth", freq, t, stop, d), 0.75, pan);
+      } else if (style === "organ") {
+        voice(this.osc("sine", freq, t, stop), 0.9);
+        voice(this.osc("sine", freq * 2, t, stop), 0.5, -0.2);
+        voice(this.osc("sine", freq * 4, t, stop), 0.25, 0.2);
+      } else if (style === "epiano") {
+        voice(this.fm(freq, 1, 2, 0.6, t, stop), 1.2);
+        voice(this.fm(freq, 14, 0.3, 0.05, t, stop), 0.3);
+      } else {
+        // pluck (più forte all'attacco: si spegne subito)
+        for (const side of [-1, 1]) voice(this.osc("sawtooth", freq, t, stop, 5 * side), 1.45, 0.3 * side);
       }
     }
   }

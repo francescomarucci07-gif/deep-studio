@@ -129,7 +129,22 @@ export type Pattern = {
   bass: (number | null)[]; // una nota MIDI per step, oppure null
   chords: Chord[][]; // per ogni battito gli accordi che suonano insieme (vuoto = continua quello prima o niente), max 3
   lead: number[][]; // la melodia: per ogni step le note MIDI che suonano insieme (vuoto = niente), max 6
+  sounds?: Sounds; // il suono proprio di questo pattern (basso, accordi, lead); manca = quello del progetto
 };
+
+// I suoni dei synth. Il progetto ha un suono "di base" per strumento; un pattern può averne uno suo,
+// come in FL quando cloni un canale per dare a un pattern un timbro diverso.
+export type BassSound = { wave: Wave; cutoff: number; length: NoteLength };
+export type ChordSound = { style: ChordStyle; cutoff: number };
+export type LeadSound = { wave: LeadWave; cutoff: number; length: NoteLength };
+export type SoundInst = "bass" | "chords" | "lead";
+export type Sounds = { bass?: BassSound; chords?: ChordSound; lead?: LeadSound };
+export const SOUND_KEY = { bass: "bassSound", chords: "chordSound", lead: "leadSound" } as const;
+
+// il suono con cui suona uno strumento in un pattern
+export function soundOf<K extends SoundInst>(p: Project, pat: Pattern, k: K): Required<Sounds>[K] {
+  return (pat.sounds?.[k] ?? p[SOUND_KEY[k]]) as Required<Sounds>[K];
+}
 
 export type Project = {
   version: 2;
@@ -138,9 +153,9 @@ export type Project = {
   patterns: Record<Slot, Pattern>;
   song: (Slot | null)[]; // da MIN_SONG_BARS a MAX_SONG_BARS battute; null = battuta vuota
   kit: KitId; // il timbro della batteria (kits.ts)
-  bassSound: { wave: Wave; cutoff: number; length: NoteLength };
-  chordSound: { style: ChordStyle; cutoff: number };
-  leadSound: { wave: LeadWave; cutoff: number; length: NoteLength };
+  bassSound: BassSound; // suoni di base: valgono nei pattern senza suono proprio
+  chordSound: ChordSound;
+  leadSound: LeadSound;
   fx: Record<ChannelId, ChannelFx>;
   masterFilter: number; // -1…1, come i filtri dei canali
   automation: Partial<Record<AutoTarget, Lane>>;
@@ -264,9 +279,9 @@ export function starterProject(): Project {
     },
     song: ["A", "A", "A", "A", ...Array(MIN_SONG_BARS - 4).fill(null)],
     kit: "house",
-    bassSound: { wave: "sawtooth", cutoff: 700, length: "corta" },
-    chordSound: { style: "pad", cutoff: 1800 },
-    leadSound: { wave: "sawtooth", cutoff: 2600, length: "corta" },
+    bassSound: { ...DEFAULT_BASS },
+    chordSound: { ...DEFAULT_CHORDS },
+    leadSound: { ...DEFAULT_LEAD },
     fx: {
       kick: { filter: 0, reverb: 0, delay: 0 },
       clap: { filter: 0, reverb: 0.22, delay: 0 },
@@ -297,14 +312,50 @@ export function starterProject(): Project {
 const clamp = (v: unknown, lo: number, hi: number, d: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
 
+const DEFAULT_BASS: BassSound = { wave: "sawtooth", cutoff: 700, length: "corta" };
+const DEFAULT_CHORDS: ChordSound = { style: "pad", cutoff: 1800 };
+const DEFAULT_LEAD: LeadSound = { wave: "sawtooth", cutoff: 2600, length: "corta" };
+
+function normBass(raw: unknown, d = DEFAULT_BASS): BassSound {
+  const r = (raw ?? {}) as Partial<BassSound>;
+  return {
+    wave: (r.wave as string) in BASS_WAVES ? (r.wave as Wave) : d.wave,
+    cutoff: clamp(r.cutoff, 150, 4000, d.cutoff),
+    length: r.length === "lunga" ? "lunga" : "corta",
+  };
+}
+function normChords(raw: unknown, d = DEFAULT_CHORDS): ChordSound {
+  const r = (raw ?? {}) as Partial<ChordSound>;
+  return {
+    style: (r.style as string) in CHORD_STYLES ? (r.style as ChordStyle) : d.style,
+    cutoff: clamp(r.cutoff, 300, 8000, d.cutoff),
+  };
+}
+function normLead(raw: unknown, d = DEFAULT_LEAD): LeadSound {
+  const r = (raw ?? {}) as Partial<LeadSound>;
+  return {
+    wave: LEAD_WAVES.includes(r.wave as LeadWave) ? (r.wave as LeadWave) : d.wave,
+    cutoff: clamp(r.cutoff, 300, 9000, d.cutoff),
+    length: r.length === "lunga" ? "lunga" : "corta",
+  };
+}
+
 function normalizePattern(raw: unknown): Pattern {
   const r = (raw && typeof raw === "object" ? raw : {}) as Partial<Pattern>;
   const steps = (a: unknown) => Array.from({ length: STEPS }, (_, i) => (Array.isArray(a) ? a[i] === true : false));
+  // il suono proprio solo per gli strumenti che ce l'hanno: gli altri seguono il progetto
+  const o = (r.sounds && typeof r.sounds === "object" ? r.sounds : {}) as Sounds;
+  const sounds: Sounds = {
+    ...(o.bass ? { bass: normBass(o.bass) } : {}),
+    ...(o.chords ? { chords: normChords(o.chords) } : {}),
+    ...(o.lead ? { lead: normLead(o.lead) } : {}),
+  };
   return {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(r.drums?.[id])])) as Pattern["drums"],
     bass: notes(r.bass, BASS_LOW, BASS_HIGH),
     chords: Array.from({ length: BEATS }, (_, i) => chordLayers(Array.isArray(r.chords) ? r.chords[i] : null)),
     lead: leadNotes(r.lead),
+    ...(Object.keys(sounds).length ? { sounds } : {}),
   };
 }
 
@@ -361,20 +412,9 @@ export function normalize(raw: unknown): Project {
     patterns,
     song,
     kit: isKit(r.kit) ? r.kit : d.kit, // i progetti di prima suonano come prima: house
-    bassSound: {
-      wave: (r.bassSound?.wave as string) in BASS_WAVES ? (r.bassSound?.wave as Wave) : "sawtooth",
-      cutoff: clamp(r.bassSound?.cutoff, 150, 4000, d.bassSound.cutoff),
-      length: r.bassSound?.length === "lunga" ? "lunga" : "corta",
-    },
-    chordSound: {
-      style: (r.chordSound?.style as string) in CHORD_STYLES ? (r.chordSound?.style as ChordStyle) : "pad",
-      cutoff: clamp(r.chordSound?.cutoff, 300, 8000, d.chordSound.cutoff),
-    },
-    leadSound: {
-      wave: LEAD_WAVES.includes(r.leadSound?.wave as LeadWave) ? (r.leadSound?.wave as LeadWave) : d.leadSound.wave,
-      cutoff: clamp(r.leadSound?.cutoff, 300, 9000, d.leadSound.cutoff),
-      length: r.leadSound?.length === "lunga" ? "lunga" : "corta",
-    },
+    bassSound: normBass(r.bassSound),
+    chordSound: normChords(r.chordSound),
+    leadSound: normLead(r.leadSound),
     fx: Object.fromEntries(
       CHANNEL_IDS.map((id) => {
         const f = r.fx?.[id];
@@ -426,6 +466,7 @@ export function describe(p: Project, title: string, editing: Slot) {
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
     `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}.`,
     `Kit di batteria: ${KITS[p.kit].label} (${KITS[p.kit].hint}).`,
+    "Suoni dei synth: quelli qui sotto sono i suoni di base; un pattern con un suono proprio lo dice nella sua scheda.",
     `Accordi: suono ${CHORD_STYLES[p.chordSound.style].label} (${CHORD_STYLES[p.chordSound.style].hint}), filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
     `Lead: suono ${LEAD_SOUNDS[p.leadSound.wave].label} (${LEAD_SOUNDS[p.leadSound.wave].hint}), filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}.`,
     `Effetti (filtro DJ -1…1: negativo = passa-basso, positivo = passa-alto; riverbero e delay 0…1): ${CHANNEL_IDS.map(
@@ -448,6 +489,15 @@ export function describe(p: Project, title: string, editing: Slot) {
     lines.push(`  Accordi   ${pat.chords.map((c, b) => `battito ${b + 1}: ${c.length ? c.map(chordName).join(" + ") : "-"}`).join(", ")}`);
     const lead = pat.lead.map((n, i) => (n.length ? `${i + 1}:${n.map(noteName).join("+")}` : null)).filter(Boolean);
     lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
+    const own = pat.sounds;
+    if (own) {
+      const parts = [
+        own.bass && `basso ${BASS_WAVES[own.bass.wave].label} (filtro ${Math.round(own.bass.cutoff)} Hz, ${own.bass.length})`,
+        own.chords && `accordi ${CHORD_STYLES[own.chords.style].label} (filtro ${Math.round(own.chords.cutoff)} Hz)`,
+        own.lead && `lead ${LEAD_SOUNDS[own.lead.wave].label} (filtro ${Math.round(own.lead.cutoff)} Hz, ${own.lead.length})`,
+      ].filter(Boolean);
+      lines.push(`  Suono proprio di questo pattern: ${parts.join("; ")}`);
+    }
   }
   // la canzone a righe da 16 battute (le pagine della playlist), più facile da leggere
   lines.push(

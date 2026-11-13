@@ -270,3 +270,16 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   Scegliendo un suono lo si sente subito. Coach (prompt `crea-v16`): quale suono per quale genere.
 - Prova offline: tutti i suoni suonano, nessun valore rotto, picchi sotto -3,5 dB; i Pluck alzati di ~4 dB perché
   il colpo d'attacco arrivi al livello degli altri suoni dello stesso strumento.
+
+## Aggiornamento 13 nov 2026 · suono per pattern
+
+- Ogni pattern può avere un suono proprio per basso, accordi e lead (campo facoltativo `patterns.X.sounds`).
+  Se manca, il pattern usa il suono di base del progetto (`bassSound`, `chordSound`, `leadSound`), quindi i
+  progetti di prima restano uguali. `soundOf(progetto, pattern, strumento)` dice con che suono suona.
+- Interfaccia: nel synth del Roll l'interruttore **Tutti / Solo X**. "Solo X" copia il suono di base nel pattern,
+  da lì cambia solo lì; "Tutti" toglie il suono proprio. Il Roll ha anche i pulsanti dei pattern, per passare da
+  uno all'altro senza tornare al Beat. Svuota e Duplica tengono il suono del pattern.
+- Coach (`crea-v17`): `scrivi_pattern` con `suoni_solo_qui` scrive il suono proprio del pattern; riscrivere un
+  pattern non gli toglie il suono proprio.
+- Alternativa scartata: canali in più (Lead 2, Lead 3) come in FL. Più flessibile, ma raddoppia mixer, insert e
+  automazioni; il suono per pattern copre il caso chiesto ("questo lead suona diverso in questo pattern").

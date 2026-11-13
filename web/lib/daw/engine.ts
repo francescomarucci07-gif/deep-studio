@@ -97,10 +97,11 @@ export class Engine {
     this.graph.setSolo(ids);
   }
 
-  async preview(id: ChannelId, opts: { note?: number; chord?: Chord } = {}) {
+  // senza slot suona con il suono del pattern che stai modificando
+  async preview(id: ChannelId, opts: { note?: number; chord?: Chord; slot?: Slot } = {}) {
     await this.ready;
     await this.ctx.resume();
-    this.graph.preview(id, this.ctx.currentTime + 0.01, opts);
+    this.graph.preview(id, this.ctx.currentTime + 0.01, { ...opts, slot: opts.slot ?? this.getPlayback().editing });
   }
 
   private tick() {

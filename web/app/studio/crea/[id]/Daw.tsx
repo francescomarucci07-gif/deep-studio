@@ -38,6 +38,10 @@ import {
   songSeconds,
   filterLabel,
   laneValue,
+  soundOf,
+  SOUND_KEY,
+  type SoundInst,
+  type Sounds,
   type AutoTarget,
   type ChannelFx,
   type ChannelId,
@@ -311,7 +315,7 @@ export function Daw({
         const root = keyRoot(code);
         if (root === null) return false;
         const chord: Chord = { root, type: k.keyChord };
-        void engine().preview("chords", { chord });
+        void engine().preview("chords", { chord, slot: slot || undefined });
         setLastKey(chordName(chord));
         lightKey("chords", root);
         if (recording) {
@@ -327,7 +331,7 @@ export function Daw({
         const inst = k.keyInst;
         const note = keyNote(code, inst, k.octaves[inst]);
         if (note === null) return false;
-        void engine().preview(inst, { note });
+        void engine().preview(inst, { note, slot: slot || undefined });
         setLastKey(noteName(note));
         lightKey(inst, note);
         if (recording) {
@@ -350,6 +354,54 @@ export function Daw({
     },
     [engine, rec, update, lightKey],
   );
+  // I suoni dei synth del pattern che modifichi: il suo, se ce l'ha, altrimenti quello di base del progetto
+  const editPat = project.patterns[editing];
+  const bassS = soundOf(project, editPat, "bass");
+  const leadS = soundOf(project, editPat, "lead");
+  const chordS = soundOf(project, editPat, "chords");
+  // una modifica al suono va dove suona: nel suono proprio del pattern o in quello di base
+  const setSound = <K extends SoundInst>(k: K, fn: (x: Required<Sounds>[K]) => void) =>
+    update((p) => fn(soundOf(p, p.patterns[editing], k)));
+  // "Solo X": il pattern prende una copia del suono di base e da lì in poi va per conto suo.
+  // "Tutti": il pattern lascia il suo e torna a quello di base.
+  const setOwnSound = (k: SoundInst, own: boolean) =>
+    update((p) => {
+      const pat = p.patterns[editing];
+      if (own) pat.sounds = { ...pat.sounds, [k]: structuredClone(p[SOUND_KEY[k]]) } as Sounds;
+      else if (pat.sounds) {
+        delete pat.sounds[k];
+        if (Object.keys(pat.sounds).length === 0) delete pat.sounds;
+      }
+    });
+  const soundScope = (k: SoundInst) => {
+    const own = !!editPat.sounds?.[k];
+    const others = SLOTS.filter((x) => x !== editing && project.patterns[x].sounds?.[k]);
+    return (
+      <div className="hw-seg hw-scope" role="group" aria-label="Dove vale questo suono">
+        <button
+          type="button"
+          className="hw-btn hw-btn--small"
+          aria-pressed={!own}
+          title={`Suono di base: vale in tutti i pattern senza un suono proprio${others.length ? ` (ce l'hanno: ${others.join(", ")})` : ""}`}
+          onClick={() => own && setOwnSound(k, false)}
+        >
+          <span className="hw-btn-led" />
+          Tutti
+        </button>
+        <button
+          type="button"
+          className="hw-btn hw-btn--small"
+          aria-pressed={own}
+          title={`Suono proprio del pattern ${editing}: cambia solo qui`}
+          onClick={() => !own && setOwnSound(k, true)}
+        >
+          <span className="hw-btn-led" />
+          Solo {editing}
+        </button>
+        {others.length > 0 && <span className="hw-scope-note">proprio: {others.join(" ")}</span>}
+      </div>
+    );
+  };
   // scegli un suono e lo senti subito (dopo che React ha aggiornato il progetto che il motore legge)
   const tryOut = (c: "bass" | "lead" | "chords") => setTimeout(() => !engineRef.current?.playing && hitPad(c), 30);
   const shiftOctave = (d: number) => {
@@ -677,7 +729,7 @@ export function Daw({
   const clearPattern = () => {
     if (isEmptyPattern(pat) || !window.confirm(`Svuoto il pattern ${editing}?`)) return;
     update((p) => {
-      p.patterns[editing] = emptyPattern();
+      p.patterns[editing] = { ...emptyPattern(), ...(p.patterns[editing].sounds ? { sounds: p.patterns[editing].sounds } : {}) };
     });
   };
   // canzone come la playlist di FL: clic = metti il pattern del pennello, clic sullo stesso = svuota
@@ -686,6 +738,23 @@ export function Daw({
       p.song[b] = p.song[b] === brush ? null : brush;
     });
   const shown = visibleSlots(project, editing);
+  // i pulsanti dei pattern: nel Beat e nel Roll (per cambiare pattern senza uscire dal Roll)
+  const patternButtons = shown.map((s) => (
+    <button
+      key={s}
+      type="button"
+      data-c={slotColor(s)}
+      className="hw-btn hw-btn--small hw-btn--slot"
+      aria-pressed={editing === s}
+      data-playing={playingSlot === s}
+      data-empty={isEmptyPattern(project.patterns[s])}
+      title={`Pattern ${s}${project.patterns[s].sounds ? " · ha un suono proprio" : ""}`}
+      onClick={() => setEditing(s)}
+    >
+      <span className="hw-btn-led" />
+      {s}
+    </button>
+  ));
   // la spia del limiter si aggiorna a ogni step mentre suona
   const limiterDb = playing && step >= 0 ? (engineRef.current?.limiterDb ?? 0) : 0;
 
@@ -856,14 +925,15 @@ export function Daw({
               </div>
             </div>
             <div className="hw-keys" role="group" aria-label="Tastiera del computer">
-              {/* un clic apre il Roll di quello strumento: da lì la tastiera suona le sue note */}
+              {/* un clic apre il Roll di quello strumento: da lì la tastiera suona le sue note.
+                  Nel Roll lo strumento si sceglie in alto nel Roll: qui sparisce e la colonna resta corta */}
+              {keyMode !== "keys" && (
               <div className="hw-seg" role="group" aria-label="Strumento della tastiera">
                 {(["bass", "lead", "chords"] as const).map((k) => (
                   <button
                     key={k}
                     type="button"
                     className="hw-btn hw-btn--small"
-                    aria-pressed={keyMode === "keys" && keyInst === k}
                     title={`Apre il Roll di ${k === "chords" ? "Chord" : k === "bass" ? "Bass" : "Lead"}: la tastiera ne suona le note (Z X C V B N M = Do Re Mi Fa Sol La Si, S D G H J = diesis, Q W E R T Y U = ottava sopra)`}
                     onClick={() => {
                       setRoll(k);
@@ -874,6 +944,7 @@ export function Daw({
                   </button>
                 ))}
               </div>
+              )}
               {keyMode === "keys" && (
                 <div className="hw-keys-row">
                   {keyInst === "chords" ? (
@@ -1101,21 +1172,7 @@ export function Daw({
             <div className="hw-seq-head">
               <h2 className="hw-title">Step sequencer · Pattern {editing}</h2>
               <div className="hw-patterns" role="group" aria-label="Pattern da modificare">
-                {shown.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    data-c={slotColor(s)}
-                    className="hw-btn hw-btn--small hw-btn--slot"
-                    aria-pressed={editing === s}
-                    data-playing={playingSlot === s}
-                    data-empty={isEmptyPattern(project.patterns[s])}
-                    onClick={() => setEditing(s)}
-                  >
-                    <span className="hw-btn-led" />
-                    {s}
-                  </button>
-                ))}
+                {patternButtons}
                 <button type="button" className="hw-btn hw-btn--small" disabled={!firstFree} onClick={duplicate}>
                   Duplica{firstFree ? ` → ${firstFree}` : ""}
                 </button>
@@ -1628,8 +1685,11 @@ export function Daw({
           >
             <div className="hw-seq-head">
               <h2 className="hw-title">
-                Piano roll · {ROLL_TABS.find((t) => t.id === roll)?.label} · Pattern {editing}
+                Piano roll · {ROLL_TABS.find((t) => t.id === roll)?.label}
               </h2>
+              <div className="hw-patterns hw-roll-patterns" role="group" aria-label="Pattern nel piano roll">
+                {patternButtons}
+              </div>
               <div className="hw-patterns" role="group" aria-label="Strumento nel piano roll">
                 {ROLL_TABS.map((r) => (
                   <button
@@ -1761,18 +1821,21 @@ export function Daw({
                 </p>
             <div className="hw-synths">
               <div className="hw-strip hw-strip--synth hw-strip--chords">
-                <span className="hw-label">Chord synth</span>
+                <div className="hw-synth-head">
+                  <span className="hw-label">Chord synth</span>
+                  {soundScope("chords")}
+                </div>
                 <div className="hw-seg">
                   {(Object.keys(CHORD_STYLES) as ChordStyle[]).map((st) => (
                     <button
                       key={st}
                       type="button"
                       className="hw-btn hw-btn--small"
-                      aria-pressed={project.chordSound.style === st}
+                      aria-pressed={chordS.style === st}
                       title={CHORD_STYLES[st].hint}
                       onClick={() => {
-                        update((p) => {
-                          p.chordSound.style = st;
+                        setSound("chords", (x) => {
+                          x.style = st;
                         });
                         tryOut("chords");
                       }}
@@ -1784,15 +1847,15 @@ export function Daw({
                 </div>
                 <Knob
                   label="Cutoff"
-                  value={project.chordSound.cutoff}
+                  value={chordS.cutoff}
                   min={300}
                   max={8000}
                   step={10}
                   defaultValue={1800}
-                  display={`${Math.round(project.chordSound.cutoff)} Hz`}
+                  display={`${Math.round(chordS.cutoff)} Hz`}
                   onChange={(v) =>
-                    update((p) => {
-                      p.chordSound.cutoff = v;
+                    setSound("chords", (x) => {
+                      x.cutoff = v;
                     })
                   }
                 />
@@ -1804,18 +1867,34 @@ export function Daw({
             <div className="hw-synths">
               {roll === "bass" ? (
                   <div className="hw-strip hw-strip--synth">
-                    <span className="hw-label">Bass synth</span>
+                    <div className="hw-synth-head">
+                      <span className="hw-label">Bass synth</span>
+                      {soundScope("bass")}
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small"
+                        aria-pressed={bassS.length === "lunga"}
+                        onClick={() =>
+                          setSound("bass", (x) => {
+                            x.length = x.length === "lunga" ? "corta" : "lunga";
+                          })
+                        }
+                      >
+                        <span className="hw-btn-led" />
+                        808 long
+                      </button>
+                    </div>
                     <div className="hw-seg">
                       {(Object.keys(BASS_WAVES) as Wave[]).map((w) => (
                         <button
                           key={w}
                           type="button"
                           className="hw-btn hw-btn--small"
-                          aria-pressed={project.bassSound.wave === w}
+                          aria-pressed={bassS.wave === w}
                           title={BASS_WAVES[w].hint}
                           onClick={() => {
-                            update((p) => {
-                              p.bassSound.wave = w;
+                            setSound("bass", (x) => {
+                              x.wave = w;
                             });
                             tryOut("bass");
                           }}
@@ -1827,46 +1906,49 @@ export function Daw({
                     </div>
                     <Knob
                       label="Cutoff"
-                      value={project.bassSound.cutoff}
+                      value={bassS.cutoff}
                       min={150}
                       max={4000}
                       step={10}
                       defaultValue={700}
-                      display={`${Math.round(project.bassSound.cutoff)} Hz`}
+                      display={`${Math.round(bassS.cutoff)} Hz`}
                       onChange={(v) =>
-                        update((p) => {
-                          p.bassSound.cutoff = v;
+                        setSound("bass", (x) => {
+                          x.cutoff = v;
                         })
                       }
                     />
-                    <button
-                      type="button"
-                      className="hw-btn hw-btn--small"
-                      aria-pressed={project.bassSound.length === "lunga"}
-                      onClick={() =>
-                        update((p) => {
-                          p.bassSound.length = p.bassSound.length === "lunga" ? "corta" : "lunga";
-                        })
-                      }
-                    >
-                      <span className="hw-btn-led" />
-                      808 long
-                    </button>
                   </div>
               ) : (
                   <div className="hw-strip hw-strip--synth hw-strip--chords hw-strip--lead">
-                    <span className="hw-label">Lead synth</span>
+                    <div className="hw-synth-head">
+                      <span className="hw-label">Lead synth</span>
+                      {soundScope("lead")}
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small"
+                        aria-pressed={leadS.length === "lunga"}
+                        onClick={() =>
+                          setSound("lead", (x) => {
+                            x.length = x.length === "lunga" ? "corta" : "lunga";
+                          })
+                        }
+                      >
+                        <span className="hw-btn-led" />
+                        Legato
+                      </button>
+                    </div>
                     <div className="hw-seg">
                       {LEAD_WAVES.map((w) => (
                         <button
                           key={w}
                           type="button"
                           className="hw-btn hw-btn--small"
-                          aria-pressed={project.leadSound.wave === w}
+                          aria-pressed={leadS.wave === w}
                           title={LEAD_SOUNDS[w].hint}
                           onClick={() => {
-                            update((p) => {
-                              p.leadSound.wave = w;
+                            setSound("lead", (x) => {
+                              x.wave = w;
                             });
                             tryOut("lead");
                           }}
@@ -1878,31 +1960,18 @@ export function Daw({
                     </div>
                     <Knob
                         label="Cutoff"
-                        value={project.leadSound.cutoff}
+                        value={leadS.cutoff}
                         min={300}
                         max={9000}
                         step={10}
                         defaultValue={2600}
-                        display={`${Math.round(project.leadSound.cutoff)} Hz`}
+                        display={`${Math.round(leadS.cutoff)} Hz`}
                         onChange={(v) =>
-                          update((p) => {
-                            p.leadSound.cutoff = v;
+                          setSound("lead", (x) => {
+                            x.cutoff = v;
                           })
                         }
                       />
-                    <button
-                      type="button"
-                      className="hw-btn hw-btn--small"
-                      aria-pressed={project.leadSound.length === "lunga"}
-                      onClick={() =>
-                        update((p) => {
-                          p.leadSound.length = p.leadSound.length === "lunga" ? "corta" : "lunga";
-                        })
-                      }
-                    >
-                      <span className="hw-btn-led" />
-                      Legato
-                    </button>
                   </div>
               )}
             </div>

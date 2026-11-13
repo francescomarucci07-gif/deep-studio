@@ -128,6 +128,8 @@ cd web && npm run dev
    nel Roll suona le note, altrove i pad.
 5. ~~Solo~~ **fatto il 13 nov**: pulsante S nel Mixer, nelle righe del Beat e nel Roll; Ctrl+clic per più canali;
    vale in Pattern e Song, non si salva e non entra nell'export.
+6. ~~Suono per pattern~~ **fatto il 13 nov**: interruttore Tutti / Solo X nei synth del Roll (`patterns.X.sounds`,
+   `soundOf()` in `project.ts`); pulsanti dei pattern anche nel Roll.
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

@@ -1702,6 +1702,23 @@ ol.ds-led-row {
   padding: var(--ds-space-2) var(--ds-space-3);
 }
 
+/* dove vale il suono: Tutti i pattern / Solo questo pattern */
+.hw-synth-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.hw-scope {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.hw-scope-note {
+  color: var(--hw-print);
+  font: 500 11px var(--ds-font-mono);
+  opacity: 0.75;
+}
+
 /* piano roll nella console */
 .hw-roll-panel .daw-key {
   background: var(--hw-print);
@@ -2092,7 +2109,7 @@ ol.ds-led-row {
   }
   .console-side .hw-pad {
     aspect-ratio: auto;
-    min-height: clamp(36px, calc((100dvh - 520px) / 3), 92px);
+    min-height: clamp(30px, calc((100dvh - 560px) / 3), 92px);
   }
   /* sul computer la spiegazione dei tasti è nel tooltip dei pulsanti: la colonna resta corta */
   .console-side .hw-keys-map {
@@ -2139,5 +2156,12 @@ ol.ds-led-row {
   }
   .hw-btn--rec[aria-pressed="true"] .hw-btn-led {
     animation: none;
+  }
+}
+
+/* computer con la colonna centrale stretta: nel Roll il titolo ripete i pulsanti, lo tolgo per stare su una riga */
+@media (min-width: 1000px) and (max-width: 1250px) {
+  .hw-roll-panel .hw-seq-head .hw-title {
+    display: none;
   }
 }

@@ -12,7 +12,12 @@ import {
   chordNotes,
   filterFreqs,
   laneValue,
+  soundOf,
   type AutoTarget,
+  type BassSound,
+  type ChordSound,
+  type LeadSound,
+  type Slot,
   type ChannelId,
   type Chord,
   type DrumId,
@@ -279,34 +284,39 @@ export class Graph {
     const p = this.getProject();
     for (const { id } of DRUMS) if (pat.drums[id][s]) this.drum(id, t);
     if (pat.drums.kick[s] && p.sidechain) this.sidechain(t, stepDur);
+    // ogni pattern suona con il suo suono, se ce l'ha, altrimenti con quello del progetto
+    const bs = soundOf(p, pat, "bass"), ls = soundOf(p, pat, "lead"), cs = soundOf(p, pat, "chords");
     const n = pat.bass[s];
     if (n !== null) {
-      const len = p.bassSound.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
-      this.bassNote(t, n, stepDur * len);
+      const len = bs.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
+      this.bassNote(t, n, stepDur * len, bs);
     }
     const chord = pat.lead[s];
     if (chord.length) {
       const line = pat.lead.map((n) => (n.length ? n[0] : null));
-      const len = p.leadSound.length === "lunga" ? this.stepsToNext(line, s) - 0.05 : 0.8;
+      const len = ls.length === "lunga" ? this.stepsToNext(line, s) - 0.05 : 0.8;
       // più voci insieme: ognuna un po' più piano, così un accordo non è 4 volte più forte di una nota
       const level = 1 / Math.sqrt(chord.length);
-      for (const m of chord) this.leadNote(t, m, stepDur * len, level);
+      for (const m of chord) this.leadNote(t, m, stepDur * len, ls, level);
     }
     if (s % 4 === 0) {
       const layers = pat.chords[s / 4];
       if (layers.length) {
-        const beats = CHORD_STYLES[p.chordSound.style].hold ? this.beatsToNextChord(pat, s / 4) : 0.5;
+        const beats = CHORD_STYLES[cs.style].hold ? this.beatsToNextChord(pat, s / 4) : 0.5;
         // accordi sovrapposti: ognuno un po' più piano, come per il lead
-        for (const c of layers) this.chord(t, c, beats * 4 * stepDur, 1 / Math.sqrt(layers.length));
+        for (const c of layers) this.chord(t, c, beats * 4 * stepDur, cs, 1 / Math.sqrt(layers.length));
       }
     }
   }
 
-  preview(id: ChannelId, t: number, opts: { note?: number; chord?: Chord } = {}) {
-    const stepDur = 60 / this.getProject().bpm / 4;
-    if (id === "bass") this.bassNote(t, opts.note ?? 33, stepDur * 2);
-    else if (id === "lead") this.leadNote(t, opts.note ?? 69, stepDur * 2);
-    else if (id === "chords") this.chord(t, opts.chord ?? { root: 9, type: "min7" }, stepDur * 8);
+  // un colpo di prova con il suono del pattern "slot" (quello che stai modificando)
+  preview(id: ChannelId, t: number, opts: { note?: number; chord?: Chord; slot?: Slot } = {}) {
+    const p = this.getProject();
+    const pat = p.patterns[opts.slot ?? "A"];
+    const stepDur = 60 / p.bpm / 4;
+    if (id === "bass") this.bassNote(t, opts.note ?? 33, stepDur * 2, soundOf(p, pat, "bass"));
+    else if (id === "lead") this.leadNote(t, opts.note ?? 69, stepDur * 2, soundOf(p, pat, "lead"));
+    else if (id === "chords") this.chord(t, opts.chord ?? { root: 9, type: "min7" }, stepDur * 8, soundOf(p, pat, "chords"));
     else this.drum(id, t);
   }
 
@@ -510,8 +520,8 @@ export class Graph {
   }
 
   // Basso: un suono a scelta (BASS_WAVES), sempre monofonico. "lunga" = 808: parte più alto e scende sulla nota.
-  private bassNote(t: number, midi: number, dur: number) {
-    const { wave, cutoff, length } = this.getProject().bassSound;
+  private bassNote(t: number, midi: number, dur: number, snd: BassSound) {
+    const { wave, cutoff, length } = snd;
     const ctx = this.ctx;
     const freq = mtof(midi);
     const end = t + Math.max(dur, 0.04);
@@ -580,8 +590,8 @@ export class Graph {
 
   // Lead: polifonico, una voce per nota, un suono a scelta (LEAD_SOUNDS). Il filtro si apre all'attacco;
   // vibrato leggero sulle note lunghe.
-  private leadNote(t: number, midi: number, dur: number, level = 1) {
-    const { wave, cutoff } = this.getProject().leadSound;
+  private leadNote(t: number, midi: number, dur: number, snd: LeadSound, level = 1) {
+    const { wave, cutoff } = snd;
     const ctx = this.ctx;
     const freq = mtof(midi);
     const end = t + Math.max(dur, 0.05);
@@ -654,8 +664,8 @@ export class Graph {
   }
 
   // Accordo: un suono a scelta (CHORD_STYLES) per tutte le note. I suoni "hold" tengono fino al prossimo accordo.
-  private chord(t: number, c: Chord, dur: number, level = 1) {
-    const { style, cutoff } = this.getProject().chordSound;
+  private chord(t: number, c: Chord, dur: number, snd: ChordSound, level = 1) {
+    const { style, cutoff } = snd;
     const ctx = this.ctx;
     const notes = chordNotes(c);
     const f = this.filter("lowpass", cutoff, 0.8);

@@ -169,6 +169,15 @@ export function Daw({
   const [step, setStep] = useState(-1);
   const [playing, setPlaying] = useState(false);
   const [rec, setRec] = useState(false);
+  // count-in: una battuta di click (4) prima di registrare; la scelta resta nel browser
+  const [countInOn, setCountInOn] = useState(true);
+  const [counting, setCounting] = useState(0); // 4, 3, 2, 1 durante il conto, 0 = niente
+  useEffect(() => setCountInOn(stored("ds-count-in") !== "0"), []);
+  const toggleCountIn = () =>
+    setCountInOn((o) => {
+      store("ds-count-in", o ? "0" : "1");
+      return !o;
+    });
   const [flash, setFlash] = useState<ChannelId | null>(null);
   const [save, setSave] = useState<SaveState>("salvato");
   const [undo, setUndo] = useState<{ project: Project; name: string } | null>(null);
@@ -246,13 +255,14 @@ export function Daw({
         },
       );
       engineRef.current.setSolo(soloRef.current); // il motore nasce al primo suono: parte con il solo già scelto
+      engineRef.current.onCount = setCounting;
     }
     return engineRef.current;
   }, []);
 
-  const play = useCallback(async () => {
+  const play = useCallback(async (countIn = 0) => {
     const e = engine();
-    if (!e.playing) await e.start(playbackRef.current.song ? startRef.current : 0);
+    if (!e.playing) await e.start(playbackRef.current.song ? startRef.current : 0, countIn);
     setPlaying(true);
   }, [engine]);
   const stop = useCallback(() => {
@@ -265,7 +275,8 @@ export function Daw({
   const toggleRec = () => {
     const on = !rec;
     setRec(on);
-    if (on && !engineRef.current?.playing) void play();
+    // da fermo: prima il count-in (4 click, una battuta), poi parte e registra
+    if (on && !engineRef.current?.playing) void play(countInOn ? 4 : 0);
   };
 
   useEffect(() => () => engineRef.current?.close(), []);
@@ -787,8 +798,10 @@ export function Daw({
           </label>
           <input id="titolo" className="hw-lcd-title" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} />
           <div className="hw-lcd-row">
-            <span className="hw-lcd-big">{project.bpm}</span>
-            <span className="hw-lcd-unit">BPM</span>
+            <span className="hw-lcd-big" data-count={counting > 0}>
+              {counting > 0 ? counting : project.bpm}
+            </span>
+            <span className="hw-lcd-unit">{counting > 0 ? "COUNT" : "BPM"}</span>
             <span className="hw-lcd-small">
               {songMode
                 ? `SONG · BAR ${bar >= 0 ? two(bar + 1) : `▶${two(effStart + 1)}`}/${two(songLength(project))}`
@@ -808,7 +821,7 @@ export function Daw({
         </div>
 
         <div className="hw-transport">
-          <button type="button" className="hw-btn hw-btn--play" aria-pressed={playing} onClick={() => void play()}>
+          <button type="button" className="hw-btn hw-btn--play" aria-pressed={playing} onClick={() => void play(0)}>
             <span className="hw-btn-led" />▶ Play
           </button>
           <button type="button" className="hw-btn" onClick={stop}>
@@ -818,7 +831,7 @@ export function Daw({
             type="button"
             className="hw-btn hw-btn--rec"
             aria-pressed={rec}
-            title="Registra: pad e tastiera scrivono nel pattern sullo step più vicino (fa partire il Play)"
+            title="Registra: pad e tastiera scrivono nel pattern sullo step più vicino (da fermo: count-in di 4 click, poi parte)"
             onClick={toggleRec}
           >
             <span className="hw-btn-led" />● Rec
@@ -994,16 +1007,28 @@ export function Daw({
                   </span>
                 </div>
               )}
-              <button
-                type="button"
-                className="hw-btn hw-btn--small hw-btn--rec hw-keys-rec"
-                aria-pressed={rec}
-                title="Accende Rec e fa partire il Play: pad e note che suoni si scrivono nel pattern"
-                onClick={toggleRec}
-              >
-                <span className="hw-btn-led" />
-                {rec ? "Registro… (clic per smettere)" : "● Registra"}
-              </button>
+              <div className="hw-keys-recrow">
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small hw-btn--rec hw-keys-rec"
+                  aria-pressed={rec}
+                  title="Accende Rec e fa partire il Play: pad e note che suoni si scrivono nel pattern"
+                  onClick={toggleRec}
+                >
+                  <span className="hw-btn-led" />
+                  {counting > 0 ? `Pronti… ${counting}` : rec ? "Registro… (clic per smettere)" : "● Registra"}
+                </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-pressed={countInOn}
+                  title="Count-in: prima di registrare una battuta di click (4), per prepararti alla prima battuta"
+                  onClick={toggleCountIn}
+                >
+                  <span className="hw-btn-led" />
+                  1234
+                </button>
+              </div>
               <p className="hw-keys-map">
                 {keyMode === "keys" ? (
                   <>

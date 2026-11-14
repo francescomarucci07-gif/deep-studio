@@ -22,6 +22,11 @@ export class Engine {
   private loopFrom = 0;
   // gli ultimi step programmati, con il loro orario: servono a registrare sullo step più vicino
   private recent: { t: number; step: number; slot: Slot | null }[] = [];
+  // count-in: i click programmati e i timer del conto, da fermare se premi Stop durante il conto
+  private clicks: OscillatorNode[] = [];
+  private countTimers: ReturnType<typeof setTimeout>[] = [];
+  // durante il count-in lo studio riceve 4, 3, 2, 1 e poi 0 quando parte la battuta
+  onCount?: (n: number) => void;
 
   constructor(
     private getProject: () => Project,
@@ -47,16 +52,32 @@ export class Engine {
     return this.timer !== null;
   }
 
-  // fromBar: in modalità song la battuta da cui partire (il marker); a fine canzone si torna lì
-  async start(fromBar = 0) {
+  // fromBar: in modalità song la battuta da cui partire (il marker); a fine canzone si torna lì.
+  // countIn: quanti click di metronomo (uno per battito) prima della prima battuta; 0 = parte subito.
+  async start(fromBar = 0, countIn = 0) {
     await this.ready;
     await this.ctx.resume();
     this.step = 0;
     this.recent = [];
     this.bar = fromBar;
     this.loopFrom = fromBar;
-    this.nextTime = this.ctx.currentTime + 0.05;
+    const t0 = this.ctx.currentTime + 0.05;
+    const beat = 60 / this.getProject().bpm;
+    for (let i = 0; i < countIn; i++) {
+      const t = t0 + i * beat;
+      this.clicks.push(this.graph.click(t, i === 0));
+      this.later(t, countIn - i);
+    }
+    this.nextTime = t0 + countIn * beat;
+    if (countIn > 0) this.later(this.nextTime, 0);
+    // l'orologio parte subito: programma la prima battuta solo quando il conto sta per finire
     this.timer = setInterval(() => this.tick(), TICK_MS);
+  }
+
+  // avvisa lo studio del numero del conto quando quel click arriva alle casse
+  private later(t: number, n: number) {
+    const ms = Math.max(0, (t - this.ctx.currentTime) * 1000);
+    this.countTimers.push(setTimeout(() => this.onCount?.(n), ms));
   }
 
   // Dove scrivere una nota suonata adesso (quantizzazione come in FL): lo step il cui suono arriva alle
@@ -80,6 +101,17 @@ export class Engine {
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    for (const c of this.clicks) {
+      try {
+        c.stop();
+      } catch {
+        // già finito
+      }
+    }
+    this.clicks = [];
+    this.countTimers.forEach(clearTimeout);
+    this.countTimers = [];
+    this.onCount?.(0);
     this.onStep(-1, -1, null);
   }
 

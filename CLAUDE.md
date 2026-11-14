@@ -135,9 +135,9 @@ cd web && npm run dev
 - Controllo generale dello studio con Francesco (tutte le viste, suoni, Solo, plugin, export, coach).
 - Un link da girare ad amici che provano lo studio e segnalano problemi (serve il login: decidere come
   entrano e come ci mandano i problemi).
-- Count-in della registrazione: premendo REC/Registra non si parte subito, ma prima c'è un conto alla rovescia
-  (per esempio 3 click o una battuta di metronomo, come il "countdown before recording" di FL Studio) per
-  prepararsi alla prima battuta.
+- ~~Count-in~~ **fatto il 14 nov**: REC da fermo suona 4 click (una battuta, il primo più acuto) e poi parte;
+  il display conta 4-3-2-1; interruttore "1234" accanto a Registra (scelta salvata nel browser). Click in
+  `graph.ts` (`click()`, dritto alle casse, non entra nell'export), conto in `engine.ts` (`start(fromBar, countIn)`).
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

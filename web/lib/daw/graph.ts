@@ -309,6 +309,23 @@ export class Graph {
     }
   }
 
+  // Il click del count-in, come un metronomo: il primo (accent) più acuto. Va dritto alle casse: mixer, solo
+  // e filtri non lo toccano, e l'export non lo sente. Restituisce l'oscillatore per poterlo fermare.
+  click(t: number, accent: boolean) {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = "sine";
+    o.frequency.value = accent ? 1760 : 1320;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.35, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(g).connect(ctx.destination);
+    o.start(t);
+    o.stop(t + 0.07);
+    return o;
+  }
+
   // un colpo di prova con il suono del pattern "slot" (quello che stai modificando)
   preview(id: ChannelId, t: number, opts: { note?: number; chord?: Chord; slot?: Slot } = {}) {
     const p = this.getProject();

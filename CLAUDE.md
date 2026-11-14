@@ -103,6 +103,8 @@ cd web && npm run dev
   dello studio e apre la vista giusta; parte da solo la prima volta (`user_metadata.tour_done` nell'account,
   più `ds-tour-visto` nel browser), pulsante Tutorial per rivederlo; voce del coach se accesa. Su telefono salta
   le tappe `wide`.
+  Al primo login (`auth/callback`), se l'account non ha progetti e non ha visto il tour, si crea un progetto
+  (`lib/daw/new-project.ts`) e si apre subito: il tour parte senza passare dalla pagina "Il tuo studio".
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
   (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi

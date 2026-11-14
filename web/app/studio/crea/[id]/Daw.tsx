@@ -69,6 +69,7 @@ import { measure, type Measures } from "@/lib/daw/measure";
 import { encodeWav, renderAudio, renderPlan, SAMPLE_RATE } from "@/lib/daw/render";
 import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
 import { createClient } from "@/lib/supabase/client";
+import { Tour } from "./Tour";
 
 type SaveState = "salvato" | "modificato" | "salvo" | "errore";
 
@@ -158,11 +159,13 @@ export function Daw({
   initialTitle,
   initialProject,
   coachMessages,
+  tourDone = true,
 }: {
   id: string;
   initialTitle: string;
   initialProject: Project;
   coachMessages: Msg[];
+  tourDone?: boolean; // l'account ha già visto il tour guidato
 }) {
   const [project, setProject] = useState(initialProject);
   const [title, setTitle] = useState(initialTitle);
@@ -221,6 +224,18 @@ export function Daw({
     setView(v);
     store("ds-vista", v);
   }, []);
+  // Tour guidato: parte da solo la prima volta (account o browser che non l'hanno mai visto)
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    if (!tourDone && stored("ds-tour-visto") !== "1") setTouring(true);
+  }, [tourDone]);
+  const endTour = useCallback(() => {
+    setTouring(false);
+    store("ds-tour-visto", "1");
+    // nell'account, così non riparte su un altro computer
+    if (!tourDone) void createClient().auth.updateUser({ data: { tour_done: true } }).catch(() => {});
+  }, [tourDone]);
+  const openCoach = useCallback(() => setCoachOpen(true), []);
   const toggleCoach = () => {
     setCoachOpen((o) => {
       store("ds-coach-aperto", o ? "0" : "1");
@@ -783,6 +798,7 @@ export function Daw({
 
   return (
     <div className="console" data-coach={coachOpen ? "on" : "off"}>
+      {touring && <Tour onView={chooseView} onCoach={openCoach} onClose={endTour} />}
       {/* ---- pannello superiore: marchio, display, trasporto, manopole ---- */}
       <section className="hw-panel hw-top" aria-label="Trasporto">
         <div className="hw-brand">
@@ -1102,9 +1118,14 @@ export function Daw({
             <button
               type="button"
               className="hw-btn hw-btn--small hw-views-end"
-              aria-pressed={coachOpen}
-              onClick={toggleCoach}
+              aria-pressed={touring}
+              title="Il tour guidato dello studio, con il coach"
+              onClick={() => setTouring(true)}
             >
+              <span className="hw-btn-led" />
+              Tutorial
+            </button>
+            <button type="button" className="hw-btn hw-btn--small" aria-pressed={coachOpen} onClick={toggleCoach}>
               <span className="hw-btn-led" />
               Coach
             </button>

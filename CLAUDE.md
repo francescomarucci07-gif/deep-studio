@@ -99,6 +99,10 @@ cd web && npm run dev
   in tempo reale e per l'export), `web/lib/daw/engine.ts` (l'orologio del sequencer, swing, pattern/song), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
   `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone, scrivi_effetti con i plugin); plugin degli insert in `lib/daw/plugins.ts`; streaming condiviso in `lib/coach/stream.ts`.
+- **Tour guidato** (`web/app/studio/crea/[id]/Tour.tsx`): 14 tappe scritte a mano (`TOUR`), evidenzia la parte
+  dello studio e apre la vista giusta; parte da solo la prima volta (`user_metadata.tour_done` nell'account,
+  più `ds-tour-visto` nel browser), pulsante Tutorial per rivederlo; voce del coach se accesa. Su telefono salta
+  le tappe `wide`.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
   (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
@@ -135,6 +139,7 @@ cd web && npm run dev
 - Controllo generale dello studio con Francesco (tutte le viste, suoni, Solo, plugin, export, coach).
 - Un link da girare ad amici che provano lo studio e segnalano problemi (serve il login: decidere come
   entrano e come ci mandano i problemi).
+- ~~Tutorial~~ **fatto il 14 nov**: tour guidato del coach alla prima apertura dello studio (vedi "Cose da sapere").
 - ~~Count-in~~ **fatto il 14 nov**: REC da fermo suona 4 click (una battuta, il primo più acuto) e poi parte;
   il display conta 4-3-2-1; interruttore "1234" accanto a Registra (scelta salvata nel browser). Click in
   `graph.ts` (`click()`, dritto alle casse, non entra nell'export), conto in `engine.ts` (`start(fromBar, countIn)`).

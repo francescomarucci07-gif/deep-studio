@@ -16,6 +16,9 @@ export default async function Crea({ params }: { params: Promise<{ id: string }>
   const { data: project } = await supabase.from("projects").select("id, title, data").eq("id", id).maybeSingle();
   if (!project) notFound(); // non esiste, oppure è di un altro utente (RLS)
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const { data: msgs } = await supabase
     .from("coach_messages")
     .select("role, content")
@@ -28,6 +31,7 @@ export default async function Crea({ params }: { params: Promise<{ id: string }>
       initialTitle={project.title}
       initialProject={normalize(project.data)}
       coachMessages={(msgs ?? []) as Msg[]}
+      tourDone={user?.user_metadata?.tour_done === true}
     />
   );
 }

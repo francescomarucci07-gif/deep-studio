@@ -139,8 +139,9 @@ cd web && npm run dev
 
 **Per il 14 nov (chiesto da Francesco il 13 nov):**
 - Controllo generale dello studio con Francesco (tutte le viste, suoni, Solo, plugin, export, coach).
-- Un link da girare ad amici che provano lo studio e segnalano problemi (serve il login: decidere come
-  entrano e come ci mandano i problemi).
+- ~~Link per gli amici~~ **fatto il 14 nov**: https://deep-studio-azure.vercel.app (Accedi con link magico; al primo
+  login si apre subito un progetto con il tour). Le segnalazioni per ora arrivano a Francesco su WhatsApp.
+- **Più avanti**: pulsante "Segnala un problema" nello studio (tabella nuova con RLS: messaggio, vista, browser).
 - ~~Tutorial~~ **fatto il 14 nov**: tour guidato del coach alla prima apertura dello studio (vedi "Cose da sapere").
 - ~~Count-in~~ **fatto il 14 nov**: REC da fermo suona 4 click (una battuta, il primo più acuto) e poi parte;
   il display conta 4-3-2-1; interruttore "1234" accanto a Registra (scelta salvata nel browser). Click in

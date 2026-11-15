@@ -236,6 +236,10 @@ export function Daw({
     if (!tourDone) void createClient().auth.updateUser({ data: { tour_done: true } }).catch(() => {});
   }, [tourDone]);
   const openCoach = useCallback(() => setCoachOpen(true), []);
+  const openRoll = (k: "bass" | "lead" | "chords") => {
+    setRoll(k);
+    chooseView("roll");
+  };
   const toggleCoach = () => {
     setCoachOpen((o) => {
       store("ds-coach-aperto", o ? "0" : "1");
@@ -1254,7 +1258,7 @@ export function Daw({
               ))}
               <div className="hw-seq-row" data-row="bass">
                 <div className="hw-seq-label">
-                  <button type="button" className="hw-seq-name" onClick={() => void engine().preview("bass")}>
+                  <button type="button" className="hw-seq-name" onClick={() => openRoll("bass")}>
                     Bass
                   </button>
                   {soloButton("bass", "Bass")}
@@ -1266,6 +1270,8 @@ export function Daw({
                     data-group={Math.floor(i / 4)}
                     data-on={n !== null}
                     data-now={i === step && playingSlot === editing}
+                    title="Le note del basso si scrivono nel Roll: clic per aprirlo"
+                    onClick={() => openRoll("bass")}
                   >
                     {n !== null ? noteName(n).replace(/\d$/, "") : ""}
                   </span>
@@ -1292,10 +1298,32 @@ export function Daw({
                     data-group={Math.floor(i / 4)}
                     data-on={n.length > 0}
                     data-now={i === step && playingSlot === editing}
-                    title={n.map(noteName).join(" + ")}
+                    title={`${n.length ? `${n.map(noteName).join(" + ")} · ` : ""}la melodia si scrive nel Roll: clic per aprirlo`}
+                    onClick={() => openRoll("lead")}
                   >
                     {/* più note insieme: la più bassa e quante ce ne sono in tutto */}
                     {n.length ? `${noteName(n[0]).replace(/\d$/, "")}${n.length > 1 ? `+${n.length - 1}` : ""}` : ""}
+                  </span>
+                ))}
+              </div>
+              {/* gli accordi: uno per battito (4 step); si scrivono nella scheda Chord del Roll */}
+              <div className="hw-seq-row" data-row="chords">
+                <div className="hw-seq-label">
+                  <button type="button" className="hw-seq-name" onClick={() => openRoll("chords")}>
+                    Chord
+                  </button>
+                  {soloButton("chords", "Chord")}
+                </div>
+                {pat.chords.map((c, b) => (
+                  <span
+                    key={b}
+                    className="hw-key hw-key--note hw-key--chord"
+                    data-on={c.length > 0}
+                    data-now={Math.floor(step / 4) === b && playingSlot === editing}
+                    title="Gli accordi si scrivono nel Roll, scheda Chord: clic per aprirlo"
+                    onClick={() => openRoll("chords")}
+                  >
+                    {c.map(chordName).join(" + ")}
                   </span>
                 ))}
               </div>

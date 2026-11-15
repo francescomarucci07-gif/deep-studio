@@ -147,6 +147,17 @@ cd web && npm run dev
   il display conta 4-3-2-1; interruttore "1234" accanto a Registra (scelta salvata nel browser). Click in
   `graph.ts` (`click()`, dritto alle casse, non entra nell'export), conto in `engine.ts` (`start(fromBar, countIn)`).
 
+**Prova di un amico (15 nov):**
+- ~~Automazioni che "saltano" al cambio di pattern~~ **corretto**: la rampa del filtro finiva esattamente all'inizio della
+  battuta dopo; per un arrotondamento a volte veniva cancellata e il filtro restava fermo tutta la battuta (a 120, 128,
+  140 BPM; anche nell'export). Ora finisce 1 ms prima (`automateBar` in `graph.ts`).
+- ~~Legato del lead: note che si sovrappongono~~ **corretto**: con Legato una nota nuova chiude quelle di prima
+  (`voiceGain` in `graph.ts`, come un synth mono; le note dello stesso step restano insieme); l'ultima nota tiene al
+  massimo fino a fine battuta. Il basso è sempre mono.
+- ~~Non si capisce dove si scrivono gli accordi~~ **fatto**: riga Chord nel Beat (un accordo per battito); le righe Bass,
+  Lead e Chord del Beat portano al Roll con un clic.
+- **Da fare**: routing più avanzato nel mixer, per esempio un gruppo (bus) per la batteria.
+
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,
 canzoni fino a 256 battute.

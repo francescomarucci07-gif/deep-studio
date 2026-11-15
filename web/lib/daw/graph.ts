@@ -53,6 +53,9 @@ export class Graph {
   // "choke": un colpo nuovo taglia la coda di quello prima (hat chiuso → open hat; kick → kick,
   // così la coda lunga dell'808 non si accumula). Un gain a parte, senza toccare l'inviluppo.
   private chokes: { kick: GainNode | null; hat: GainNode | null } = { kick: null, hat: null };
+  // Basso (sempre) e lead con Legato: una nota nuova chiude quelle di prima, come un synth mono.
+  // Le note che partono insieme (un accordo del lead) non si chiudono tra loro.
+  private voices: Record<"bass" | "lead", { g: GainNode; t: number }[]> = { bass: [], lead: [] };
   private out: GainNode;
   private limiter: AudioNode;
   limiterDb = 0; // quanto sta abbassando il limiter adesso (dB, 0 = niente)
@@ -274,7 +277,10 @@ export class Graph {
       ] as const) {
         param.cancelScheduledValues(t);
         param.setValueAtTime(from, t);
-        param.exponentialRampToValueAtTime(to, t + barDur);
+        // finisce 1 ms prima della battuta dopo: se finisse "esattamente" lì, per un arrotondamento a volte cadrebbe
+        // un soffio dopo, la cancelScheduledValues della battuta dopo la cancellerebbe e il filtro resterebbe fermo
+        // per tutta la battuta, per poi saltare al cambio di pattern
+        param.exponentialRampToValueAtTime(to, t + barDur - 0.001);
       }
     }
   }
@@ -297,7 +303,7 @@ export class Graph {
       const len = ls.length === "lunga" ? this.stepsToNext(line, s) - 0.05 : 0.8;
       // più voci insieme: ognuna un po' più piano, così un accordo non è 4 volte più forte di una nota
       const level = 1 / Math.sqrt(chord.length);
-      for (const m of chord) this.leadNote(t, m, stepDur * len, ls, level);
+      for (const m of chord) this.leadNote(t, m, stepDur * len, ls, level, ls.length === "lunga");
     }
     if (s % 4 === 0) {
       const layers = pat.chords[s / 4];
@@ -338,9 +344,11 @@ export class Graph {
   }
 
   // quanti step mancano alla prossima nota (ricominciando dall'inizio della battuta)
+  // quanti step mancano alla prossima nota della battuta; l'ultima nota tiene fino a fine battuta
+  // (non oltre: in Song la battuta dopo può essere un altro pattern, con altre note)
   private stepsToNext(line: (number | null)[], s: number) {
-    for (let k = 1; k < STEPS; k++) if (line[(s + k) % STEPS] !== null) return k;
-    return STEPS;
+    for (let k = s + 1; k < STEPS; k++) if (line[k] !== null) return k - s;
+    return STEPS - s;
   }
 
   // il pad tiene fino al prossimo accordo della battuta (o fino alla fine della battuta)
@@ -391,6 +399,16 @@ export class Graph {
     f.frequency.value = freq;
     f.Q.value = q;
     return f;
+  }
+
+  // un gain per la nota: se choke, chiude le note dello strumento partite prima di t
+  private voiceGain(inst: "bass" | "lead", t: number, choke: boolean) {
+    const list = this.voices[inst].filter((v) => this.ctx.currentTime < v.t + 8); // le note vecchie sono già finite
+    if (choke) for (const v of list) if (v.t < t - 0.0005) v.g.gain.setTargetAtTime(0, t, 0.006);
+    const g = this.ctx.createGain();
+    list.push({ g, t });
+    this.voices[inst] = list.slice(-24);
+    return g;
   }
 
   private choke(group: "kick" | "hat", t: number) {
@@ -553,7 +571,7 @@ export class Graph {
       g.gain.setValueAtTime(0.5, t + (end - t) * 0.85);
     }
     g.gain.linearRampToValueAtTime(0, end);
-    g.connect(this.shaper()).connect(this.channels.bass);
+    g.connect(this.voiceGain("bass", t, true)).connect(this.shaper()).connect(this.channels.bass);
 
     const oscs: OscillatorNode[] = [];
     const add = (o: OscillatorNode, gain: number, to: AudioNode = g) => {
@@ -607,7 +625,7 @@ export class Graph {
 
   // Lead: polifonico, una voce per nota, un suono a scelta (LEAD_SOUNDS). Il filtro si apre all'attacco;
   // vibrato leggero sulle note lunghe.
-  private leadNote(t: number, midi: number, dur: number, snd: LeadSound, level = 1) {
+  private leadNote(t: number, midi: number, dur: number, snd: LeadSound, level = 1, legato = false) {
     const { wave, cutoff } = snd;
     const ctx = this.ctx;
     const freq = mtof(midi);
@@ -635,7 +653,7 @@ export class Graph {
       g.gain.setValueAtTime(peak, end - 0.015);
       g.gain.linearRampToValueAtTime(0, end + tail);
     }
-    f.connect(g).connect(this.channels.lead);
+    f.connect(g).connect(this.voiceGain("lead", t, legato)).connect(this.channels.lead);
 
     const vibrato = ctx.createOscillator();
     vibrato.frequency.value = 5.5;

@@ -1007,6 +1007,7 @@ ol.ds-led-row {
 .hw-seq-row[data-row="perc"] { --key: var(--hw-pad-teal); }
 .hw-seq-row[data-row="bass"] { --key: var(--hw-pad-green); }
 .hw-seq-row[data-row="lead"] { --key: var(--hw-pad-blue); }
+.hw-seq-row[data-row="chords"] { --key: var(--hw-pad-purple); }
 .hw-seq-name {
   display: flex;
   align-items: center;
@@ -1068,8 +1069,18 @@ ol.ds-led-row {
   outline: 2px solid var(--ds-text);
   outline-offset: 1px;
 }
+/* basso, lead e accordi nel Beat sono un'anteprima: il clic porta al Roll, dove si scrivono */
 .hw-key--note {
-  cursor: default;
+  cursor: pointer;
+}
+/* un accordo per battito: la casella è larga 4 step */
+.hw-key--chord {
+  grid-column: span 4;
+  overflow: hidden;
+  padding: 0 6px;
+  font: 600 11px var(--ds-font-num);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .hw-seq-numbers span {
   color: var(--hw-print-faint);

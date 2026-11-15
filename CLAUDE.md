@@ -105,6 +105,8 @@ cd web && npm run dev
   le tappe `wide`.
   Al primo login (`auth/callback`), se l'account non ha progetti e non ha visto il tour, si crea un progetto
   (`lib/daw/new-project.ts`) e si apre subito: il tour parte senza passare dalla pagina "Il tuo studio".
+- **Mixer e bus**: ogni canale esce sul master o in un bus (`mixer.X.out`); i bus (`buses`, `BUS_IDS`) hanno fader
+  (`BUS_UNITY` = 0 dB), mute e 8 insert, poi vanno al master. In `graph.ts` il routing si ricollega in `applyMixer`.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
   (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
@@ -156,7 +158,8 @@ cd web && npm run dev
   massimo fino a fine battuta. Il basso è sempre mono.
 - ~~Non si capisce dove si scrivono gli accordi~~ **fatto**: riga Chord nel Beat (un accordo per battito); le righe Bass,
   Lead e Chord del Beat portano al Roll con un clic.
-- **Da fare**: routing più avanzato nel mixer, per esempio un gruppo (bus) per la batteria.
+- ~~Routing del mixer~~ **fatto il 15 nov**: 4 bus come in FL (`buses`, `mixer.X.out`, insert sui bus; ADR); nei
+  progetti nuovi la batteria entra nel bus Drums. Uscita sotto ogni canale, "+ Bus" nella striscia del Master.
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

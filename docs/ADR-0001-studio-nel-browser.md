@@ -283,3 +283,16 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
   pattern non gli toglie il suono proprio.
 - Alternativa scartata: canali in più (Lead 2, Lead 3) come in FL. Più flessibile, ma raddoppia mixer, insert e
   automazioni; il suono per pattern copre il caso chiesto ("questo lead suona diverso in questo pattern").
+
+## Aggiornamento 15 nov 2026 · routing del mixer e bus (come FL)
+
+- Contesto: un amico che ha provato lo studio chiede un routing più avanzato, per esempio un gruppo per la batteria.
+- Decisione: 4 bus (`buses.bus1…bus4`: nome, volume, mute, `shown`) con 8 slot di insert ciascuno (`inserts.bus1…`);
+  ogni canale ha `mixer.X.out` = `"master"` o un bus. Il bus va al master. Fader del bus: 0.8 = volume invariato
+  (`BUS_UNITY`), si può alzare fino a +1,9 dB. Riverbero, delay e sidechain restano sui canali (il sidechain ora ha un
+  "duck" per canale, così basso e accordi possono andare in bus diversi).
+- Progetti nuovi: kick, clap, hat, open hat e perc nel bus "Drums". Progetti di prima: tutto al master, suonano uguali.
+- Opzioni scartate per ora: bus dentro altri bus (in FL si può), send verso i bus, automazioni del filtro sui bus.
+- Conseguenze: un bus si vede nel mixer solo se lo usi ("+ Bus" nella striscia del Master, oppure "+ Nuovo bus"
+  nell'uscita di un canale); il coach (`crea-v19`) legge il routing e lo scrive con `scrivi_effetti.bus`.
+- Prova offline: con la batteria nel bus a 0 dB il mix è identico a tutto dritto al master; bus mutato = batteria mutata.

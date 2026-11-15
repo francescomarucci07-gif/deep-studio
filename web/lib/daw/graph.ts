@@ -14,6 +14,12 @@ import {
   laneValue,
   soundOf,
   type AutoTarget,
+  type BusId,
+  type MixTarget,
+  type Out,
+  BUS_IDS,
+  BUS_UNITY,
+  MIX_TARGETS,
   type BassSound,
   type ChordSound,
   type LeadSound,
@@ -42,7 +48,14 @@ const HAT_FREQS = [205.3, 304.4, 369.6, 522.7, 540, 800];
 
 export class Graph {
   readonly channels: Record<ChannelId, GainNode>;
-  private duck: GainNode;
+  // basso e accordi hanno ciascuno il suo "duck": il sidechain del kick li abbassa, ovunque vadano
+  private ducks: GainNode[] = [];
+  private master: GainNode;
+  // routing: l'ultimo nodo di ogni canale, e dove è collegato adesso (master o un bus)
+  private outs = {} as Record<ChannelId, AudioNode>;
+  private routes: Partial<Record<ChannelId, Out>> = {};
+  // i bus: ingresso (dove entrano i canali) → plugin → fader → master
+  private buses = {} as Record<BusId, { input: GainNode; fader: GainNode }>;
   private reverb: ConvolverNode;
   private delay: DelayNode;
   private filters: Record<AutoTarget, DjFilter>;
@@ -65,11 +78,11 @@ export class Graph {
     this.solo = new Set(ids);
     this.applyMixer();
   }
-  private chains: Record<AutoTarget, { from: AudioNode; to: AudioNode }>;
+  private chains: Record<MixTarget, { from: AudioNode; to: AudioNode }>;
   // i plugin vivi di ogni fila, e com'era la fila l'ultima volta (per ricollegarla solo se cambia)
-  private inserts: Partial<Record<AutoTarget, (PluginInstance | null)[]>> = {};
-  private insertTypes: Partial<Record<AutoTarget, string[]>> = {};
-  private insertWiring: Partial<Record<AutoTarget, string>> = {};
+  private inserts: Partial<Record<MixTarget, (PluginInstance | null)[]>> = {};
+  private insertTypes: Partial<Record<MixTarget, string[]>> = {};
+  private insertWiring: Partial<Record<MixTarget, string>> = {};
 
   constructor(
     readonly ctx: BaseAudioContext,
@@ -91,7 +104,8 @@ export class Graph {
     masterFilter.hp.connect(glue);
     glue.connect(this.out).connect(this.limiter).connect(ctx.destination);
     // la fila dei plugin del master sta tra il filtro DJ e la colla (il limiter resta l'ultimo anello)
-    const chains: Partial<Record<AutoTarget, { from: AudioNode; to: AudioNode }>> = {
+    this.master = master;
+    const chains: Partial<Record<MixTarget, { from: AudioNode; to: AudioNode }>> = {
       master: { from: masterFilter.hp, to: glue },
     };
 
@@ -112,21 +126,35 @@ export class Graph {
     delayTone.connect(feedback).connect(this.delay);
     delayTone.connect(master);
 
-    // basso e accordi passano dal "duck": il sidechain del kick li abbassa a ogni colpo
-    this.duck = ctx.createGain();
-    this.duck.connect(master);
+    // i bus (gruppi del mixer): ingresso → fila dei plugin → fader → master
+    for (const b of BUS_IDS) {
+      const input = ctx.createGain();
+      const fader = ctx.createGain();
+      fader.connect(master);
+      chains[b] = { from: input, to: fader };
+      this.buses[b] = { input, fader };
+    }
 
     // ogni canale: fader → filtro DJ → pan → uscita; i send di riverbero e delay partono dopo il filtro
     const filters: Partial<Record<AutoTarget, DjFilter>> = { master: masterFilter };
     const sends: Partial<Record<ChannelId, { reverb: GainNode; delay: GainNode }>> = {};
-    const make = (id: ChannelId, to: AudioNode) => {
+    const make = (id: ChannelId, ducked = false) => {
       const g = ctx.createGain();
       const f = this.djFilter();
       const pan = ctx.createStereoPanner();
       pan.pan.value = PAN[id];
       g.connect(f.lp);
       chains[id] = { from: g, to: f.lp }; // la fila dei plugin: dopo il fader, prima del filtro e dei send
-      f.hp.connect(pan).connect(to);
+      f.hp.connect(pan);
+      let last: AudioNode = pan;
+      if (ducked) {
+        // basso e accordi passano dal loro "duck": il sidechain del kick li abbassa a ogni colpo
+        const duck = ctx.createGain();
+        pan.connect(duck);
+        this.ducks.push(duck);
+        last = duck;
+      }
+      this.outs[id] = last; // dove va (master o bus) lo decide applyMixer
       const reverb = ctx.createGain();
       const delay = ctx.createGain();
       f.hp.connect(reverb).connect(this.reverb);
@@ -136,13 +164,13 @@ export class Graph {
       return g;
     };
     this.channels = {
-      ...(Object.fromEntries(DRUMS.map(({ id }) => [id, make(id, master)])) as Record<DrumId, GainNode>),
-      bass: make("bass", this.duck),
-      chords: make("chords", this.duck),
-      lead: make("lead", master),
+      ...(Object.fromEntries(DRUMS.map(({ id }) => [id, make(id)])) as Record<DrumId, GainNode>),
+      bass: make("bass", true),
+      chords: make("chords", true),
+      lead: make("lead"),
     };
     this.filters = filters as Record<AutoTarget, DjFilter>;
-    this.chains = chains as Record<AutoTarget, { from: AudioNode; to: AudioNode }>;
+    this.chains = chains as Record<MixTarget, { from: AudioNode; to: AudioNode }>;
     this.sends = sends as Record<ChannelId, { reverb: GainNode; delay: GainNode }>;
 
     this.noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
@@ -208,6 +236,20 @@ export class Graph {
       set(this.sends[id].delay.gain, p.fx[id].delay * DELAY_MAX);
     }
     set(this.delay.delayTime, (60 / p.bpm / 4) * 3);
+    // i bus: fader (0.8 = volume invariato) e mute; il solo dei canali non li tocca (sono di passaggio)
+    for (const b of BUS_IDS) {
+      const bus = p.buses[b];
+      set(this.buses[b].fader.gain, bus.muted ? 0 : bus.volume / BUS_UNITY);
+    }
+    // routing: ricollego un canale solo se la sua uscita è cambiata
+    for (const id of CHANNEL_IDS) {
+      const out = p.mixer[id].out;
+      if (this.routes[id] === out) continue;
+      const node = this.outs[id];
+      if (this.routes[id] !== undefined) node.disconnect();
+      node.connect(out === "master" ? this.master : this.buses[out].input);
+      this.routes[id] = out;
+    }
     this.applyInserts(immediate);
     // i filtri con un'automazione, in modalità song, li muove automateBar
     for (const t of AUTO_TARGETS) {
@@ -220,7 +262,7 @@ export class Graph {
   // qualcosa nella fila (un plugin in più o in meno, acceso o spento), la ricollego.
   private applyInserts(immediate: boolean) {
     const p = this.getProject();
-    for (const t of AUTO_TARGETS) {
+    for (const t of MIX_TARGETS) {
       const slots = p.inserts[t];
       const live = (this.inserts[t] ??= Array(INSERT_SLOTS).fill(null));
       const types = (this.insertTypes[t] ??= Array(INSERT_SLOTS).fill(""));
@@ -370,10 +412,12 @@ export class Graph {
   }
 
   private sidechain(t: number, stepDur: number) {
-    const g = this.duck.gain;
-    g.cancelScheduledValues(t);
-    g.setValueAtTime(0.2, t);
-    g.linearRampToValueAtTime(1, t + stepDur * 2.5);
+    for (const d of this.ducks) {
+      const g = d.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(0.2, t);
+      g.linearRampToValueAtTime(1, t + stepDur * 2.5);
+    }
   }
 
   private noiseSource(t: number, dur: number) {

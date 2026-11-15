@@ -6,6 +6,12 @@ import { KIT_IDS, KITS } from "./kits";
 import { defaultSlot, INSERT_SLOTS, isPluginType, normalizeSlot, pluginParams, PLUGIN_TYPES, PLUGINS } from "./plugins";
 import {
   AUTO_TARGETS,
+  BUS_IDS,
+  BUS_UNITY,
+  MIX_TARGETS,
+  isBus,
+  type MixTarget,
+  type Out,
   CHANNEL_IDS,
   BASS_HIGH,
   BASS_LOW,
@@ -155,7 +161,7 @@ const SONG_TOOL: Anthropic.Beta.BetaTool = {
 const FX_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_effetti",
   description:
-    "Imposta volume ed effetti dei canali (volume del fader, filtro DJ, riverbero, delay a 3/16), i plugin negli insert (per esempio un chorus sul lead) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
+    "Imposta volume ed effetti dei canali (volume del fader, filtro DJ, riverbero, delay a 3/16), il routing nei bus (gruppi del mixer, come in FL), i plugin negli insert (per esempio un chorus sul lead) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
   input_schema: {
     type: "object",
     properties: {
@@ -203,13 +209,27 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
           required: ["bersaglio", "punti"],
         },
       },
-      plugin: {
+      bus: {
         type: "array",
-        description: `Plugin negli insert (come gli slot del mixer di FL), ${INSERT_SLOTS} slot per canale e per il master, in fila dal primo all'ultimo. tipo "nessuno" svuota lo slot. Plugin disponibili: ${PLUGIN_TYPES.map((t) => `${t} (${PLUGINS[t].hint}; manopole: ${pluginParams(t).map((q) => `${q.id} ${q.min}–${q.max}`).join(", ")})`).join("; ")}.`,
+        description: `Routing nei bus, come il mixer di FL: un bus è una traccia di gruppo (per esempio tutta la batteria in "Drums") con fader e plugin suoi, che poi va al master. Ci sono ${BUS_IDS.length} bus (${BUS_IDS.join(", ")}). Per ogni bus: il nome, il volume (fader 0–1, ${BUS_UNITY} = volume invariato) e i canali che ci entrano; un canale non elencato non cambia uscita. Per rimandare un canale al master usa il bus "master" con quel canale.`,
         items: {
           type: "object",
           properties: {
-            bersaglio: { type: "string", enum: [...AUTO_TARGETS] },
+            bus: { type: "string", enum: [...BUS_IDS, "master"] },
+            nome: { type: "string", description: "Nome del bus nel mixer, es. 'Drums' o 'Synth' (max 16 caratteri)." },
+            volume: { type: "number", minimum: 0, maximum: 1 },
+            canali: { type: "array", items: { type: "string", enum: [...CHANNEL_IDS] } },
+          },
+          required: ["bus"],
+        },
+      },
+      plugin: {
+        type: "array",
+        description: `Plugin negli insert (come gli slot del mixer di FL), ${INSERT_SLOTS} slot per canale, per bus e per il master, in fila dal primo all'ultimo. tipo "nessuno" svuota lo slot. Plugin disponibili: ${PLUGIN_TYPES.map((t) => `${t} (${PLUGINS[t].hint}; manopole: ${pluginParams(t).map((q) => `${q.id} ${q.min}–${q.max}`).join(", ")})`).join("; ")}.`,
+        items: {
+          type: "object",
+          properties: {
+            bersaglio: { type: "string", enum: [...MIX_TARGETS] },
             slot: { type: "integer", minimum: 1, maximum: INSERT_SLOTS },
             tipo: { type: "string", enum: [...PLUGIN_TYPES, "nessuno"] },
             acceso: { type: "boolean", description: "false = in bypass (resta nello slot ma non suona)." },
@@ -397,18 +417,39 @@ export function createStudioWriter(current: Project, editing: Slot) {
       let plugins = 0;
       if (Array.isArray(raw.plugin)) {
         for (const pl of raw.plugin as { bersaglio?: unknown; slot?: unknown; tipo?: unknown; acceso?: unknown; manopole?: unknown }[]) {
-          const t = pl?.bersaglio as (typeof AUTO_TARGETS)[number];
+          const t = pl?.bersaglio as MixTarget;
           const k = Number(pl?.slot) - 1;
-          if (!AUTO_TARGETS.includes(t) || !Number.isInteger(k) || k < 0 || k >= INSERT_SLOTS) continue;
+          if (!MIX_TARGETS.includes(t) || !Number.isInteger(k) || k < 0 || k >= INSERT_SLOTS) continue;
           inserts[t][k] = isPluginType(pl.tipo)
             ? normalizeSlot({ type: pl.tipo, on: pl.acceso !== false, params: { ...defaultSlot(pl.tipo).params, ...(pl.manopole as object) } })
             : null;
           plugins++;
         }
       }
-      project = normalize({ ...project, song, fx, mixer, masterFilter, automation, inserts });
+      // bus: nome, volume e canali che ci entrano (un bus che riceve canali si vede nel mixer)
+      const buses = structuredClone(project.buses);
+      let routed = 0;
+      if (Array.isArray((raw as { bus?: unknown }).bus)) {
+        for (const b of (raw as { bus: { bus?: unknown; nome?: unknown; volume?: unknown; canali?: unknown }[] }).bus) {
+          const dest = b?.bus;
+          if (dest !== "master" && !isBus(dest)) continue;
+          if (isBus(dest)) {
+            if (typeof b.nome === "string" && b.nome.trim()) buses[dest].name = b.nome.trim().slice(0, 16);
+            if (typeof b.volume === "number") buses[dest].volume = b.volume;
+            buses[dest].shown = true;
+          }
+          if (Array.isArray(b.canali)) {
+            for (const c of b.canali) {
+              if (!CHANNEL_IDS.includes(c as (typeof CHANNEL_IDS)[number])) continue;
+              mixer[c as (typeof CHANNEL_IDS)[number]].out = dest as Out;
+              routed++;
+            }
+          }
+        }
+      }
+      project = normalize({ ...project, song, fx, mixer, masterFilter, automation, inserts, buses });
       names.push(label(raw.nome, "effetti"));
-      return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}${plugins ? ` (${plugins} plugin)` : ""}: ${label(raw.nome, "effetti")}`;
+      return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}${plugins ? ` (${plugins} plugin)` : ""}${routed ? ` (${routed} canali instradati)` : ""}: ${label(raw.nome, "effetti")}`;
     }
     if (name === "scrivi_canzone" && Array.isArray(i.battute)) {
       const list = i.battute as unknown[];

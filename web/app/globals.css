@@ -1356,6 +1356,56 @@ ol.ds-led-row {
 .hw-strip-fx .hw-value {
   font-size: 9px;
 }
+/* bus: tracce di gruppo, con il bordo del colore dello studio */
+.hw-strip--bus {
+  position: relative;
+  border-color: color-mix(in srgb, var(--ds-accent) 70%, var(--hw-panel-edge));
+  background: color-mix(in srgb, var(--ds-accent) 8%, var(--hw-panel-2));
+}
+.hw-bus-in {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--hw-print);
+  font: 500 9px var(--ds-font-mono);
+  line-height: 1.3;
+  text-align: center;
+  opacity: 0.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.hw-bus-name {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  text-align: center;
+}
+.hw-bus-name:hover,
+.hw-bus-name:focus {
+  border-color: var(--hw-panel-edge);
+  background: var(--hw-lcd-bg);
+  outline: none;
+}
+.hw-bus-x {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  border: 0;
+  background: none;
+  color: var(--ds-text-muted);
+  font-size: 10px;
+  cursor: pointer;
+}
+/* l'uscita del canale (routing) */
+.hw-out {
+  width: 100%;
+  min-width: 0;
+  min-height: 24px;
+  padding: 2px 2px;
+  font-size: 10px;
+}
 .hw-strip--master {
   min-width: 110px;
   justify-content: center;
@@ -2149,7 +2199,8 @@ ol.ds-led-row {
   /* mixer: canali e master su una riga, i tre synth sotto; fader più corti sugli schermi bassi */
   .console-stage .hw-strips {
     display: grid;
-    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-auto-flow: column; /* canali, bus e master su una riga: le colonne si adattano a quante sono */
+    grid-auto-columns: minmax(0, 1fr);
     gap: 6px;
   }
   .console-stage .hw-strip {
@@ -2158,7 +2209,7 @@ ol.ds-led-row {
     padding-right: 2px;
   }
   .console-stage .hw-fader {
-    height: clamp(44px, calc(100dvh - 560px), 140px);
+    height: clamp(44px, calc(100dvh - 592px), 140px);
   }
   /* rack dei plugin aperto: le strisce tengono fader, mute e FX, le manopole tornano chiudendolo */
   .console-stage .hw-mixer[data-rack="true"] .hw-strip-fx,
@@ -2168,7 +2219,7 @@ ol.ds-led-row {
   }
 
   .console-stage .hw-mixer[data-rack="true"] .hw-fader {
-    height: clamp(44px, calc(100dvh - 600px), 110px);
+    height: clamp(44px, calc(100dvh - 632px), 110px);
   }
 }
 

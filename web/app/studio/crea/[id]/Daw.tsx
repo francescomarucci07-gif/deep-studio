@@ -38,6 +38,13 @@ import {
   songSeconds,
   filterLabel,
   laneValue,
+  BUS_IDS,
+  BUS_UNITY,
+  CHANNEL_IDS,
+  isBus,
+  type BusId,
+  type MixTarget,
+  type Out,
   soundOf,
   SOUND_KEY,
   type SoundInst,
@@ -652,31 +659,32 @@ export function Daw({
       <span className="hw-btn-led" />S
     </button>
   );
-  const [fxTarget, setFxTarget] = useState<AutoTarget>("lead");
+  const [fxTarget, setFxTarget] = useState<MixTarget>("lead");
   const [fxOpen, setFxOpen] = useState(false); // il rack si apre con FX e si chiude con ✕ (come in FL)
   const [selSlot, setSelSlot] = useState(0); // lo slot di cui vedi le manopole
-  const openFx = (t: AutoTarget) => {
+  const openFx = (t: MixTarget) => {
     const closing = fxOpen && fxTarget === t;
     setFxTarget(t);
     setFxOpen(!closing);
     setSelSlot(Math.max(0, project.inserts[t].findIndex(Boolean)));
   };
-  const fxLabel = (t: AutoTarget) => (t === "master" ? "Master" : (CHANNELS.find((c) => c.id === t)?.label ?? t));
-  const setSlot = (t: AutoTarget, i: number, slot: PluginSlot | null) =>
+  const fxLabel = (t: MixTarget) =>
+    t === "master" ? "Master" : isBus(t) ? `Bus ${project.buses[t].name}` : (CHANNELS.find((c) => c.id === t)?.label ?? t);
+  const setSlot = (t: MixTarget, i: number, slot: PluginSlot | null) =>
     update((p) => {
       p.inserts[t][i] = slot;
     });
-  const setSlotParam = (t: AutoTarget, i: number, id: string, v: number) =>
+  const setSlotParam = (t: MixTarget, i: number, id: string, v: number) =>
     update((p) => {
       const slot = p.inserts[t][i];
       if (slot) slot.params[id] = v;
     });
   // quanti slot mostrare: fino all'ultimo pieno, più uno vuoto (almeno uno)
-  const shownSlots = (t: AutoTarget) => {
+  const shownSlots = (t: MixTarget) => {
     const last = project.inserts[t].reduce((acc, s, i) => (s ? i : acc), -1);
     return Math.min(INSERT_SLOTS, last + 2);
   };
-  const moveSlot = (t: AutoTarget, i: number, d: -1 | 1) =>
+  const moveSlot = (t: MixTarget, i: number, d: -1 | 1) =>
     update((p) => {
       const row = p.inserts[t];
       [row[i], row[i + d]] = [row[i + d], row[i]];
@@ -686,6 +694,25 @@ export function Daw({
     update((p) => {
       p.mixer[c] = { ...p.mixer[c], ...patch };
     });
+  // Routing come nel mixer di FL: il canale esce sul master o in un bus (che così compare nel mixer)
+  const routeTo = (c: ChannelId, out: Out) =>
+    update((p) => {
+      p.mixer[c].out = out;
+      if (out !== "master") p.buses[out].shown = true;
+    });
+  const setBus = (b: BusId, patch: Partial<Project["buses"][BusId]>) =>
+    update((p) => {
+      p.buses[b] = { ...p.buses[b], ...patch };
+    });
+  const nextBus = BUS_IDS.find((b) => !project.buses[b].shown);
+  // togli un bus: sparisce dal mixer e i suoi canali tornano dritti al master (i plugin restano, se lo riapri)
+  const removeBus = (b: BusId) => {
+    update((p) => {
+      p.buses[b].shown = false;
+      for (const id of CHANNEL_IDS) if (p.mixer[id].out === b) p.mixer[id].out = "master";
+    });
+    if (fxTarget === b) setFxOpen(false);
+  };
 
   // il coach ha scritto pattern e/o canzone: li applico e tengo il progetto di prima per "Annulla"
   const applyFromCoach = (data: unknown) => {
@@ -1585,9 +1612,98 @@ export function Daw({
                       onChange={(v) => setFx(c, { delay: v })}
                     />
                   </div>
+                  <label className="hw-visually-hidden" htmlFor={`out-${c}`}>
+                    Uscita di {label}
+                  </label>
+                  <select
+                    id={`out-${c}`}
+                    className="hw-select hw-out"
+                    value={project.mixer[c].out}
+                    title="Dove esce il canale: dritto al master o in un bus (gruppo), come il routing di FL"
+                    onChange={(e) => routeTo(c, e.target.value as Out)}
+                  >
+                    <option value="master">→ Master</option>
+                    {BUS_IDS.filter((b) => project.buses[b].shown).map((b) => (
+                      <option key={b} value={b}>
+                        → {project.buses[b].name}
+                      </option>
+                    ))}
+                    {nextBus && <option value={nextBus}>+ Nuovo bus</option>}
+                  </select>
                   <span className="hw-strip-name">{label}</span>
                 </div>
               ))}
+              {/* i bus: tracce di gruppo, come gli insert di FL in cui mandi più canali */}
+              {BUS_IDS.filter((b) => project.buses[b].shown).map((b) => {
+                const bus = project.buses[b];
+                const inside = CHANNELS.filter((c) => project.mixer[c.id].out === b);
+                const db = 20 * Math.log10(Math.max(1e-4, bus.volume / BUS_UNITY));
+                return (
+                  <div key={b} className="hw-strip hw-strip--bus">
+                    <span
+                      className="hw-meter"
+                      data-hit={!bus.muted && inside.some((c) => hitNow(c.id) && !project.mixer[c.id].muted)}
+                      aria-hidden="true"
+                    />
+                    <input
+                      className="hw-fader"
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={bus.volume}
+                      aria-label={`Volume del bus ${bus.name}`}
+                      title="Doppio clic: volume invariato (0 dB)"
+                      onDoubleClick={() => setBus(b, { volume: BUS_UNITY })}
+                      onChange={(e) => setBus(b, { volume: Number(e.target.value) })}
+                    />
+                    <span className="hw-value">{bus.volume <= 0.001 ? "−∞" : `${db > 0.05 ? "+" : ""}${db.toFixed(1)} dB`}</span>
+                    <div className="hw-strip-btns">
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small hw-btn--mute"
+                        aria-pressed={bus.muted}
+                        aria-label={`Mute del bus ${bus.name}`}
+                        onClick={() => setBus(b, { muted: !bus.muted })}
+                      >
+                        <span className="hw-btn-led" />M
+                      </button>
+                      <button
+                        type="button"
+                        className="hw-btn hw-btn--small hw-fx-btn"
+                        aria-pressed={fxOpen && fxTarget === b}
+                        aria-label={`Plugin del bus ${bus.name}`}
+                        onClick={() => openFx(b)}
+                      >
+                        FX{project.inserts[b].some(Boolean) ? ` ${project.inserts[b].filter(Boolean).length}` : ""}
+                      </button>
+                    </div>
+                    <span className="hw-bus-in" title={inside.length ? `Entrano: ${inside.map((c) => c.label).join(", ")}` : undefined}>
+                      {inside.length ? inside.map((c) => c.label).join(" · ") : "nessun canale: scegli il bus nell'uscita di un canale"}
+                    </span>
+                    <label className="hw-visually-hidden" htmlFor={`bus-${b}`}>
+                      Nome del bus
+                    </label>
+                    <input
+                      id={`bus-${b}`}
+                      className="hw-strip-name hw-bus-name"
+                      value={bus.name}
+                      maxLength={16}
+                      onChange={(e) => setBus(b, { name: e.target.value })}
+                      onBlur={(e) => !e.target.value.trim() && setBus(b, { name: `Bus ${BUS_IDS.indexOf(b) + 1}` })}
+                    />
+                    <button
+                      type="button"
+                      className="hw-bus-x"
+                      title="Togli il bus: i suoi canali tornano dritti al master"
+                      aria-label={`Togli il bus ${bus.name}`}
+                      onClick={() => removeBus(b)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
               <div className="hw-strip hw-strip--master">
                 <span className="hw-label">Master</span>
                 <button
@@ -1598,6 +1714,15 @@ export function Daw({
                   onClick={() => openFx("master")}
                 >
                   FX{project.inserts.master.some(Boolean) ? ` ${project.inserts.master.filter(Boolean).length}` : ""}
+                </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small hw-fx-btn"
+                  disabled={!nextBus}
+                  title="Un bus è una traccia di gruppo: ci mandi più canali (per esempio tutta la batteria) e li regoli insieme"
+                  onClick={() => nextBus && setBus(nextBus, { shown: true })}
+                >
+                  + Bus
                 </button>
                 <Knob
                   label="Filter"

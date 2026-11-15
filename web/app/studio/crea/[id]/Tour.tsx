@@ -74,7 +74,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Il mixer",
-    text: "Il Mixer ha un canale per ogni strumento: il volume, M per il mute, S per il solo e FX per gli effetti, come EQ, compressore, riverbero e delay. Il sidechain abbassa il basso a ogni kick: è il classico respiro della house.",
+    text: "Il Mixer ha un canale per ogni strumento: il volume, M per il mute, S per il solo e FX per gli effetti, come EQ, compressore, riverbero e delay. Sotto ogni canale scegli l'uscita: il Master o un bus, come Drums, dove la batteria passa insieme con fader ed effetti suoi, come nel mixer di FL. Il sidechain abbassa il basso a ogni kick: è il classico respiro della house.",
     target: '[data-panel="mixer"]',
     view: "mixer",
   },

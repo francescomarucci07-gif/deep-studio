@@ -111,7 +111,19 @@ export const LEAD_VOICES = 6; // il lead è polifonico: fino a 6 note sullo stes
 export const emptyLead = () => Array.from({ length: STEPS }, () => [] as number[]);
 export type LeadWave = (typeof LEAD_WAVES)[number];
 
-export type Channel = { volume: number; muted: boolean };
+// out: dove esce il canale, come il routing del mixer di FL: dritto al master o in un bus (gruppo)
+export type Channel = { volume: number; muted: boolean; out: Out };
+
+// I bus: tracce di gruppo del mixer. Più canali entrano in un bus (per esempio tutta la batteria in "Drums"),
+// il bus ha il suo fader e i suoi plugin, poi va al master. shown = si vede nel mixer.
+export const BUS_IDS = ["bus1", "bus2", "bus3", "bus4"] as const;
+export type BusId = (typeof BUS_IDS)[number];
+export type Bus = { name: string; volume: number; muted: boolean; shown: boolean };
+export type Out = "master" | BusId;
+export const isBus = (v: unknown): v is BusId => BUS_IDS.includes(v as BusId);
+export const BUS_UNITY = 0.8; // il fader del bus a 0.8 = volume invariato (si può alzare fino a +1,9 dB)
+// dove si possono mettere i plugin: master, canali e bus
+export type MixTarget = AutoTarget | BusId;
 
 // Effetti di ogni canale. filter: -1…1 come il filtro di un mixer da DJ (sinistra = passa-basso,
 // il suono si chiude; destra = passa-alto, si assottiglia; 0 = spento). reverb e delay: 0…1 di send.
@@ -122,6 +134,7 @@ export const CHANNEL_IDS: ChannelId[] = ["kick", "clap", "hat", "openhat", "perc
 // Tra due punti il valore scorre in modo graduale; prima del primo e dopo l'ultimo resta fermo.
 export type AutoTarget = "master" | ChannelId;
 export const AUTO_TARGETS: AutoTarget[] = ["master", ...CHANNEL_IDS];
+export const MIX_TARGETS: MixTarget[] = [...AUTO_TARGETS, ...BUS_IDS];
 export type Lane = (number | null)[];
 
 export type Pattern = {
@@ -159,7 +172,8 @@ export type Project = {
   fx: Record<ChannelId, ChannelFx>;
   masterFilter: number; // -1…1, come i filtri dei canali
   automation: Partial<Record<AutoTarget, Lane>>;
-  inserts: Record<AutoTarget, (PluginSlot | null)[]>; // i plugin di ogni canale e del master, INSERT_SLOTS slot
+  inserts: Record<MixTarget, (PluginSlot | null)[]>; // i plugin di master, canali e bus, INSERT_SLOTS slot
+  buses: Record<BusId, Bus>;
   sidechain: boolean; // il kick abbassa il basso
   mixer: Record<ChannelId, Channel>;
 };
@@ -222,9 +236,16 @@ export function filterLabel(v: number) {
 }
 
 // La canzone dura fino all'ultima battuta usata (almeno 1)
+// i bus all'inizio: nascosti, fader a volume invariato. Il primo si chiama Drums (la batteria è il gruppo più comune)
+export function emptyBuses(): Project["buses"] {
+  return Object.fromEntries(
+    BUS_IDS.map((b, i) => [b, { name: i === 0 ? "Drums" : `Bus ${i + 1}`, volume: BUS_UNITY, muted: false, shown: false }]),
+  ) as Project["buses"];
+}
+
 // nessun plugin: ogni canale e il master con INSERT_SLOTS slot vuoti
 export function emptyInserts(): Project["inserts"] {
-  return Object.fromEntries(AUTO_TARGETS.map((t) => [t, Array(INSERT_SLOTS).fill(null)])) as Project["inserts"];
+  return Object.fromEntries(MIX_TARGETS.map((t) => [t, Array(INSERT_SLOTS).fill(null)])) as Project["inserts"];
 }
 
 // quante battute ha la fila della canzone: almeno 16, al massimo 256
@@ -297,15 +318,16 @@ export function starterProject(): Project {
     inserts: emptyInserts(),
     sidechain: true,
     mixer: {
-      kick: { volume: 0.9, muted: false },
-      clap: { volume: 0.6, muted: false },
-      hat: { volume: 0.45, muted: false },
-      openhat: { volume: 0.4, muted: false },
-      perc: { volume: 0.5, muted: false },
-      bass: { volume: 0.7, muted: false },
-      chords: { volume: 0.45, muted: false },
-      lead: { volume: 0.5, muted: false },
+      kick: { volume: 0.9, muted: false, out: "bus1" },
+      clap: { volume: 0.6, muted: false, out: "bus1" },
+      hat: { volume: 0.45, muted: false, out: "bus1" },
+      openhat: { volume: 0.4, muted: false, out: "bus1" },
+      perc: { volume: 0.5, muted: false, out: "bus1" },
+      bass: { volume: 0.7, muted: false, out: "master" },
+      chords: { volume: 0.45, muted: false, out: "master" },
+      lead: { volume: 0.5, muted: false, out: "master" },
     },
+    buses: { ...emptyBuses(), bus1: { ...emptyBuses().bus1, shown: true } },
   };
 }
 
@@ -443,7 +465,7 @@ export function normalize(raw: unknown): Project {
       }),
     ),
     inserts: Object.fromEntries(
-      AUTO_TARGETS.map((t) => [t, Array.from({ length: INSERT_SLOTS }, (_, i) => normalizeSlot(r.inserts?.[t]?.[i]))]),
+      MIX_TARGETS.map((t) => [t, Array.from({ length: INSERT_SLOTS }, (_, i) => normalizeSlot(r.inserts?.[t]?.[i]))]),
     ) as Project["inserts"],
     sidechain: typeof r.sidechain === "boolean" ? r.sidechain : d.sidechain,
     mixer: Object.fromEntries(
@@ -452,10 +474,37 @@ export function normalize(raw: unknown): Project {
         {
           volume: clamp(r.mixer?.[id]?.volume, 0, 1, d.mixer[id].volume),
           muted: r.mixer?.[id]?.muted === true,
+          // i progetti di prima non hanno il routing: tutto al master, come suonavano
+          out: isBus(r.mixer?.[id]?.out) ? (r.mixer?.[id]?.out as BusId) : "master",
         },
       ]),
     ) as Project["mixer"],
+    buses: Object.fromEntries(
+      BUS_IDS.map((b) => {
+        const raw = r.buses?.[b];
+        const def = emptyBuses()[b];
+        const name = typeof raw?.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 16) : def.name;
+        // un bus in cui entra qualche canale si vede sempre
+        const used = CHANNEL_IDS.some((id) => r.mixer?.[id]?.out === b);
+        return [b, { name, volume: clamp(raw?.volume, 0, 1, def.volume), muted: raw?.muted === true, shown: raw?.shown === true || used }];
+      }),
+    ) as Project["buses"],
   };
+}
+
+// il routing del mixer in una riga: dove esce ogni canale e quali bus ci sono
+function routingLine(p: Project) {
+  const label = (id: ChannelId) => DRUMS.find((d) => d.id === id)?.label ?? { bass: "Bass", chords: "Accordi", lead: "Lead" }[id as "bass"];
+  const shown = BUS_IDS.filter((b) => p.buses[b].shown);
+  if (!shown.length) return "Routing: tutti i canali vanno dritti al master (nessun bus).";
+  const into = (b: BusId) => CHANNEL_IDS.filter((id) => p.mixer[id].out === b).map(label);
+  const toMaster = CHANNEL_IDS.filter((id) => p.mixer[id].out === "master").map(label);
+  return `Routing (bus = gruppo del mixer, come in FL; il bus va al master, fader ${BUS_UNITY} = volume invariato): ${shown
+    .map(
+      (b) =>
+        `${b} "${p.buses[b].name}" vol ${p.buses[b].volume.toFixed(2)}${p.buses[b].muted ? " MUTO" : ""} ← ${into(b).join(", ") || "nessun canale"}`,
+    )
+    .join("; ")}; dritti al master: ${toMaster.join(", ") || "nessuno"}.`;
 }
 
 // Il progetto in parole e griglie: è quello che legge il coach.
@@ -466,6 +515,7 @@ export function describe(p: Project, title: string, editing: Slot) {
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
     `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}.`,
     `Kit di batteria: ${KITS[p.kit].label} (${KITS[p.kit].hint}).`,
+    routingLine(p),
     "Suoni dei synth: quelli qui sotto sono i suoni di base; un pattern con un suono proprio lo dice nella sua scheda.",
     `Accordi: suono ${CHORD_STYLES[p.chordSound.style].label} (${CHORD_STYLES[p.chordSound.style].hint}), filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
     `Lead: suono ${LEAD_SOUNDS[p.leadSound.wave].label} (${LEAD_SOUNDS[p.leadSound.wave].hint}), filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}.`,
@@ -520,7 +570,7 @@ export function describe(p: Project, title: string, editing: Slot) {
       : "Automazioni: nessuna.",
   );
   // i plugin negli slot (solo quelli pieni)
-  const plugins = AUTO_TARGETS.flatMap((t) =>
+  const plugins = MIX_TARGETS.flatMap((t) =>
     p.inserts[t].flatMap((slot, i) =>
       slot
         ? [

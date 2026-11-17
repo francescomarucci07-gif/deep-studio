@@ -155,6 +155,8 @@ cd web && npm run dev
 - ~~Link per gli amici~~ **fatto il 14 nov**: https://deep-studio-azure.vercel.app (Accedi con link magico; al primo
   login si apre subito un progetto con il tour). Le segnalazioni per ora arrivano a Francesco su WhatsApp.
 - ~~Pulsante "Segnala un problema"~~ **fatto il 17 nov** (vedi "Cose da sapere").
+  Prima segnalazione (17 nov, Francesco): "non riesco a mettere gli effetti sul lead" dal Roll → ~~fatto~~: pulsante FX
+  accanto al nome del synth nel Roll (`fxJump` in `Daw.tsx`), apre il Mixer con gli insert di quello strumento.
 - ~~Tutorial~~ **fatto il 14 nov**: tour guidato del coach alla prima apertura dello studio (vedi "Cose da sapere").
 - ~~Count-in~~ **fatto il 14 nov**: REC da fermo suona 4 click (una battuta, il primo più acuto) e poi parte;
   il display conta 4-3-2-1; interruttore "1234" accanto a Registra (scelta salvata nel browser). Click in

@@ -2435,3 +2435,15 @@ ol.ds-led-row {
     display: none;
   }
 }
+
+/* nel Roll: il nome del synth e il pulsante FX (apre gli insert dello strumento nel Mixer) */
+.hw-synth-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hw-synth-title .hw-fx-btn {
+  min-height: 18px;
+  padding: 0 6px;
+  font-size: 9px;
+}

@@ -862,6 +862,26 @@ export function Daw({
     setFxOpen(!closing);
     setSelSlot(Math.max(0, project.inserts[t].findIndex(Boolean)));
   };
+  // dal Roll: apre il Mixer con gli insert di quello strumento (sul telefono scorre fino al rack)
+  const fxJump = (c: "bass" | "lead" | "chords") => {
+    const count = project.inserts[c].filter(Boolean).length;
+    return (
+      <button
+        type="button"
+        className="hw-btn hw-btn--small hw-fx-btn"
+        title={`Effetti (insert) di ${CHANNELS.find((x) => x.id === c)?.label ?? c}: apre il Mixer con i suoi plugin`}
+        onClick={() => {
+          setFxTarget(c);
+          setFxOpen(true);
+          setSelSlot(Math.max(0, project.inserts[c].findIndex(Boolean)));
+          chooseView("mixer");
+          setTimeout(() => document.querySelector(".hw-rack")?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 80);
+        }}
+      >
+        FX{count ? ` ${count}` : ""}
+      </button>
+    );
+  };
   const fxLabel = (t: MixTarget) =>
     t === "master" ? "Master" : isBus(t) ? `Bus ${project.buses[t].name}` : (CHANNELS.find((c) => c.id === t)?.label ?? t);
   const setSlot = (t: MixTarget, i: number, slot: PluginSlot | null) =>
@@ -2286,7 +2306,10 @@ export function Daw({
             <div className="hw-synths">
               <div className="hw-strip hw-strip--synth hw-strip--chords">
                 <div className="hw-synth-head">
-                  <span className="hw-label">Chord synth</span>
+                  <div className="hw-synth-title">
+                    <span className="hw-label">Chord synth</span>
+                    {fxJump("chords")}
+                  </div>
                   {soundScope("chords")}
                 </div>
                 <div className="hw-seg">
@@ -2332,7 +2355,10 @@ export function Daw({
               {roll === "bass" ? (
                   <div className="hw-strip hw-strip--synth">
                     <div className="hw-synth-head">
-                      <span className="hw-label">Bass synth</span>
+                      <div className="hw-synth-title">
+                        <span className="hw-label">Bass synth</span>
+                        {fxJump("bass")}
+                      </div>
                       {soundScope("bass")}
                       <button
                         type="button"
@@ -2386,7 +2412,10 @@ export function Daw({
               ) : (
                   <div className="hw-strip hw-strip--synth hw-strip--chords hw-strip--lead">
                     <div className="hw-synth-head">
-                      <span className="hw-label">Lead synth</span>
+                      <div className="hw-synth-title">
+                        <span className="hw-label">Lead synth</span>
+                        {fxJump("lead")}
+                      </div>
                       {soundScope("lead")}
                       <button
                         type="button"

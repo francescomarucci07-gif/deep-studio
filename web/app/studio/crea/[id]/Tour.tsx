@@ -62,7 +62,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "I suoni",
-    text: "Qui c'è il synth dello strumento. Clicca un suono per sentirlo e scegliere, e gira il Cutoff per renderlo più scuro o più brillante. Con Tutti il suono vale per ogni pattern; con Solo vale solo per il pattern che stai modificando.",
+    text: "Qui c'è il synth dello strumento. Clicca un suono per sentirlo e scegliere, e gira il Cutoff per renderlo più scuro o più brillante. Con Tutti il suono vale per ogni pattern; con Solo vale solo per il pattern che stai modificando. Il pulsante FX accanto al nome apre gli effetti dello strumento.",
     target: '[data-panel="roll"] .hw-synths',
     view: "roll",
   },

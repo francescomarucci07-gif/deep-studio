@@ -13,6 +13,7 @@ import {
   filterFreqs,
   laneValue,
   soundOf,
+  noteLen,
   type AutoTarget,
   type BusId,
   type MixTarget,
@@ -336,7 +337,9 @@ export class Graph {
     const bs = soundOf(p, pat, "bass"), ls = soundOf(p, pat, "lead"), cs = soundOf(p, pat, "chords");
     const n = pat.bass[s];
     if (n !== null) {
-      const len = bs.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
+      // una nota lunga (disegnata nel Roll) dura i suoi step; le altre: corta, o fino alla nota dopo (808 long)
+      const L = noteLen(pat, "bass", s, n);
+      const len = L > 1 ? L - 0.05 : bs.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
       this.bassNote(t, n, stepDur * len, bs);
     }
     const chord = pat.lead[s];
@@ -345,7 +348,10 @@ export class Graph {
       const len = ls.length === "lunga" ? this.stepsToNext(line, s) - 0.05 : 0.8;
       // più voci insieme: ognuna un po' più piano, così un accordo non è 4 volte più forte di una nota
       const level = 1 / Math.sqrt(chord.length);
-      for (const m of chord) this.leadNote(t, m, stepDur * len, ls, level, ls.length === "lunga");
+      for (const m of chord) {
+        const L = noteLen(pat, "lead", s, m);
+        this.leadNote(t, m, stepDur * (L > 1 ? L - 0.05 : len), ls, level, ls.length === "lunga");
+      }
     }
     if (s % 4 === 0) {
       const layers = pat.chords[s / 4];

@@ -466,8 +466,29 @@ ol.ds-led-row {
   background: var(--note);
   box-shadow: 0 0 8px color-mix(in srgb, var(--note) var(--hw-glow-amount), transparent);
 }
-.daw-roll[data-roll="lead"] .daw-cell[aria-pressed="true"] {
+.daw-roll[data-roll="lead"] .daw-cell[aria-pressed="true"],
+.daw-roll[data-roll="lead"] .daw-cell[data-tail="true"] {
   --note: var(--hw-pad-blue);
+}
+/* note lunghe: la coda ha lo stesso colore, un po' più chiaro, e si unisce alla nota (copre lo spazio tra le caselle) */
+.daw-roll .daw-cell[data-tail="true"] {
+  --note: var(--hw-pad-green);
+  background: color-mix(in srgb, var(--note) 62%, var(--ds-surface));
+  box-shadow: -4px 0 0 color-mix(in srgb, var(--note) 62%, var(--ds-surface));
+  border-radius: 0 3px 3px 0;
+}
+.daw-roll .daw-cell[data-tail="true"]:not([data-last="true"]) {
+  border-radius: 0;
+}
+.daw-roll .daw-cell[data-long="true"] {
+  border-radius: 3px 0 0 3px;
+}
+/* il bordo destro della nota: da lì la si allunga trascinando */
+.daw-roll .daw-cell[data-last="true"] {
+  cursor: ew-resize;
+}
+.daw-roll .daw-cell {
+  touch-action: pan-y; /* sul telefono si disegna in orizzontale, si scorre in verticale */
 }
 /* accordi: una casella per battito (4 step), con il nome dell'accordo */
 .daw-cell--beat {
@@ -1058,6 +1079,10 @@ ol.ds-led-row {
   border-color: var(--hw-panel-edge);
 }
 .hw-key[aria-pressed="true"],
+/* la coda di una nota lunga nelle righe Bass e Lead del Beat */
+.hw-key--note[data-hold="true"] {
+  background: color-mix(in srgb, var(--key) 45%, var(--hw-step-off));
+}
 .hw-key--note[data-on="true"] {
   background: var(--key);
   box-shadow: 0 0 10px color-mix(in srgb, var(--key) var(--hw-glow-amount), transparent);

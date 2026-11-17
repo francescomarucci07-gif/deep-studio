@@ -143,7 +143,33 @@ export type Pattern = {
   chords: Chord[][]; // per ogni battito gli accordi che suonano insieme (vuoto = continua quello prima o niente), max 3
   lead: number[][]; // la melodia: per ogni step le note MIDI che suonano insieme (vuoto = niente), max 6
   sounds?: Sounds; // il suono proprio di questo pattern (basso, accordi, lead); manca = quello del progetto
+  len?: Record<string, number>; // lunghezza in step delle note lunghe (chiavi di lenKey); manca = nota di uno step
 };
+
+// Lunghezza delle note (basso e lead), in step. Chiave: "b5" = la nota di basso dello step 6; "l5:72" = il Do5
+// del lead dello step 6. Si salvano solo le note lunghe (2 step o più): le altre suonano come prima
+// (con Legato tengono fino alla nota dopo). Una nota non va oltre la fine della battuta.
+export type NoteInst = "bass" | "lead";
+export const lenKey = (r: NoteInst, step: number, note: number) => (r === "bass" ? `b${step}` : `l${step}:${note}`);
+export const noteLen = (pat: Pattern, r: NoteInst, step: number, note: number) => pat.len?.[lenKey(r, step, note)] ?? 1;
+// la lunghezza più lunga possibile: fino a fine battuta, e senza coprire la nota dopo (stessa altezza; nel basso,
+// che è mono, qualsiasi nota)
+export function maxLen(pat: Pattern, r: NoteInst, step: number, note: number) {
+  for (let k = step + 1; k < STEPS; k++) {
+    if (r === "bass" ? pat.bass[k] !== null : pat.lead[k].includes(note)) return k - step;
+  }
+  return STEPS - step;
+}
+// scrive una lunghezza (1 = nota corta: la chiave sparisce)
+export function setNoteLen(pat: Pattern, r: NoteInst, step: number, note: number, len: number) {
+  const key = lenKey(r, step, note);
+  const l = Math.max(1, Math.min(Math.round(len), maxLen(pat, r, step, note)));
+  if (l > 1) pat.len = { ...pat.len, [key]: l };
+  else if (pat.len) {
+    delete pat.len[key];
+    if (Object.keys(pat.len).length === 0) delete pat.len;
+  }
+}
 
 // I suoni dei synth. Il progetto ha un suono "di base" per strumento; un pattern può averne uno suo,
 // come in FL quando cloni un canale per dare a un pattern un timbro diverso.
@@ -372,13 +398,25 @@ function normalizePattern(raw: unknown): Pattern {
     ...(o.chords ? { chords: normChords(o.chords) } : {}),
     ...(o.lead ? { lead: normLead(o.lead) } : {}),
   };
-  return {
+  const pat: Pattern = {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(r.drums?.[id])])) as Pattern["drums"],
     bass: notes(r.bass, BASS_LOW, BASS_HIGH),
     chords: Array.from({ length: BEATS }, (_, i) => chordLayers(Array.isArray(r.chords) ? r.chords[i] : null)),
     lead: leadNotes(r.lead),
     ...(Object.keys(sounds).length ? { sounds } : {}),
   };
+  // lunghezze: solo per note che esistono, intere, dentro la battuta e senza coprire la nota dopo
+  const lens = r.len && typeof r.len === "object" ? (r.len as Record<string, unknown>) : {};
+  for (let st = 0; st < STEPS; st++) {
+    const b = pat.bass[st];
+    const bl = b === null ? undefined : lens[lenKey("bass", st, b)];
+    if (b !== null && typeof bl === "number" && Number.isFinite(bl)) setNoteLen(pat, "bass", st, b, bl);
+    for (const m of pat.lead[st]) {
+      const v = lens[lenKey("lead", st, m)];
+      if (typeof v === "number" && Number.isFinite(v)) setNoteLen(pat, "lead", st, m, v);
+    }
+  }
+  return pat;
 }
 
 // il lead: per ogni step un elenco di note (i progetti di prima avevano una nota o null: diventa [nota] o [])
@@ -523,7 +561,7 @@ export function describe(p: Project, title: string, editing: Slot) {
       (id) => `${id} filtro ${p.fx[id].filter.toFixed(2)} (${filterLabel(p.fx[id].filter)}) rev ${p.fx[id].reverb.toFixed(2)} dly ${p.fx[id].delay.toFixed(2)}`,
     ).join("; ")}; master filtro ${p.masterFilter.toFixed(2)} (${filterLabel(p.masterFilter)}).`,
     `Basso: suono ${BASS_WAVES[p.bassSound.wave].label} (${BASS_WAVES[p.bassSound.wave].hint}), filtro ${Math.round(p.bassSound.cutoff)} Hz, note ${p.bassSound.length === "lunga" ? "lunghe (808)" : "corte"}.`,
-    "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti). x = colpo, . = vuoto.",
+    "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti). x = colpo, . = vuoto. Nelle note, (4) = lunga 4 step; senza numero = uno step.",
     `Il producer sta modificando il pattern ${editing}.`,
   ];
   // i pattern vuoti in una riga sola: con 16 pattern il messaggio resta corto
@@ -534,10 +572,13 @@ export function describe(p: Project, title: string, editing: Slot) {
     if (isEmptyPattern(pat)) continue;
     lines.push(`Pattern ${s}:`);
     for (const { id, label } of DRUMS) lines.push(`  ${label.padEnd(9)} ${pat.drums[id].map((x) => (x ? "x" : ".")).join("")}`);
-    const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}`)).filter(Boolean);
+    const ln = (r: NoteInst, i: number, n: number) => (noteLen(pat, r, i, n) > 1 ? `(${noteLen(pat, r, i, n)})` : "");
+    const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}${ln("bass", i, n)}`)).filter(Boolean);
     lines.push(`  Bass      ${notes.length ? notes.join(" ") : "nessuna nota"}`);
     lines.push(`  Accordi   ${pat.chords.map((c, b) => `battito ${b + 1}: ${c.length ? c.map(chordName).join(" + ") : "-"}`).join(", ")}`);
-    const lead = pat.lead.map((n, i) => (n.length ? `${i + 1}:${n.map(noteName).join("+")}` : null)).filter(Boolean);
+    const lead = pat.lead
+      .map((n, i) => (n.length ? `${i + 1}:${n.map((m) => `${noteName(m)}${ln("lead", i, m)}`).join("+")}` : null))
+      .filter(Boolean);
     lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
     const own = pat.sounds;
     if (own) {

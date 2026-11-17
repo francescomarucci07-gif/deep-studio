@@ -32,6 +32,7 @@ import {
   CHORD_STYLES,
   normalize,
   soundOf,
+  lenKey,
   type Pattern,
   type Project,
   type Slot,
@@ -42,6 +43,14 @@ const stepList = (label: string) => ({
   description: `Step (1–16) in cui suona ${label}. Lista vuota = non suona.`,
   items: { type: "integer", minimum: 1, maximum: STEPS },
 });
+
+// la lunghezza di una nota, in step (come nel piano roll): resta dentro la battuta e non copre la nota dopo
+const LEN_FIELD = {
+  type: "integer",
+  minimum: 1,
+  maximum: STEPS,
+  description: "Quanti step dura la nota (1 = uno step, 4 = un quarto, 16 = la battuta). Senza = uno step (con Legato/808 long tiene fino alla nota dopo).",
+};
 
 const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_pattern",
@@ -68,6 +77,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
           properties: {
             step: { type: "integer", minimum: 1, maximum: STEPS },
             nota: { type: "integer", minimum: BASS_LOW, maximum: BASS_HIGH },
+            lunghezza: LEN_FIELD,
           },
           required: ["step", "nota"],
         },
@@ -116,6 +126,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
           properties: {
             step: { type: "integer", minimum: 1, maximum: STEPS },
             nota: { type: "integer", minimum: LEAD_LOW, maximum: LEAD_HIGH },
+            lunghezza: LEN_FIELD,
           },
           required: ["step", "nota"],
         },
@@ -341,7 +352,18 @@ export function createStudioWriter(current: Project, editing: Slot) {
       };
       const sounds = { ...old.sounds };
       if (here) for (const k of ["bass", "chords", "lead"] as const) if (given[k]) Object.assign(sounds, { [k]: next[k] });
+      // lunghezze delle note (normalize le tiene dentro la battuta e senza sovrapposizioni)
+      const len: Record<string, number> = {};
+      for (const [list, r] of [[i.basso, "bass"], [i.melodia, "lead"]] as const) {
+        if (!Array.isArray(list)) continue;
+        for (const n of list as { step?: unknown; nota?: unknown; lunghezza?: unknown }[]) {
+          if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && typeof n.lunghezza === "number") {
+            len[lenKey(r, (n.step as number) - 1, n.nota as number)] = n.lunghezza;
+          }
+        }
+      }
       const pattern: Pattern = {
+        len,
         drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
         bass,
         chords: chords as Pattern["chords"], // normalize scarta radici e tipi non validi

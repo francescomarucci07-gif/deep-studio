@@ -296,3 +296,12 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Conseguenze: un bus si vede nel mixer solo se lo usi ("+ Bus" nella striscia del Master, oppure "+ Nuovo bus"
   nell'uscita di un canale); il coach (`crea-v19`) legge il routing e lo scrive con `scrivi_effetti.bus`.
 - Prova offline: con la batteria nel bus a 0 dB il mix è identico a tutto dritto al master; bus mutato = batteria mutata.
+
+## Aggiornamento 17 nov 2026 · lunghezza delle note
+
+- Il formato del pattern resta "una nota per step" (basso) e "più note per step" (lead); le lunghezze stanno a parte,
+  in `pattern.len` (chiave → step), e solo per le note da 2 step in su. Così i progetti di prima non cambiano, e le
+  note di uno step continuano a comportarsi come prima (Legato/808 long: fino alla nota dopo).
+- Opzione scartata: note come oggetti {nota, lunghezza} dentro `bass`/`lead` (più pulito, ma cambiava tutto il codice
+  che legge le note: motore, coach, Beat, registrazione).
+- Una nota non va oltre la battuta e non copre la nota dopo (stessa altezza nel lead; qualsiasi nel basso, che è mono).

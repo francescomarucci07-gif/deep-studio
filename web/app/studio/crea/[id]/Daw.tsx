@@ -46,6 +46,9 @@ import {
   type MixTarget,
   type Out,
   soundOf,
+  noteLen,
+  maxLen,
+  setNoteLen,
   SOUND_KEY,
   type SoundInst,
   type Sounds,
@@ -339,6 +342,8 @@ export function Daw({
   const keysRef = useRef({ keyMode, keyInst, octaves, keyChord });
   keysRef.current = { keyMode, keyInst, octaves, keyChord };
 
+  // le note registrate con il tasto ancora giù: al rilascio prendono la loro lunghezza
+  const held = useRef(new Map<string, { slot: Slot; step: number; note: number; inst: "bass" | "lead"; at: number }>());
   // un tasto della tastiera musicale: suona la nota (o l'accordo) e con REC + Play la scrive sullo step
   const playKey = useCallback(
     (code: string, pressedAt?: number) => {
@@ -380,9 +385,12 @@ export function Daw({
                 pp.lead[s] = [...pp.lead[s], note].sort((a, b) => a - b);
               }
             } else {
+              if (pp.bass[s] !== null) setNoteLen(pp, "bass", s, pp.bass[s] as number, 1);
               pp.bass[s] = note;
             }
           });
+          // quando lasci il tasto, la nota diventa lunga quanto l'hai tenuto (vedi onKeyUp)
+          held.current.set(code, { slot, step: s, note, inst, at: pressedAt ?? performance.now() });
         }
       }
       setFlash(k.keyInst);
@@ -506,6 +514,13 @@ export function Daw({
     // i browser "cliccano" il pulsante col focus quando lo spazio viene rilasciato: lo blocco anche lì
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === "Space" && !typing(e.target)) e.preventDefault();
+      // registrazione: la nota dura quanto hai tenuto il tasto, arrotondato agli step (da 2 step in su)
+      const h = held.current.get(e.code);
+      if (!h) return;
+      held.current.delete(e.code);
+      const stepDur = 60 / projectRef.current.bpm / 4;
+      const len = Math.round((e.timeStamp - h.at) / 1000 / stepDur);
+      if (len >= 2) update((p) => setNoteLen(p.patterns[h.slot], h.inst, h.step, h.note, len));
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
@@ -513,7 +528,7 @@ export function Daw({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [togglePlay, hitPad, chooseView, playKey]);
+  }, [togglePlay, hitPad, chooseView, playKey, update]);
 
   // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
   const snapshot = useCallback(
@@ -573,19 +588,89 @@ export function Daw({
   // una nota nel piano roll (basso o lead): clic su una nota accesa = la spegne
   // piano roll: sul basso una nota per step (la nuova sostituisce la vecchia), sul lead più note insieme
   const hasNote = (r: RollId, i: number, note: number) => (r === "lead" ? pat.lead[i].includes(note) : pat.bass[i] === note);
-  const setNote = (r: RollId, i: number, note: number) => {
-    const removing = hasNote(r, i, note);
-    if (r === "lead" && !removing && pat.lead[i].length >= LEAD_VOICES) return; // già 6 voci su questo step
-    update((p) => {
-      const pp = p.patterns[editing];
-      if (r === "lead") {
-        pp.lead[i] = removing ? pp.lead[i].filter((n) => n !== note) : [...pp.lead[i], note].sort((a, b) => a - b);
-      } else {
-        pp.bass[i] = removing ? null : note;
-      }
-    });
-    if (!removing && !playing) void engine().preview(r, { note });
+  // gli step coperti dalla coda di una nota lunga (per le righe Bass e Lead del Beat)
+  const holds = { bass: new Set<number>(), lead: new Set<number>() };
+  for (let i = 0; i < STEPS; i++) {
+    const b = pat.bass[i];
+    if (b !== null) for (let k = 1; k < noteLen(pat, "bass", i, b); k++) holds.bass.add(i + k);
+    for (const m of pat.lead[i]) for (let k = 1; k < noteLen(pat, "lead", i, m); k++) holds.lead.add(i + k);
+  }
+  // la nota che copre lo step i (con la sua coda): lo step in cui comincia, oppure -1
+  const noteAt = (r: RollId, i: number, note: number) => {
+    for (let j = i; j >= 0; j--) if (hasNote(r, j, note)) return j + noteLen(pat, r, j, note) > i ? j : -1;
+    return -1;
   };
+  // mette (con la lunghezza data) o toglie una nota; nel basso, che è mono, una nota nuova sostituisce quella dello step
+  const putNote = (p: Project, r: RollId, i: number, note: number, len: number) => {
+    const pp = p.patterns[playbackRef.current.editing];
+    if (r === "lead") {
+      if (!pp.lead[i].includes(note)) pp.lead[i] = [...pp.lead[i], note].sort((a, b) => a - b);
+    } else {
+      if (pp.bass[i] !== null) setNoteLen(pp, "bass", i, pp.bass[i] as number, 1);
+      pp.bass[i] = note;
+    }
+    setNoteLen(pp, r, i, note, len);
+  };
+  const dropNote = (p: Project, r: RollId, i: number, note: number) => {
+    const pp = p.patterns[playbackRef.current.editing];
+    setNoteLen(pp, r, i, note, 1);
+    if (r === "lead") pp.lead[i] = pp.lead[i].filter((n) => n !== note);
+    else pp.bass[i] = null;
+  };
+  // con la tastiera (Invio o spazio su una casella): metti o togli una nota, lunga quanto il pennello
+  const setNote = (r: RollId, i: number, note: number) => {
+    const at = noteAt(r, i, note);
+    if (r === "lead" && at < 0 && pat.lead[i].length >= LEAD_VOICES) return; // già 6 voci su questo step
+    update((p) => (at >= 0 ? dropNote(p, r, at, note) : putNote(p, r, i, note, brushLen.current)));
+    if (at < 0 && !playing) void engine().preview(r, { note });
+  };
+  // Col mouse, come il piano roll di FL: premi su una casella vuota e trascini = disegni una nota lunga quanto vuoi;
+  // premi su una nota e trascini = la allunghi o accorci; un clic senza trascinare su una nota = la togli.
+  // La nota nuova prende la lunghezza dell'ultima che hai disegnato (il "pennello").
+  const brushLen = useRef(1);
+  const drag = useRef<{ r: RollId; note: number; start: number; len: number; existed: boolean; moved: boolean } | null>(null);
+  const rollDown = (r: RollId, i: number, note: number) => {
+    const at = noteAt(r, i, note);
+    if (at >= 0) {
+      drag.current = { r, note, start: at, len: noteLen(pat, r, at, note), existed: true, moved: false };
+      return;
+    }
+    if (r === "lead" && pat.lead[i].length >= LEAD_VOICES) return;
+    const len = Math.min(brushLen.current, maxLen(pat, r, i, note));
+    update((p) => putNote(p, r, i, note, len));
+    if (!playing) void engine().preview(r, { note });
+    drag.current = { r, note, start: i, len, existed: false, moved: false };
+  };
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      const d = drag.current;
+      if (!d) return;
+      const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>(".daw-roll [data-step]");
+      if (!cell) return;
+      const col = Number(cell.dataset.step);
+      const cur = projectRef.current.patterns[playbackRef.current.editing];
+      const len = Math.max(1, Math.min(col - d.start + 1, maxLen(cur, d.r, d.start, d.note)));
+      if (len === d.len) return;
+      d.len = len;
+      d.moved = true;
+      update((p) => setNoteLen(p.patterns[playbackRef.current.editing], d.r, d.start, d.note, len));
+    };
+    const up = () => {
+      const d = drag.current;
+      drag.current = null;
+      if (!d) return;
+      if (d.existed && !d.moved) update((p) => dropNote(p, d.r, d.start, d.note));
+      else brushLen.current = d.len;
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [update]);
 
   const setFx = (c: ChannelId, patch: Partial<ChannelFx>) =>
     update((p) => {
@@ -1296,6 +1381,7 @@ export function Daw({
                     className="hw-key hw-key--note"
                     data-group={Math.floor(i / 4)}
                     data-on={n !== null}
+                    data-hold={n === null && holds.bass.has(i)}
                     data-now={i === step && playingSlot === editing}
                     title="Le note del basso si scrivono nel Roll: clic per aprirlo"
                     onClick={() => openRoll("bass")}
@@ -1324,6 +1410,7 @@ export function Daw({
                     className="hw-key hw-key--note hw-key--lead"
                     data-group={Math.floor(i / 4)}
                     data-on={n.length > 0}
+                    data-hold={n.length === 0 && holds.lead.has(i)}
                     data-now={i === step && playingSlot === editing}
                     title={`${n.length ? `${n.map(noteName).join(" + ")} · ` : ""}la melodia si scrive nel Roll: clic per aprirlo`}
                     onClick={() => openRoll("lead")}
@@ -1995,18 +2082,33 @@ export function Daw({
                     >
                       {noteName(note)}
                     </button>
-                    {Array.from({ length: STEPS }, (_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        className="daw-cell"
-                        aria-pressed={hasNote(roll, i, note)}
-                        aria-label={`${noteName(note)} step ${i + 1}`}
-                        data-now={i === step && playingSlot === editing}
-                        data-beat={i % 4 === 0}
-                        onClick={() => setNote(roll, i, note)}
-                      />
-                    ))}
+                    {Array.from({ length: STEPS }, (_, i) => {
+                      const head = hasNote(roll, i, note);
+                      const at = head ? i : noteAt(roll, i, note);
+                      const len = at >= 0 ? noteLen(pat, roll, at, note) : 0;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          className="daw-cell"
+                          aria-pressed={head}
+                          aria-label={`${noteName(note)} step ${i + 1}${head && len > 1 ? `, lunga ${len} step` : ""}`}
+                          data-step={i}
+                          data-tail={!head && at >= 0}
+                          data-last={at >= 0 && at + len - 1 === i}
+                          data-long={head && len > 1}
+                          data-now={i === step && playingSlot === editing}
+                          data-beat={i % 4 === 0}
+                          onPointerDown={(e) => {
+                            if (e.button !== 0) return;
+                            e.preventDefault();
+                            rollDown(roll, i, note);
+                          }}
+                          // Invio o spazio da tastiera (detail = 0): il clic del mouse lo gestisce rollDown
+                          onClick={(e) => e.detail === 0 && setNote(roll, i, note)}
+                        />
+                      );
+                    })}
                   </div>
                 ))}
               </div>

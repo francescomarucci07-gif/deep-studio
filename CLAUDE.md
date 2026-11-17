@@ -180,6 +180,17 @@ Ctrl+Y / Ctrl+Shift+Z e i pulsanti ↶ ↷ accanto a Versioni; pila di 100 passi
 ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~Velocity e accenti~~ **fatti** (vedi
 "Cose da sapere").
 
+**Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
+- Studio: ✱ tastiera MIDI vera (Web MIDI: suonare e registrare nel Roll); pattern da 2 o 4 battute; ✱ export MIDI e
+  degli stem (ponte verso FL); più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
+  comodo (selezione multipla, copia/incolla, trasposizione, quantize, velocity per nota); automazioni di volume, send,
+  plugin e bus; send verso i bus e bus dentro bus; metronomo durante la registrazione.
+- Coach: ✱ lezioni guidate ("missioni" con controllo di quello che hai fatto); parere in tempo reale (es. basso che
+  copre il kick).
+- Prodotto: pagina delle segnalazioni nel sito (solo per Francesco); link di ascolto pubblico; email di accesso con
+  SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).
+- Codice: dividere `Daw.tsx` (oltre 2.500 righe) in componenti; test Playwright nel repo; M2 worker su Modal (serve Spencer).
+
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,
 canzoni fino a 256 battute.

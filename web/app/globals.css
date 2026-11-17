@@ -2373,3 +2373,25 @@ ol.ds-led-row {
   border-color: var(--ds-accent);
   background: color-mix(in srgb, var(--ds-accent) 28%, var(--hw-button));
 }
+
+/* velocity nel Beat: una barra dal basso, alta quanto la forza del colpo (80% = normale) */
+.hw-vel {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  max-height: calc(100% - 6px);
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--ds-text) 70%, transparent);
+  pointer-events: none;
+}
+.hw-key[data-velkey] {
+  cursor: ns-resize;
+  touch-action: none; /* sul telefono il dito trascina la barra, non la pagina */
+}
+.hw-key--chord .hw-vel {
+  left: 50%;
+  right: auto;
+  width: 8px;
+  margin-left: -4px;
+}

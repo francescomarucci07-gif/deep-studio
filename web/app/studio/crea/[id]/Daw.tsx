@@ -49,6 +49,10 @@ import {
   noteLen,
   maxLen,
   setNoteLen,
+  setVel,
+  velOf,
+  VEL_DEFAULT,
+  VEL_MIN,
   SOUND_KEY,
   type SoundInst,
   type Sounds,
@@ -636,6 +640,7 @@ export function Daw({
     const turningOn = !pat.drums[d][i];
     update((p) => {
       p.patterns[editing].drums[d][i] = turningOn;
+      if (!turningOn) setVel(p.patterns[editing], `${d}${i}`, VEL_DEFAULT); // spento: la sua velocity sparisce
     });
     if (turningOn && !playing) void engine().preview(d);
   };
@@ -650,6 +655,52 @@ export function Daw({
     if (b !== null) for (let k = 1; k < noteLen(pat, "bass", i, b); k++) holds.bass.add(i + k);
     for (const m of pat.lead[i]) for (let k = 1; k < noteLen(pat, "lead", i, m); k++) holds.lead.add(i + k);
   }
+  // Velocity nel Beat (come il graph editor di FL): con il pulsante acceso, premi su un colpo e trascini su e giù per
+  // la sua forza; passando sugli altri colpi tenendo premuto li "dipingi". In questa modalità il clic non accende step.
+  const [velMode, setVelMode] = useState(false);
+  const [velShown, setVelShown] = useState<number | null>(null); // l'ultimo valore toccato, per il display
+  const velDrag = useRef(false);
+  const velAt = (el: HTMLElement, y: number) => {
+    const key = el.dataset.velkey;
+    if (!key) return;
+    const r = el.getBoundingClientRect();
+    const v = Math.max(VEL_MIN, Math.min(1, 1 - (y - r.top) / r.height));
+    setVelShown(Math.round(v * 100));
+    update((p) => setVel(p.patterns[playbackRef.current.editing], key, v));
+  };
+  const velBar = (key: string, on: boolean) =>
+    velMode && on ? <span className="hw-vel" style={{ height: `${Math.round(velOf(pat, key) * 100)}%` }} aria-hidden="true" /> : null;
+  const velProps = (key: string, on: boolean) =>
+    velMode && on
+      ? {
+          "data-velkey": key,
+          title: `Velocity ${Math.round(velOf(pat, key) * 100)}% (trascina su e giù)`,
+          onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            velDrag.current = true;
+            velAt(e.currentTarget, e.clientY);
+          },
+        }
+      : {};
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      if (!velDrag.current) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>("[data-velkey]");
+      if (el) velAt(el, e.clientY);
+    };
+    const up = () => {
+      velDrag.current = false;
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  });
   // la nota che copre lo step i (con la sua coda): lo step in cui comincia, oppure -1
   const noteAt = (r: RollId, i: number, note: number) => {
     for (let j = i; j >= 0; j--) if (hasNote(r, j, note)) return j + noteLen(pat, r, j, note) > i ? j : -1;
@@ -1418,6 +1469,19 @@ export function Daw({
                 <button type="button" className="hw-btn hw-btn--small" onClick={clearPattern}>
                   Svuota
                 </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-pressed={velMode}
+                  title="Velocity: la forza di ogni colpo e nota. Acceso: trascina su e giù sui colpi (80% = normale, 100% = accento)"
+                  onClick={() => {
+                    setVelMode(!velMode);
+                    setVelShown(null);
+                  }}
+                >
+                  <span className="hw-btn-led" />
+                  {velMode && velShown !== null ? `Vel ${velShown}%` : "Vel"}
+                </button>
               </div>
             </div>
             <div className="hw-seq-grid">
@@ -1438,9 +1502,11 @@ export function Daw({
                       aria-pressed={on}
                       aria-label={`${label} step ${i + 1}`}
                       data-now={i === step && playingSlot === editing}
-                      onClick={() => toggleDrum(d, i)}
+                      onClick={() => !velMode && toggleDrum(d, i)}
+                      {...velProps(`${d}${i}`, on)}
                     >
                       <span className="hw-key-led" />
+                      {velBar(`${d}${i}`, on)}
                     </button>
                   ))}
                 </div>
@@ -1461,8 +1527,10 @@ export function Daw({
                     data-hold={n === null && holds.bass.has(i)}
                     data-now={i === step && playingSlot === editing}
                     title="Le note del basso si scrivono nel Roll: clic per aprirlo"
-                    onClick={() => openRoll("bass")}
+                    onClick={() => !velMode && openRoll("bass")}
+                    {...velProps(`b${i}`, n !== null)}
                   >
+                    {velBar(`b${i}`, n !== null)}
                     {n !== null ? noteName(n).replace(/\d$/, "") : ""}
                   </span>
                 ))}
@@ -1490,8 +1558,10 @@ export function Daw({
                     data-hold={n.length === 0 && holds.lead.has(i)}
                     data-now={i === step && playingSlot === editing}
                     title={`${n.length ? `${n.map(noteName).join(" + ")} · ` : ""}la melodia si scrive nel Roll: clic per aprirlo`}
-                    onClick={() => openRoll("lead")}
+                    onClick={() => !velMode && openRoll("lead")}
+                    {...velProps(`l${i}`, n.length > 0)}
                   >
+                    {velBar(`l${i}`, n.length > 0)}
                     {/* più note insieme: la più bassa e quante ce ne sono in tutto */}
                     {n.length ? `${noteName(n[0]).replace(/\d$/, "")}${n.length > 1 ? `+${n.length - 1}` : ""}` : ""}
                   </span>
@@ -1512,8 +1582,10 @@ export function Daw({
                     data-on={c.length > 0}
                     data-now={Math.floor(step / 4) === b && playingSlot === editing}
                     title="Gli accordi si scrivono nel Roll, scheda Chord: clic per aprirlo"
-                    onClick={() => openRoll("chords")}
+                    onClick={() => !velMode && openRoll("chords")}
+                    {...velProps(`c${b}`, c.length > 0)}
                   >
+                    {velBar(`c${b}`, c.length > 0)}
                     {c.map(chordName).join(" + ")}
                   </span>
                 ))}

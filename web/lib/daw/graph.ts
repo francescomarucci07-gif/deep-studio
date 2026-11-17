@@ -14,6 +14,8 @@ import {
   laneValue,
   soundOf,
   noteLen,
+  velOf,
+  velGain,
   type AutoTarget,
   type BusId,
   type MixTarget,
@@ -331,7 +333,8 @@ export class Graph {
   // Tutto quello che suona allo step s del pattern, al tempo t
   playStep(pat: Pattern, s: number, t: number, stepDur: number) {
     const p = this.getProject();
-    for (const { id } of DRUMS) if (pat.drums[id][s]) this.drum(id, t);
+    // velocity: ogni colpo e ogni nota con la sua forza (0.8 = come prima)
+    for (const { id } of DRUMS) if (pat.drums[id][s]) this.drum(id, t, velGain(velOf(pat, `${id}${s}`)));
     if (pat.drums.kick[s] && p.sidechain) this.sidechain(t, stepDur);
     // ogni pattern suona con il suo suono, se ce l'ha, altrimenti con quello del progetto
     const bs = soundOf(p, pat, "bass"), ls = soundOf(p, pat, "lead"), cs = soundOf(p, pat, "chords");
@@ -340,14 +343,14 @@ export class Graph {
       // una nota lunga (disegnata nel Roll) dura i suoi step; le altre: corta, o fino alla nota dopo (808 long)
       const L = noteLen(pat, "bass", s, n);
       const len = L > 1 ? L - 0.05 : bs.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
-      this.bassNote(t, n, stepDur * len, bs);
+      this.bassNote(t, n, stepDur * len, bs, velGain(velOf(pat, `b${s}`)));
     }
     const chord = pat.lead[s];
     if (chord.length) {
       const line = pat.lead.map((n) => (n.length ? n[0] : null));
       const len = ls.length === "lunga" ? this.stepsToNext(line, s) - 0.05 : 0.8;
       // più voci insieme: ognuna un po' più piano, così un accordo non è 4 volte più forte di una nota
-      const level = 1 / Math.sqrt(chord.length);
+      const level = velGain(velOf(pat, `l${s}`)) / Math.sqrt(chord.length);
       for (const m of chord) {
         const L = noteLen(pat, "lead", s, m);
         this.leadNote(t, m, stepDur * (L > 1 ? L - 0.05 : len), ls, level, ls.length === "lunga");
@@ -358,7 +361,8 @@ export class Graph {
       if (layers.length) {
         const beats = CHORD_STYLES[cs.style].hold ? this.beatsToNextChord(pat, s / 4) : 0.5;
         // accordi sovrapposti: ognuno un po' più piano, come per il lead
-        for (const c of layers) this.chord(t, c, beats * 4 * stepDur, cs, 1 / Math.sqrt(layers.length));
+        const cv = velGain(velOf(pat, `c${s / 4}`));
+        for (const c of layers) this.chord(t, c, beats * 4 * stepDur, cs, cv / Math.sqrt(layers.length));
       }
     }
   }
@@ -452,10 +456,11 @@ export class Graph {
   }
 
   // un gain per la nota: se choke, chiude le note dello strumento partite prima di t
-  private voiceGain(inst: "bass" | "lead", t: number, choke: boolean) {
+  private voiceGain(inst: "bass" | "lead", t: number, choke: boolean, level = 1) {
     const list = this.voices[inst].filter((v) => this.ctx.currentTime < v.t + 8); // le note vecchie sono già finite
     if (choke) for (const v of list) if (v.t < t - 0.0005) v.g.gain.setTargetAtTime(0, t, 0.006);
     const g = this.ctx.createGain();
+    g.gain.value = level;
     list.push({ g, t });
     this.voices[inst] = list.slice(-24);
     return g;
@@ -474,8 +479,14 @@ export class Graph {
     return s;
   }
 
-  private drum(id: DrumId, t: number) {
-    const out = this.channels[id];
+  private drum(id: DrumId, t: number, level = 1) {
+    let out: AudioNode = this.channels[id];
+    if (level !== 1) {
+      const v = this.ctx.createGain();
+      v.gain.value = level;
+      v.connect(out);
+      out = v;
+    }
     const ctx = this.ctx;
     const kit = KITS[this.getProject().kit] ?? KITS.house;
     if (id === "kick") {
@@ -605,7 +616,7 @@ export class Graph {
   }
 
   // Basso: un suono a scelta (BASS_WAVES), sempre monofonico. "lunga" = 808: parte più alto e scende sulla nota.
-  private bassNote(t: number, midi: number, dur: number, snd: BassSound) {
+  private bassNote(t: number, midi: number, dur: number, snd: BassSound, level = 1) {
     const { wave, cutoff, length } = snd;
     const ctx = this.ctx;
     const freq = mtof(midi);
@@ -621,7 +632,7 @@ export class Graph {
       g.gain.setValueAtTime(0.5, t + (end - t) * 0.85);
     }
     g.gain.linearRampToValueAtTime(0, end);
-    g.connect(this.voiceGain("bass", t, true)).connect(this.shaper()).connect(this.channels.bass);
+    g.connect(this.voiceGain("bass", t, true, level)).connect(this.shaper()).connect(this.channels.bass);
 
     const oscs: OscillatorNode[] = [];
     const add = (o: OscillatorNode, gain: number, to: AudioNode = g) => {

@@ -144,7 +144,35 @@ export type Pattern = {
   lead: number[][]; // la melodia: per ogni step le note MIDI che suonano insieme (vuoto = niente), max 6
   sounds?: Sounds; // il suono proprio di questo pattern (basso, accordi, lead); manca = quello del progetto
   len?: Record<string, number>; // lunghezza in step delle note lunghe (chiavi di lenKey); manca = nota di uno step
+  vel?: Record<string, number>; // velocity (forza) dei colpi e delle note, 0.1–1; manca = VEL_DEFAULT
 };
+
+// Velocity: quanto forte suona un colpo o una nota, come la forza su un tasto. 0.8 = normale (i progetti di prima),
+// 1 = accento (+1,9 dB), sotto = più piano. Chiavi: "hat3" = l'hi-hat dello step 4, "b5" = il basso dello step 6,
+// "l5" = tutte le note del lead dello step 6, "c2" = gli accordi del battito 3.
+export const VEL_DEFAULT = 0.8;
+export const VEL_MIN = 0.1;
+export const velOf = (pat: Pattern, key: string) => pat.vel?.[key] ?? VEL_DEFAULT;
+export const velGain = (v: number) => v / VEL_DEFAULT; // il volume rispetto al normale
+export function setVel(pat: Pattern, key: string, v: number) {
+  const x = Math.round(Math.max(VEL_MIN, Math.min(1, v)) * 100) / 100;
+  if (Math.abs(x - VEL_DEFAULT) < 0.005) {
+    if (pat.vel) {
+      delete pat.vel[key];
+      if (Object.keys(pat.vel).length === 0) delete pat.vel;
+    }
+  } else pat.vel = { ...pat.vel, [key]: x };
+}
+// la chiave esiste solo se c'è qualcosa che suona lì
+function velKeyLive(pat: Pattern, key: string) {
+  const m = /^(openhat|kick|clap|hat|perc|b|l|c)(\d+)$/.exec(key);
+  if (!m) return false;
+  const i = Number(m[2]);
+  if (m[1] === "b") return i < STEPS && pat.bass[i] !== null;
+  if (m[1] === "l") return i < STEPS && pat.lead[i].length > 0;
+  if (m[1] === "c") return i < BEATS && pat.chords[i].length > 0;
+  return i < STEPS && pat.drums[m[1] as DrumId][i];
+}
 
 // Lunghezza delle note (basso e lead), in step. Chiave: "b5" = la nota di basso dello step 6; "l5:72" = il Do5
 // del lead dello step 6. Si salvano solo le note lunghe (2 step o più): le altre suonano come prima
@@ -416,6 +444,9 @@ function normalizePattern(raw: unknown): Pattern {
       if (typeof v === "number" && Number.isFinite(v)) setNoteLen(pat, "lead", st, m, v);
     }
   }
+  // velocity: solo per colpi e note che ci sono
+  const vels = r.vel && typeof r.vel === "object" ? (r.vel as Record<string, unknown>) : {};
+  for (const [k, v] of Object.entries(vels)) if (typeof v === "number" && Number.isFinite(v) && velKeyLive(pat, k)) setVel(pat, k, v);
   return pat;
 }
 
@@ -580,6 +611,12 @@ export function describe(p: Project, title: string, editing: Slot) {
       .map((n, i) => (n.length ? `${i + 1}:${n.map((m) => `${noteName(m)}${ln("lead", i, m)}`).join("+")}` : null))
       .filter(Boolean);
     lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
+    if (pat.vel) {
+      const pc = (v: number) => `${Math.round(v * 100)}%`;
+      const label = (k: string) =>
+        k.replace(/^b(\d+)$/, (_, n) => `basso ${+n + 1}`).replace(/^l(\d+)$/, (_, n) => `lead ${+n + 1}`).replace(/^c(\d+)$/, (_, n) => `accordi battito ${+n + 1}`).replace(/^([a-z]+)(\d+)$/, (_, d, n) => `${d} ${+n + 1}`);
+      lines.push(`  Velocity (normale ${pc(VEL_DEFAULT)}, accento 100%): ${Object.entries(pat.vel).map(([k, v]) => `${label(k)}=${pc(v)}`).join(", ")}`);
+    }
     const own = pat.sounds;
     if (own) {
       const parts = [

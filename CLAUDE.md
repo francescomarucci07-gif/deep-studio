@@ -109,6 +109,9 @@ cd web && npm run dev
   `setNoteLen`/`maxLen`/`noteLen` in `project.ts`: dentro la battuta, senza coprire la nota dopo). Nel Roll: premi e
   trascini = disegni o allunghi, clic su una nota = la togli, pennello = lunghezza dell'ultima; in registrazione la
   nota dura quanto tieni il tasto. Coach: campo `lunghezza` in `scrivi_pattern` (`crea-v20`).
+- **Velocity**: `pattern.vel` (chiavi `hat3`, `b5`, `l5` = tutte le note del lead dello step, `c2` = accordi del
+  battito; 0.1–1, `VEL_DEFAULT` 0.8 = come prima e non si salva; `velGain` = v/0.8). Nel Beat il pulsante Vel: trascini
+  su e giù sulle barre (il clic non accende step). Coach: campo `velocity` in `scrivi_pattern` (`crea-v21`).
 - **Mixer e bus**: ogni canale esce sul master o in un bus (`mixer.X.out`); i bus (`buses`, `BUS_IDS`) hanno fader
   (`BUS_UNITY` = 0 dB), mute e 8 insert, poi vanno al master. In `graph.ts` il routing si ricollega in `applyMixer`.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
@@ -168,8 +171,8 @@ cd web && npm run dev
 **17 nov:** ~~Lunghezza delle note nel Roll~~ **fatta** (vedi "Cose da sapere"). ~~Annulla/Ripeti~~ **fatto**: Ctrl+Z,
 Ctrl+Y / Ctrl+Shift+Z e i pulsanti ↶ ↷ accanto a Versioni; pila di 100 passi in `Daw.tsx` (`remember`, `undoEdit`,
 `redoEdit`): ogni `update` salva il progetto di prima, le modifiche entro 450 ms diventano un passo solo; il coach e i
-ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. Idee per dopo: velocity e accenti,
-pulsante "Segnala un problema".
+ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~Velocity e accenti~~ **fatti** (vedi
+"Cose da sapere").
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

@@ -38,7 +38,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Il beat",
-    text: "Questo è lo step sequencer: una battuta divisa in 16 step. Clicca una casella per accendere un colpo. Il kick sugli step 1, 5, 9 e 13 è il battito della house. Ogni riga è uno strumento, e il pulsante S lo fa suonare da solo. Le ultime righe, Bass, Lead e Chord, mostrano le note: un clic ti porta al Roll, dove si scrivono.",
+    text: "Questo è lo step sequencer: una battuta divisa in 16 step. Clicca una casella per accendere un colpo. Il kick sugli step 1, 5, 9 e 13 è il battito della house. Ogni riga è uno strumento, e il pulsante S lo fa suonare da solo. Le ultime righe, Bass, Lead e Chord, mostrano le note: un clic ti porta al Roll, dove si scrivono. Il pulsante Vel cambia la forza di ogni colpo: trascina su e giù.",
     target: '[data-panel="beat"] .hw-seq-grid',
     view: "beat",
   },

@@ -138,6 +138,20 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       },
       filtro_lead: { type: "number", minimum: 300, maximum: 9000 },
       durata_lead: { type: "string", enum: ["corta", "lunga"], description: "corta = note staccate; lunga = legate." },
+      velocity: {
+        type: "array",
+        description:
+          "La forza (velocity) di colpi e note, come lo step sequencer di FL: 0.8 = normale (il default, non serve scriverlo), 1 = accento, 0.4–0.6 = colpo leggero (per esempio gli hat in levare per il groove). riga: lo strumento della batteria, oppure basso, melodia (tutte le note dello step) o accordi (step = battito 1–4). Vale solo dove c'è un colpo o una nota.",
+        items: {
+          type: "object",
+          properties: {
+            riga: { type: "string", enum: [...DRUMS.map((d) => d.id), "basso", "melodia", "accordi"] },
+            step: { type: "integer", minimum: 1, maximum: STEPS },
+            valore: { type: "number", minimum: 0.1, maximum: 1 },
+          },
+          required: ["riga", "step", "valore"],
+        },
+      },
       suoni_solo_qui: {
         type: "boolean",
         description:
@@ -362,7 +376,18 @@ export function createStudioWriter(current: Project, editing: Slot) {
           }
         }
       }
+      // velocity (normalize tiene solo quelle dove c'è un colpo o una nota)
+      const vel: Record<string, number> = {};
+      if (Array.isArray((i as { velocity?: unknown }).velocity)) {
+        for (const v of (i as { velocity: { riga?: unknown; step?: unknown; valore?: unknown }[] }).velocity) {
+          if (!Number.isInteger(v?.step) || typeof v.valore !== "number") continue;
+          const st = (v.step as number) - 1;
+          const pre = v.riga === "basso" ? "b" : v.riga === "melodia" ? "l" : v.riga === "accordi" ? "c" : DRUMS.some((d) => d.id === v.riga) ? (v.riga as string) : null;
+          if (pre) vel[`${pre}${st}`] = v.valore;
+        }
+      }
       const pattern: Pattern = {
+        vel,
         len,
         drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
         bass,

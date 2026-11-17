@@ -1219,6 +1219,13 @@ ol.ds-led-row {
   flex-wrap: wrap;
   gap: 6px;
 }
+/* Annulla / Ripeti: solo l'icona */
+.hw-btn--icon {
+  min-width: 36px;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-size: 16px;
+}
 .hw-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -2263,6 +2270,17 @@ ol.ds-led-row {
 @media (min-width: 1000px) and (max-width: 1250px) {
   .hw-roll-panel .hw-seq-head .hw-title {
     display: none;
+  }
+  /* la barra del trasporto (con Annulla e Ripeti) resta su una riga */
+  .console .hw-top .hw-transport {
+    gap: 4px;
+  }
+  .console .hw-top .hw-transport .hw-btn {
+    padding: 0 7px;
+  }
+  .console .hw-top .hw-transport .hw-btn--icon {
+    min-width: 26px;
+    padding: 0 4px;
   }
 }
 

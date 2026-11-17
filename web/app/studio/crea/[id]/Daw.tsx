@@ -313,14 +313,54 @@ export function Daw({
     engineRef.current?.applyMixer();
   }, [project.mixer, project.bpm, project.fx, project.masterFilter, project.automation, project.inserts]);
 
+  // Annulla / Ripeti: una pila dei progetti di prima (come i fogli di un blocco). Le modifiche fatte di seguito
+  // in meno di mezzo secondo (un trascinamento, un fader che scorre) diventano un passo solo.
+  const past = useRef<Project[]>([]);
+  const future = useRef<Project[]>([]);
+  const lastEdit = useRef(0);
+  const [hist, setHist] = useState({ undo: 0, redo: 0 });
+  const syncHist = useCallback(() => setHist({ undo: past.current.length, redo: future.current.length }), []);
+  // force: un passo a sé (il coach, una versione ripristinata), mai unito alle modifiche vicine
+  const remember = useCallback(
+    (force = false) => {
+      const now = performance.now();
+      if (force || now - lastEdit.current > 450) {
+        past.current.push(projectRef.current);
+        if (past.current.length > 100) past.current.shift();
+        future.current = [];
+        syncHist();
+      }
+      lastEdit.current = force ? 0 : now;
+    },
+    [syncHist],
+  );
+  const undoEdit = useCallback(() => {
+    const prev = past.current.pop();
+    if (!prev) return;
+    future.current.push(projectRef.current);
+    lastEdit.current = 0;
+    setProject(prev);
+    syncHist();
+  }, [syncHist]);
+  const redoEdit = useCallback(() => {
+    const next = future.current.pop();
+    if (!next) return;
+    past.current.push(projectRef.current);
+    lastEdit.current = 0;
+    setProject(next);
+    syncHist();
+  }, [syncHist]);
+
   const update = useCallback(
-    (fn: (p: Project) => void) =>
+    (fn: (p: Project) => void) => {
+      remember();
       setProject((p) => {
         const next = structuredClone(p);
         fn(next);
         return next;
-      }),
-    [],
+      });
+    },
+    [remember],
   );
 
   // Tastiera musicale (come la typing keyboard di FL): in modalità "keys" le lettere suonano note
@@ -492,6 +532,20 @@ export function Daw({
         if (!e.repeat) togglePlay();
         return;
       }
+      // Ctrl+Z annulla, Ctrl+Y o Ctrl+Shift+Z ripete (Cmd sul Mac); mentre scrivi resta l'annulla del testo
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing(e.target)) {
+        const k = e.key.toLowerCase();
+        if (k === "z" && !e.shiftKey) {
+          e.preventDefault();
+          undoEdit();
+          return;
+        }
+        if (k === "y" || (k === "z" && e.shiftKey)) {
+          e.preventDefault();
+          redoEdit();
+          return;
+        }
+      }
       const tag = (e.target as HTMLElement).tagName;
       if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       // con il Roll aperto le lettere (e alcuni numeri) sono note: niente pad e niente cambio vista
@@ -528,7 +582,7 @@ export function Daw({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [togglePlay, hitPad, chooseView, playKey, update]);
+  }, [togglePlay, hitPad, chooseView, playKey, update, undoEdit, redoEdit]);
 
   // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
   const snapshot = useCallback(
@@ -573,6 +627,7 @@ export function Daw({
     if (!saved) return;
     await snapshot(`Prima del ripristino di “${v.label}”`);
     setUndo(null);
+    remember(true);
     setProject(normalize(saved.data));
     setTitle(saved.title);
   };
@@ -805,6 +860,7 @@ export function Daw({
     if (!d?.project) return;
     setUndo({ project: projectRef.current, name: d.name || "pattern" });
     void snapshot(`Prima del coach: ${d.name || "modifica"}`);
+    remember(true);
     setProject(normalize(d.project));
     if (d.focus && SLOTS.includes(d.focus)) setEditing(d.focus);
     if (d.song) setSongMode(true);
@@ -970,6 +1026,26 @@ export function Daw({
           </button>
           <button type="button" className="hw-btn" aria-pressed={showVersions} onClick={() => setShowVersions(!showVersions)}>
             <span className="hw-btn-led" />↺ Versioni
+          </button>
+          <button
+            type="button"
+            className="hw-btn hw-btn--icon"
+            disabled={hist.undo === 0}
+            aria-label="Annulla"
+            title="Annulla l'ultima modifica (Ctrl+Z)"
+            onClick={undoEdit}
+          >
+            ↶
+          </button>
+          <button
+            type="button"
+            className="hw-btn hw-btn--icon"
+            disabled={hist.redo === 0}
+            aria-label="Ripeti"
+            title="Ripeti quello che hai annullato (Ctrl+Y)"
+            onClick={redoEdit}
+          >
+            ↷
           </button>
           <button
             type="button"
@@ -1317,6 +1393,7 @@ export function Daw({
                 type="button"
                 className="hw-btn hw-btn--small"
                 onClick={() => {
+                  remember(true);
                   setProject(undo.project);
                   setUndo(null);
                 }}

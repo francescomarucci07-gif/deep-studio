@@ -165,8 +165,11 @@ cd web && npm run dev
 - ~~Routing del mixer~~ **fatto il 15 nov**: 4 bus come in FL (`buses`, `mixer.X.out`, insert sui bus; ADR); nei
   progetti nuovi la batteria entra nel bus Drums. Uscita sotto ogni canale, "+ Bus" nella striscia del Master.
 
-**17 nov:** ~~Lunghezza delle note nel Roll~~ **fatta** (vedi "Cose da sapere"). Idee per dopo: velocity e accenti,
-Annulla/Ripeti (Ctrl+Z), pulsante "Segnala un problema".
+**17 nov:** ~~Lunghezza delle note nel Roll~~ **fatta** (vedi "Cose da sapere"). ~~Annulla/Ripeti~~ **fatto**: Ctrl+Z,
+Ctrl+Y / Ctrl+Shift+Z e i pulsanti ↶ ↷ accanto a Versioni; pila di 100 passi in `Daw.tsx` (`remember`, `undoEdit`,
+`redoEdit`): ogni `update` salva il progetto di prima, le modifiche entro 450 ms diventano un passo solo; il coach e i
+ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. Idee per dopo: velocity e accenti,
+pulsante "Segnala un problema".
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

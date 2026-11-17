@@ -83,6 +83,7 @@ import { measure, type Measures } from "@/lib/daw/measure";
 import { encodeWav, renderAudio, renderPlan, SAMPLE_RATE } from "@/lib/daw/render";
 import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
 import { createClient } from "@/lib/supabase/client";
+import { Segnala } from "./Segnala";
 import { Tour } from "./Tour";
 
 type SaveState = "salvato" | "modificato" | "salvo" | "errore";
@@ -250,6 +251,8 @@ export function Daw({
     if (!tourDone) void createClient().auth.updateUser({ data: { tour_done: true } }).catch(() => {});
   }, [tourDone]);
   const openCoach = useCallback(() => setCoachOpen(true), []);
+  const [reporting, setReporting] = useState(false); // il riquadro "Segnala un problema"
+  const closeReport = useCallback(() => setReporting(false), []);
   const openRoll = (k: "bass" | "lead" | "chords") => {
     setRoll(k);
     chooseView("roll");
@@ -1022,6 +1025,7 @@ export function Daw({
   return (
     <div className="console" data-coach={coachOpen ? "on" : "off"}>
       {touring && <Tour onView={chooseView} onCoach={openCoach} onClose={endTour} />}
+      {reporting && <Segnala projectId={id} view={view} onClose={closeReport} />}
       {/* ---- pannello superiore: marchio, display, trasporto, manopole ---- */}
       <section className="hw-panel hw-top" aria-label="Trasporto">
         <div className="hw-brand">
@@ -1361,6 +1365,16 @@ export function Daw({
             <button
               type="button"
               className="hw-btn hw-btn--small hw-views-end"
+              aria-pressed={reporting}
+              title="Qualcosa non va o manca? Scrivilo qui"
+              onClick={() => setReporting(true)}
+            >
+              <span className="hw-btn-led" />
+              Segnala
+            </button>
+            <button
+              type="button"
+              className="hw-btn hw-btn--small"
               aria-pressed={touring}
               title="Il tour guidato dello studio, con il coach"
               onClick={() => setTouring(true)}
@@ -2451,6 +2465,10 @@ export function Daw({
             ]}
             intro="Sono qui con te. Chiedimi di creare un beat (lo scrivo io nello studio e ti spiego come l'ho fatto) oppure fallo tu e ti do consigli mentre lo cambi."
           />
+          {/* sul telefono la barra delle viste non c'è: il pulsante sta qui */}
+          <button type="button" className="hw-btn hw-btn--small ds-report-mobile" onClick={() => setReporting(true)}>
+            Segnala un problema
+          </button>
         </aside>
       </div>
     </div>

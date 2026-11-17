@@ -49,7 +49,8 @@ Decisione del 3 nov 2026: `docs/ADR-0001-studio-nel-browser.md` (da confermare c
 ```
 analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script di prova P3/P4
 db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach,
-            0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions)
+            0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions),
+            0006–0007 segnalazioni dallo studio (tabella segnalazioni, limite di 30 al giorno con un trigger)
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili (palette "Neon morbido"; font Geist, Chakra Petch, Geist Mono
             caricati in app/layout.tsx con next/font). Collegamento a Supabase e Vercel: docs/DEPLOY.md
@@ -112,6 +113,9 @@ cd web && npm run dev
 - **Velocity**: `pattern.vel` (chiavi `hat3`, `b5`, `l5` = tutte le note del lead dello step, `c2` = accordi del
   battito; 0.1–1, `VEL_DEFAULT` 0.8 = come prima e non si salva; `velGain` = v/0.8). Nel Beat il pulsante Vel: trascini
   su e giù sulle barre (il clic non accende step). Coach: campo `velocity` in `scrivi_pattern` (`crea-v21`).
+- **Segnala un problema** (`Segnala.tsx`): pulsante Segnala nella barra delle viste (sul telefono sotto il coach);
+  salva messaggio, vista, progetto e dati tecnici (browser, schermo) in `segnalazioni` (RLS: ognuno le sue; 30 al
+  giorno). Si leggono da Supabase → Table editor → segnalazioni. (La tabella `feedback` è un'altra cosa: M4.)
 - **Mixer e bus**: ogni canale esce sul master o in un bus (`mixer.X.out`); i bus (`buses`, `BUS_IDS`) hanno fader
   (`BUS_UNITY` = 0 dB), mute e 8 insert, poi vanno al master. In `graph.ts` il routing si ricollega in `applyMixer`.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
@@ -150,7 +154,7 @@ cd web && npm run dev
 - Controllo generale dello studio con Francesco (tutte le viste, suoni, Solo, plugin, export, coach).
 - ~~Link per gli amici~~ **fatto il 14 nov**: https://deep-studio-azure.vercel.app (Accedi con link magico; al primo
   login si apre subito un progetto con il tour). Le segnalazioni per ora arrivano a Francesco su WhatsApp.
-- **Più avanti**: pulsante "Segnala un problema" nello studio (tabella nuova con RLS: messaggio, vista, browser).
+- ~~Pulsante "Segnala un problema"~~ **fatto il 17 nov** (vedi "Cose da sapere").
 - ~~Tutorial~~ **fatto il 14 nov**: tour guidato del coach alla prima apertura dello studio (vedi "Cose da sapere").
 - ~~Count-in~~ **fatto il 14 nov**: REC da fermo suona 4 click (una battuta, il primo più acuto) e poi parte;
   il display conta 4-3-2-1; interruttore "1234" accanto a Registra (scelta salvata nel browser). Click in

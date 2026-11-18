@@ -21,7 +21,7 @@ type Step = {
 export const TOUR: Step[] = [
   {
     title: "Benvenuto in Deep Studio",
-    text: "Ciao! Sono il tuo coach. In un paio di minuti ti faccio vedere dove stanno le cose e come si costruisce una traccia house, un pezzo alla volta. Puoi saltare quando vuoi e rivedere il tour con il pulsante Tutorial.",
+    text: "Ciao! Sono il tuo coach. In un paio di minuti ti faccio vedere dove stanno le cose e come si costruisce una traccia house, un pezzo alla volta. Puoi saltare quando vuoi e rivedere il tour dal pulsante Impara, dove trovi anche le lezioni guidate.",
   },
   {
     title: "Play, Stop, Rec",
@@ -99,7 +99,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Tocca a te",
-    text: "Per cominciare, chiedimi: fammi un groove deep house a 122 BPM. Oppure accendi qualche step nel Beat e premi Play. Buona musica!",
+    text: "Per cominciare, apri Impara e fai la prima lezione, Il primo groove: ti guido passo per passo. Oppure chiedimi: fammi un groove deep house a 122 BPM. Buona musica!",
   },
 ];
 

@@ -92,6 +92,7 @@ import { projectToMidi } from "@/lib/daw/midifile";
 import { storeZip } from "@/lib/daw/zip";
 import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
 import { createClient } from "@/lib/supabase/client";
+import { Lezioni } from "./Lezioni";
 import { Segnala } from "./Segnala";
 import { Tour } from "./Tour";
 
@@ -263,6 +264,8 @@ export function Daw({
   }, [tourDone]);
   const openCoach = useCallback(() => setCoachOpen(true), []);
   const [reporting, setReporting] = useState(false); // il riquadro "Segnala un problema"
+  const [learnMenu, setLearnMenu] = useState(false); // il menu "Impara" (tour e lezioni)
+  const [exported, setExported] = useState(false); // ha esportato o chiesto un parere (per l'ultima lezione)
   const closeReport = useCallback(() => setReporting(false), []);
   const openRoll = (k: "bass" | "lead" | "chords") => {
     setRoll(k);
@@ -1132,6 +1135,7 @@ export function Daw({
     try {
       await job();
       setExporting("no");
+      setExported(true);
     } catch (e) {
       console.error("export", e);
       setExporting("errore");
@@ -1186,6 +1190,7 @@ export function Daw({
       setMeasures(m);
       const what_ = songMode ? `sulla canzone (${plan.length} battute)` : `sul pattern ${editing} (4 giri)`;
       setAsk({ id: Date.now(), text: `Fammi un parere ${what_}: come suona?`, extra: { misure: m } });
+      setExported(true);
     } catch (e) {
       console.error("parere", e);
     }
@@ -1259,6 +1264,24 @@ export function Daw({
     <div className="console" data-coach={coachOpen ? "on" : "off"}>
       {touring && <Tour onView={chooseView} onCoach={openCoach} onClose={endTour} />}
       {reporting && <Segnala projectId={id} view={view} onClose={closeReport} />}
+      <Lezioni
+        ctx={{ project, editing, playing, songMode, exported }}
+        menu={learnMenu}
+        onMenu={setLearnMenu}
+        onView={chooseView}
+        onRoll={setRoll}
+        onFreshPattern={() => {
+          if (isEmptyPattern(project.patterns[editing])) return null;
+          const free = SLOTS.find((x) => isEmptyPattern(project.patterns[x]));
+          if (free) setEditing(free);
+          return free ?? null;
+        }}
+        onAsk={(text) => {
+          setCoachOpen(true);
+          setAsk({ id: Date.now(), text });
+        }}
+        onTour={() => setTouring(true)}
+      />
       {/* ---- pannello superiore: marchio, display, trasporto, manopole ---- */}
       <section className="hw-panel hw-top" aria-label="Trasporto">
         <div className="hw-brand">
@@ -1638,12 +1661,12 @@ export function Daw({
             <button
               type="button"
               className="hw-btn hw-btn--small"
-              aria-pressed={touring}
-              title="Il tour guidato dello studio, con il coach"
-              onClick={() => setTouring(true)}
+              aria-pressed={touring || learnMenu}
+              title="Il tour dello studio e le lezioni guidate del coach"
+              onClick={() => setLearnMenu(true)}
             >
               <span className="hw-btn-led" />
-              Tutorial
+              Impara
             </button>
             <button type="button" className="hw-btn hw-btn--small" aria-pressed={coachOpen} onClick={toggleCoach}>
               <span className="hw-btn-led" />
@@ -2743,9 +2766,14 @@ export function Daw({
             intro="Sono qui con te. Chiedimi di creare un beat (lo scrivo io nello studio e ti spiego come l'ho fatto) oppure fallo tu e ti do consigli mentre lo cambi."
           />
           {/* sul telefono la barra delle viste non c'è: il pulsante sta qui */}
-          <button type="button" className="hw-btn hw-btn--small ds-report-mobile" onClick={() => setReporting(true)}>
-            Segnala un problema
-          </button>
+          <div className="ds-report-mobile">
+            <button type="button" className="hw-btn hw-btn--small" onClick={() => setLearnMenu(true)}>
+              Impara
+            </button>
+            <button type="button" className="hw-btn hw-btn--small" onClick={() => setReporting(true)}>
+              Segnala un problema
+            </button>
+          </div>
         </aside>
       </div>
     </div>

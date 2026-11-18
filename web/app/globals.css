@@ -2431,6 +2431,8 @@ ol.ds-led-row {
   resize: vertical;
 }
 .ds-report-mobile {
+  display: flex;
+  gap: var(--ds-space-2);
   align-self: flex-start;
   margin-top: var(--ds-space-2);
 }
@@ -2529,4 +2531,106 @@ ol.ds-led-row {
 }
 .hw-bars-tab[data-playing="true"] {
   box-shadow: inset 0 -2px 0 var(--hw-led-green);
+}
+
+/* ---- Impara: menu delle lezioni e scheda della lezione in corso (Lezioni.tsx) ---- */
+.ds-learn {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+.ds-learn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: var(--ds-space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ds-learn-list button {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--hw-panel-edge);
+  border-radius: 10px;
+  background: var(--hw-panel-2);
+  color: var(--ds-text);
+  text-align: left;
+  cursor: pointer;
+}
+.ds-learn-list button:hover,
+.ds-learn-list button:focus-visible {
+  border-color: var(--ds-accent);
+  outline: none;
+}
+.ds-learn-list strong {
+  font: 600 13px var(--ds-font-sans);
+}
+.ds-learn-list span {
+  color: var(--ds-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.ds-learn-done {
+  margin-left: 6px;
+  color: var(--hw-led-green) !important;
+  font: 600 11px var(--ds-font-mono) !important;
+}
+/* la lezione in corso: in basso al centro, non blocca niente; si riduce a una pillola */
+.ds-lesson {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  z-index: 900;
+  width: min(380px, calc(100vw - 24px));
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--ds-accent) 60%, var(--hw-panel-edge));
+  border-radius: 14px;
+  background: var(--ds-surface-raised);
+  color: var(--ds-text);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.55);
+  transform: translateX(-50%);
+}
+.ds-lesson[data-small="true"] {
+  width: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+}
+.ds-lesson-title {
+  border: 0;
+  background: none;
+  color: var(--ds-accent-strong);
+  font: 600 11px var(--ds-font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.ds-lesson-intro {
+  margin: 6px 0 4px;
+  color: var(--ds-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ds-lesson .ds-tour-text {
+  margin-top: 6px;
+}
+.ds-lesson .ds-tour-text[data-ok="true"] {
+  color: var(--hw-led-green);
+  font-weight: 600;
+}
+.ds-lesson-hint {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.ds-lesson .ds-tour-dots {
+  margin: 8px 0;
+}
+.ds-tour-dots span[data-done="true"] {
+  background: var(--hw-led-green);
 }

@@ -103,7 +103,11 @@ cd web && npm run dev
 - **Tour guidato** (`web/app/studio/crea/[id]/Tour.tsx`): 14 tappe scritte a mano (`TOUR`), evidenzia la parte
   dello studio e apre la vista giusta; parte da solo la prima volta (`user_metadata.tour_done` nell'account,
   più `ds-tour-visto` nel browser), pulsante Tutorial per rivederlo; voce del coach se accesa. Su telefono salta
-  le tappe `wide`.
+  le tappe `wide`. Il pulsante si chiama **Impara** (ex Tutorial): apre il tour e le lezioni.
+- **Lezioni guidate** (`lib/daw/lessons.ts` = testi e controlli, `Lezioni.tsx` = menu Impara e scheda in basso):
+  5 lezioni (Il primo groove, La bassline, Accordi e melodia, Costruisci la canzone, Build drop e mix); ogni passo ha
+  istruzione, suggerimento e `done(ctx)` che guarda il progetto: quando è vero la lezione va avanti da sola. La prima
+  parte da un pattern vuoto. "Chiedi al coach" manda il passo nella chat. Lezioni finite in `ds-lezioni` (browser).
   Al primo login (`auth/callback`), se l'account non ha progetti e non ha visto il tour, si crea un progetto
   (`lib/daw/new-project.ts`) e si apre subito: il tour parte senza passare dalla pagina "Il tuo studio".
 - **Lunghezza delle note** (basso e lead): `pattern.len` (chiavi `lenKey`: `b5`, `l5:72`; solo note da 2 step in su,
@@ -197,7 +201,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   degli stem~~ **fatto il 18 nov**; più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
   comodo (selezione multipla, copia/incolla, trasposizione, quantize, velocity per nota); automazioni di volume, send,
   plugin e bus; send verso i bus e bus dentro bus; metronomo durante la registrazione.
-- Coach: ✱ lezioni guidate ("missioni" con controllo di quello che hai fatto); parere in tempo reale (es. basso che
+- Coach: ~~lezioni guidate~~ **fatte il 18 nov**; parere in tempo reale (es. basso che
   copre il kick).
 - Prodotto: pagina delle segnalazioni nel sito (solo per Francesco); link di ascolto pubblico; email di accesso con
   SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).

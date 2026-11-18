@@ -124,6 +124,10 @@ cd web && npm run dev
   (`BUS_UNITY` = 0 dB), mute e 8 insert, poi vanno al master. In `graph.ts` il routing si ricollega in `applyMixer`.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
   (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
+- **Export** (pulsante ⤓ Export, menu): Mix WAV come prima; **Stem** = un WAV 24 bit per strumento che suona
+  (`renderAudio(p, what, stem)`: gli altri canali muti, `Graph` con `dry` = senza plugin del master, colla e limiter;
+  in uno zip STORE scritto a mano, `lib/daw/zip.ts`); **MIDI** = file .mid tipo 1 (`lib/daw/midifile.ts`: 96 tick
+  per quarto, tracce Bass/Lead/Chords/Drums, batteria sul canale 10 General MIDI, lunghezze e velocity; lo swing no).
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
   Python); `Daw.tsx` le manda a `/api/coach/crea` nel campo `misure` (solo per Claude, non salvate).
 - **Cronologia**: `project_versions` (ultime 60 per progetto, trigger di pulizia); il browser salva una versione
@@ -185,8 +189,8 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 "Cose da sapere").
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
-- Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; pattern da 2 o 4 battute; ✱ export MIDI e
-  degli stem (ponte verso FL); più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
+- Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; pattern da 2 o 4 battute; ~~export MIDI e
+  degli stem~~ **fatto il 18 nov**; più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
   comodo (selezione multipla, copia/incolla, trasposizione, quantize, velocity per nota); automazioni di volume, send,
   plugin e bus; send verso i bus e bus dentro bus; metronomo durante la registrazione.
 - Coach: ✱ lezioni guidate ("missioni" con controllo di quello che hai fatto); parere in tempo reale (es. basso che

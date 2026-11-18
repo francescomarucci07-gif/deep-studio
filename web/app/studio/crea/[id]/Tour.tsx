@@ -86,7 +86,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Esporta e chiedi un parere",
-    text: "Quando sei pronto, WAV esporta la traccia. Parere mi fa ascoltare l'export e ti dico cosa sistemare nel mix. Se sbagli qualcosa, le frecce accanto a Versioni annullano e ripetono l'ultima modifica, come Ctrl+Z e Ctrl+Y; Versioni ti riporta a una versione salvata.",
+    text: "Quando sei pronto, Export ti dà la traccia in WAV, gli stem (un WAV per strumento) o le note in MIDI, da portare in FL Studio. Parere mi fa ascoltare l'export e ti dico cosa sistemare nel mix. Se sbagli qualcosa, le frecce accanto a Versioni annullano e ripetono l'ultima modifica, come Ctrl+Z e Ctrl+Y; Versioni ti riporta a una versione salvata.",
     target: ".hw-transport",
     view: "beat",
   },

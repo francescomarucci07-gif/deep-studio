@@ -2282,6 +2282,10 @@ ol.ds-led-row {
     min-width: 26px;
     padding: 0 4px;
   }
+  /* Versioni: solo l'icona ↺ (la scritta è nel tooltip) */
+  .console .hw-top .hw-transport .hw-btn-text {
+    display: none;
+  }
 }
 
 /* ---- tour guidato della prima volta (Tour.tsx) ----
@@ -2463,4 +2467,47 @@ ol.ds-led-row {
 .hw-midi[data-hit="true"] .hw-btn-led {
   background: var(--hw-led-green);
   box-shadow: 0 0 6px var(--hw-led-green);
+}
+
+/* Export: il menu sotto il pulsante (mix WAV, stem, MIDI) */
+.hw-export {
+  position: relative;
+  display: inline-flex;
+}
+.hw-export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 250px;
+  padding: 4px;
+  border: 1px solid var(--hw-panel-edge);
+  border-radius: 10px;
+  background: var(--ds-surface-raised);
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
+}
+.hw-export-menu button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ds-text);
+  font: 600 12px var(--ds-font-mono);
+  text-align: left;
+  cursor: pointer;
+}
+.hw-export-menu button span {
+  color: var(--ds-text-muted);
+  font: 400 11px var(--ds-font-sans);
+}
+.hw-export-menu button:hover,
+.hw-export-menu button:focus-visible {
+  background: color-mix(in srgb, var(--ds-accent) 18%, transparent);
+  outline: none;
 }

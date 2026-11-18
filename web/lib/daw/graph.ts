@@ -87,9 +87,12 @@ export class Graph {
   private insertTypes: Partial<Record<MixTarget, string[]>> = {};
   private insertWiring: Partial<Record<MixTarget, string>> = {};
 
+  // dry: per gli stem. Il master non passa dalla sua fila di plugin, dalla colla e dal limiter: ogni stem esce
+  // com'è nel mix prima del master, così in FL si rimettono insieme e il master lo fai tu.
   constructor(
     readonly ctx: BaseAudioContext,
     private getProject: () => Project,
+    private opts: { dry?: boolean } = {},
   ) {
     // master: un compressore leggero che "incolla" il mix, poi il limiter che tiene il true peak sotto -1 dBTP
     const master = ctx.createGain();
@@ -104,12 +107,16 @@ export class Graph {
     this.limiter = createFallbackLimiter(ctx);
     const masterFilter = this.djFilter();
     master.connect(masterFilter.lp);
-    masterFilter.hp.connect(glue);
-    glue.connect(this.out).connect(this.limiter).connect(ctx.destination);
+    if (opts.dry) {
+      masterFilter.hp.connect(this.out).connect(ctx.destination);
+    } else {
+      masterFilter.hp.connect(glue);
+      glue.connect(this.out).connect(this.limiter).connect(ctx.destination);
+    }
     // la fila dei plugin del master sta tra il filtro DJ e la colla (il limiter resta l'ultimo anello)
     this.master = master;
     const chains: Partial<Record<MixTarget, { from: AudioNode; to: AudioNode }>> = {
-      master: { from: masterFilter.hp, to: glue },
+      master: { from: masterFilter.hp, to: opts.dry ? this.out : glue },
     };
 
     // riverbero condiviso: una "stanza" generata, con le basse tagliate per non impastare il low end
@@ -210,6 +217,7 @@ export class Graph {
   // immediate = subito al valore giusto (export offline: niente rampa all'inizio del file)
   // Mette il limiter vero al posto di quello di riserva (dopo loadLimiter). false se non si può.
   useRealLimiter(): boolean {
+    if (this.opts.dry) return false; // stem: niente limiter
     try {
       const node = createLimiterNode(this.ctx);
       node.port.onmessage = (e: MessageEvent<number>) => {
@@ -266,6 +274,7 @@ export class Graph {
   private applyInserts(immediate: boolean) {
     const p = this.getProject();
     for (const t of MIX_TARGETS) {
+      if (t === "master" && this.opts.dry) continue; // stem: niente plugin del master
       const slots = p.inserts[t];
       const live = (this.inserts[t] ??= Array(INSERT_SLOTS).fill(null));
       const types = (this.insertTypes[t] ??= Array(INSERT_SLOTS).fill(""));

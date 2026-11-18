@@ -83,6 +83,8 @@ import { connectMidi, gmDrum, midiGranted, midiSupported } from "@/lib/daw/midi"
 import { KIT_IDS, KITS } from "@/lib/daw/kits";
 import { measure, type Measures } from "@/lib/daw/measure";
 import { encodeWav, renderAudio, renderPlan, SAMPLE_RATE } from "@/lib/daw/render";
+import { projectToMidi } from "@/lib/daw/midifile";
+import { storeZip } from "@/lib/daw/zip";
 import { AUTO_EVERY_MS, loadVersion, saveVersion, type Version } from "@/lib/daw/versions";
 import { createClient } from "@/lib/supabase/client";
 import { Segnala } from "./Segnala";
@@ -1026,25 +1028,76 @@ export function Daw({
   };
 
   // Export WAV: in Song tutta la canzone, in Pattern 4 giri del loop che stai modificando
-  const exportWav = async () => {
+  // Export: il mix in WAV, gli stem (un WAV per strumento, in uno zip) o le note in MIDI, da portare in FL
+  const [exportMenu, setExportMenu] = useState(false);
+  const [exportMsg, setExportMsg] = useState("");
+  const fileBase = () => {
+    const name = (titleRef.current.trim() || "deep-studio").replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "deep-studio";
+    return `${name}${songMode ? "" : ` - pattern ${editing}`}`;
+  };
+  const download = (blob: Blob, file: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = file;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+  // il menu si chiude con un clic fuori o con Esc
+  useEffect(() => {
+    if (!exportMenu) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as HTMLElement).closest(".hw-export")) setExportMenu(false);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [exportMenu]);
+  const exportWhat = () => (songMode ? ({ song: true } as const) : ({ song: false, slot: editing } as const));
+  const runExport = async (job: () => Promise<void>) => {
+    setExportMenu(false);
     setExporting("sì");
     try {
-      const buf = await renderAudio(projectRef.current, songMode ? { song: true } : { song: false, slot: editing });
-      const url = URL.createObjectURL(encodeWav(buf));
-      const a = document.createElement("a");
-      const name = (titleRef.current.trim() || "deep-studio").replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "deep-studio";
-      a.href = url;
-      a.download = `${name}${songMode ? "" : ` - pattern ${editing}`}.wav`;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      await job();
       setExporting("no");
     } catch (e) {
       console.error("export", e);
       setExporting("errore");
+    } finally {
+      setExportMsg("");
     }
   };
+  const exportWav = () =>
+    runExport(async () => download(encodeWav(await renderAudio(projectRef.current, exportWhat())), `${fileBase()}.wav`));
+  // gli stem: solo gli strumenti che suonano davvero (non muti e con almeno un colpo o una nota nell'export)
+  const exportStems = () =>
+    runExport(async () => {
+      const p = projectRef.current;
+      const pats = [...new Set(renderPlan(p, exportWhat()).filter((x): x is Slot => x !== null))].map((x) => p.patterns[x]);
+      const plays = (c: ChannelId) =>
+        !p.mixer[c].muted &&
+        pats.some((pt) =>
+          c === "bass" ? pt.bass.some((n) => n !== null) : c === "lead" ? pt.lead.some((n) => n.length) : c === "chords" ? pt.chords.some((x) => x.length) : pt.drums[c].some(Boolean),
+        );
+      const list = CHANNELS.filter((c) => plays(c.id));
+      const files: { name: string; data: Uint8Array }[] = [];
+      for (const [k, c] of list.entries()) {
+        setExportMsg(`Stem ${k + 1}/${list.length}`);
+        const wav = encodeWav(await renderAudio(p, exportWhat(), c.id));
+        files.push({ name: `${String(k + 1).padStart(2, "0")} ${c.label}.wav`, data: new Uint8Array(await wav.arrayBuffer()) });
+      }
+      download(storeZip(files), `${fileBase()} - stem.zip`);
+    });
+  const exportMidi = () =>
+    runExport(async () => {
+      const p = projectRef.current;
+      download(new Blob([projectToMidi(p, renderPlan(p, exportWhat()))], { type: "audio/midi" }), `${fileBase()}.mid`);
+    });
 
   // "Fammi un parere": renderizzo come l'export, misuro nel browser e mando le misure al coach
   const listen = async () => {
@@ -1182,8 +1235,15 @@ export function Daw({
           >
             <span className="hw-btn-led" />● Rec
           </button>
-          <button type="button" className="hw-btn" aria-pressed={showVersions} onClick={() => setShowVersions(!showVersions)}>
-            <span className="hw-btn-led" />↺ Versioni
+          <button
+            type="button"
+            className="hw-btn"
+            aria-pressed={showVersions}
+            aria-label="Versioni"
+            title="Versioni salvate del progetto"
+            onClick={() => setShowVersions(!showVersions)}
+          >
+            <span className="hw-btn-led" />↺<span className="hw-btn-text"> Versioni</span>
           </button>
           <button
             type="button"
@@ -1205,17 +1265,36 @@ export function Daw({
           >
             ↷
           </button>
-          <button
-            type="button"
-            className="hw-btn"
-            aria-pressed={exporting === "sì"}
-            disabled={exporting === "sì"}
-            title={songMode ? "Esporta tutta la canzone" : `Esporta 4 giri del pattern ${editing}`}
-            onClick={() => void exportWav()}
-          >
-            <span className="hw-btn-led" />
-            {exporting === "sì" ? "Esporto…" : exporting === "errore" ? "Riprova WAV" : "⤓ WAV"}
-          </button>
+          <span className="hw-export">
+            <button
+              type="button"
+              className="hw-btn"
+              aria-pressed={exporting === "sì" || exportMenu}
+              aria-expanded={exportMenu}
+              disabled={exporting === "sì"}
+              title={songMode ? "Esporta tutta la canzone" : `Esporta 4 giri del pattern ${editing}`}
+              onClick={() => setExportMenu(!exportMenu)}
+            >
+              <span className="hw-btn-led" />
+              {exporting === "sì" ? exportMsg || "Esporto…" : exporting === "errore" ? "Riprova" : "⤓ Export"}
+            </button>
+            {exportMenu && (
+              <span className="hw-export-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => void exportWav()}>
+                  <strong>Mix WAV</strong>
+                  <span>tutta la traccia, 24 bit</span>
+                </button>
+                <button type="button" role="menuitem" onClick={() => void exportStems()}>
+                  <strong>Stem</strong>
+                  <span>un WAV per strumento, senza il master (zip)</span>
+                </button>
+                <button type="button" role="menuitem" onClick={() => void exportMidi()}>
+                  <strong>MIDI</strong>
+                  <span>le note, da trascinare in FL Studio (.mid)</span>
+                </button>
+              </span>
+            )}
+          </span>
           <button
             type="button"
             className="hw-btn hw-btn--listen"

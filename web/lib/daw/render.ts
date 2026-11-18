@@ -3,7 +3,7 @@
 import { Graph } from "./graph";
 import { loadLimiter } from "./limiter";
 import { truePeak } from "./measure";
-import { STEPS, songLength, type Project, type Slot } from "./project";
+import { CHANNEL_IDS, STEPS, songLength, type ChannelId, type Project, type Slot } from "./project";
 
 export const SAMPLE_RATE = 44100;
 const TAIL_S = 2.5; // coda dopo l'ultima battuta: riverbero e release degli accordi
@@ -16,13 +16,18 @@ export function renderPlan(p: Project, what: RenderWhat): (Slot | null)[] {
   return what.song ? p.song.slice(0, songLength(p)) : Array(PATTERN_BARS).fill(what.slot);
 }
 
-export async function renderAudio(p: Project, what: RenderWhat): Promise<AudioBuffer> {
+// stem: suona solo quel canale (gli altri muti), senza la catena del master e senza abbassare il volume a fine
+// render: gli stem sommati in FL danno il mix prima del master
+export async function renderAudio(p0: Project, what: RenderWhat, stem?: ChannelId): Promise<AudioBuffer> {
+  const p: Project = stem
+    ? { ...p0, mixer: Object.fromEntries(CHANNEL_IDS.map((id) => [id, { ...p0.mixer[id], muted: id !== stem || p0.mixer[id].muted }])) as Project["mixer"] }
+    : p0;
   const bars = renderPlan(p, what);
   const stepDur = 60 / p.bpm / 4;
   const seconds = 0.05 + bars.length * STEPS * stepDur + TAIL_S;
   const ctx = new OfflineAudioContext(2, Math.ceil(seconds * SAMPLE_RATE), SAMPLE_RATE);
-  const graph = new Graph(ctx, () => p);
-  if (await loadLimiter(ctx)) graph.useRealLimiter();
+  const graph = new Graph(ctx, () => p, { dry: !!stem });
+  if (!stem && (await loadLimiter(ctx))) graph.useRealLimiter();
   graph.applyMixer(true);
   if (what.song) graph.setAutomating(true);
   bars.forEach((slot, b) => {
@@ -34,6 +39,7 @@ export async function renderAudio(p: Project, what: RenderWhat): Promise<AudioBu
     }
   });
   const buf = await ctx.startRendering();
+  if (stem) return buf;
   // rete di sicurezza: se il true peak (tra un campione e l'altro) supera comunque -1 dBTP, abbasso tutto
   // il file di quel tanto. Con il limiter vero non dovrebbe servire quasi mai.
   const ch = Array.from({ length: buf.numberOfChannels }, (_, c) => buf.getChannelData(c));

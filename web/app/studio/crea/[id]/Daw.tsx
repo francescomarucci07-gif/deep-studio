@@ -51,6 +51,7 @@ import {
   setNoteLen,
   setVel,
   velOf,
+  velGain,
   VEL_DEFAULT,
   VEL_MIN,
   SOUND_KEY,
@@ -77,7 +78,8 @@ import {
   PLUGINS,
   type PluginSlot,
 } from "@/lib/daw/plugins";
-import { KEY_NOTES, keyNote, keyRoot, OCTAVES, type KeyInstrument } from "@/lib/daw/keyboard";
+import { fold, KEY_NOTES, keyNote, keyRoot, OCTAVES, type KeyInstrument } from "@/lib/daw/keyboard";
+import { connectMidi, gmDrum, midiGranted, midiSupported } from "@/lib/daw/midi";
 import { KIT_IDS, KITS } from "@/lib/daw/kits";
 import { measure, type Measures } from "@/lib/daw/measure";
 import { encodeWav, renderAudio, renderPlan, SAMPLE_RATE } from "@/lib/daw/render";
@@ -138,6 +140,8 @@ const ROLL_TABS: { id: RollTab; label: string }[] = [
 const CHORD_ROOTS = Array.from({ length: 12 }, (_, i) => 11 - i); // Si in alto, Do in basso
 const isSharp = (m: number) => [1, 3, 6, 8, 10].includes(m % 12);
 const pct = (v: number) => `${Math.round(v * 100)}%`;
+// la forza di un tasto MIDI (1–127) nella velocity dello studio (0.1–1): un tasto premuto "normale" (~100) ≈ 80%
+const midiVel = (v: number) => Math.max(0.1, Math.min(1, v / 125));
 const two = (n: number) => String(n).padStart(2, "0");
 
 // I pad: colore della retroilluminazione e tasto della tastiera del computer (come un controller)
@@ -391,9 +395,23 @@ export function Daw({
 
   // le note registrate con il tasto ancora giù: al rilascio prendono la loro lunghezza
   const held = useRef(new Map<string, { slot: Slot; step: number; note: number; inst: "bass" | "lead"; at: number }>());
+  // registrazione: quando il tasto si alza la nota dura quanto l'hai tenuto, arrotondato agli step (da 2 in su)
+  const releaseKey = useCallback(
+    (code: string, at: number) => {
+      const h = held.current.get(code);
+      if (!h) return;
+      held.current.delete(code);
+      const stepDur = 60 / projectRef.current.bpm / 4;
+      const len = Math.round((at - h.at) / 1000 / stepDur);
+      if (len >= 2) update((p) => setNoteLen(p.patterns[h.slot], h.inst, h.step, h.note, len));
+    },
+    [update],
+  );
   // un tasto della tastiera musicale: suona la nota (o l'accordo) e con REC + Play la scrive sullo step
+  // midi: un tasto di una tastiera MIDI (nota 0–127 e forza 1–127) al posto di un tasto del computer;
+  // code allora è "midi" + nota, e serve solo a ritrovare la nota quando il tasto si alza
   const playKey = useCallback(
-    (code: string, pressedAt?: number) => {
+    (code: string, pressedAt?: number, midi?: { note: number; vel: number }) => {
       const k = keysRef.current;
       // registrazione: lo step più vicino a quando hai premuto (in song nel pattern che suona lì)
       const pos = rec ? engineRef.current?.recordPosition(pressedAt) : null;
@@ -401,10 +419,11 @@ export function Daw({
       const slot = pos ? (playbackRef.current.song ? pos.slot : playbackRef.current.editing) : null;
       const recording = pos && s >= 0 && slot;
       if (k.keyInst === "chords") {
-        const root = keyRoot(code);
+        const root = midi ? midi.note % 12 : keyRoot(code);
         if (root === null) return false;
         const chord: Chord = { root, type: k.keyChord };
-        void engine().preview("chords", { chord, slot: slot || undefined });
+        const level = midi ? velGain(midiVel(midi.vel)) : 1;
+        void engine().preview("chords", { chord, slot: slot || undefined, level });
         setLastKey(chordName(chord));
         lightKey("chords", root);
         if (recording) {
@@ -414,13 +433,16 @@ export function Daw({
             if (!layers.some((x) => x.root === chord.root && x.type === chord.type) && layers.length < CHORD_LAYERS) {
               layers.push(chord);
             }
+            if (midi) setVel(p.patterns[slot], `c${Math.floor(s / 4)}`, midiVel(midi.vel));
           });
         }
       } else {
         const inst = k.keyInst;
-        const note = keyNote(code, inst, k.octaves[inst]);
+        // dalla tastiera MIDI la nota è quella del tasto, spostata di ottava se esce dall'estensione dello strumento
+        const note = midi ? fold(midi.note, OCTAVES[inst].low, OCTAVES[inst].high) : keyNote(code, inst, k.octaves[inst]);
         if (note === null) return false;
-        void engine().preview(inst, { note, slot: slot || undefined });
+        const level = midi ? velGain(midiVel(midi.vel)) : 1;
+        void engine().preview(inst, { note, slot: slot || undefined, level });
         setLastKey(noteName(note));
         lightKey(inst, note);
         if (recording) {
@@ -435,6 +457,7 @@ export function Daw({
               if (pp.bass[s] !== null) setNoteLen(pp, "bass", s, pp.bass[s] as number, 1);
               pp.bass[s] = note;
             }
+            if (midi) setVel(pp, `${inst === "lead" ? "l" : "b"}${s}`, midiVel(midi.vel));
           });
           // quando lasci il tasto, la nota diventa lunga quanto l'hai tenuto (vedi onKeyUp)
           held.current.set(code, { slot, step: s, note, inst, at: pressedAt ?? performance.now() });
@@ -503,12 +526,14 @@ export function Daw({
   };
 
   // Un colpo sul pad: suona sempre; con REC acceso e Play, scrive il colpo sullo step che sta suonando
+  // vel: la forza di un tasto MIDI (1–127); senza = colpo normale
   const hitPad = useCallback(
-    (c: ChannelId, pressedAt?: number) => {
+    (c: ChannelId, pressedAt?: number, vel?: number) => {
       const cur = projectRef.current.patterns[playbackRef.current.editing];
       void engine().preview(c, {
         note: c === "lead" ? (cur.lead.find((n) => n.length)?.[0] ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
         chord: cur.chords.find((x) => x.length)?.[0],
+        level: vel ? velGain(midiVel(vel)) : 1,
       });
       setFlash(c);
       setTimeout(() => setFlash((f) => (f === c ? null : f)), 140);
@@ -519,6 +544,7 @@ export function Daw({
       if (pos && s >= 0 && isDrum(c) && slot) {
         update((p) => {
           p.patterns[slot].drums[c][s] = true;
+          if (vel) setVel(p.patterns[slot], `${c}${s}`, midiVel(vel));
         });
       }
     },
@@ -575,13 +601,7 @@ export function Daw({
     // i browser "cliccano" il pulsante col focus quando lo spazio viene rilasciato: lo blocco anche lì
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.code === "Space" && !typing(e.target)) e.preventDefault();
-      // registrazione: la nota dura quanto hai tenuto il tasto, arrotondato agli step (da 2 step in su)
-      const h = held.current.get(e.code);
-      if (!h) return;
-      held.current.delete(e.code);
-      const stepDur = 60 / projectRef.current.bpm / 4;
-      const len = Math.round((e.timeStamp - h.at) / 1000 / stepDur);
-      if (len >= 2) update((p) => setNoteLen(p.patterns[h.slot], h.inst, h.step, h.note, len));
+      releaseKey(e.code, e.timeStamp);
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
@@ -589,7 +609,70 @@ export function Daw({
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [togglePlay, hitPad, chooseView, playKey, update, undoEdit, redoEdit]);
+  }, [togglePlay, hitPad, chooseView, playKey, releaseKey, undoEdit, redoEdit]);
+
+  // Tastiera MIDI: nel Roll (sul computer) suona lo strumento della scheda, come la tastiera del computer;
+  // nelle altre viste i tasti bassi (35–51, mappa General MIDI) suonano la batteria, come i pad di un controller.
+  const [midiState, setMidiState] = useState<{ on: boolean; names: string[]; error: string }>({ on: false, names: [], error: "" });
+  const [midiHit, setMidiHit] = useState(false);
+  // il controllo si fa nel browser, dopo il caricamento: sul server il MIDI non esiste
+  const [midiOk, setMidiOk] = useState(false);
+  const midiStop = useRef<(() => void) | null>(null);
+  const midiRef = useRef({ playKey, hitPad, releaseKey });
+  midiRef.current = { playKey, hitPad, releaseKey };
+  const startMidi = useCallback(async () => {
+    if (midiStop.current) return;
+    try {
+      midiStop.current = await connectMidi({
+        on: (note, vel, at) => {
+          const m = midiRef.current;
+          if (keysRef.current.keyMode === "keys") m.playKey(`midi${note}`, at, { note, vel });
+          else {
+            const d = gmDrum(note);
+            if (d) m.hitPad(d, at, vel);
+          }
+          setMidiHit(true);
+          setTimeout(() => setMidiHit(false), 120);
+        },
+        off: (note, at) => midiRef.current.releaseKey(`midi${note}`, at),
+        devices: (names) => setMidiState({ on: true, names, error: "" }),
+      });
+      store("ds-midi", "1");
+    } catch {
+      setMidiState({ on: false, names: [], error: "Il browser non ha dato il permesso per il MIDI" });
+    }
+  }, []);
+  useEffect(() => {
+    setMidiOk(midiSupported());
+    // permesso già dato in una visita precedente: mi ricollego da solo
+    if (midiSupported() && stored("ds-midi") === "1") void midiGranted().then((ok) => {
+        if (ok) void startMidi();
+      });
+    return () => midiStop.current?.();
+  }, [startMidi]);
+  const midiButton = (
+    <button
+      type="button"
+      className="hw-btn hw-btn--small hw-midi"
+      aria-pressed={midiState.on}
+      data-hit={midiHit}
+      disabled={!midiOk}
+      title={
+        !midiOk
+          ? "Questo browser non legge le tastiere MIDI: usa Chrome o Edge"
+          : midiState.error ||
+            (midiState.on
+              ? midiState.names.length
+                ? `Collegata: ${midiState.names.join(", ")}. Nel Roll suona lo strumento; altrove i tasti bassi suonano la batteria.`
+                : "MIDI acceso: collega una tastiera USB"
+              : "Collega una tastiera MIDI (USB): suoni e registri con lunghezza e forza dei tasti")
+      }
+      onClick={() => void startMidi()}
+    >
+      <span className="hw-btn-led" />
+      MIDI{midiState.on && midiState.names.length ? ` ${midiState.names.length}` : ""}
+    </button>
+  );
 
   // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
   const snapshot = useCallback(
@@ -1196,7 +1279,10 @@ export function Daw({
         <aside className="console-side">
           <section className="hw-panel hw-pads-panel" aria-label="Drum pad">
             <div className="hw-seq-head">
-              <h2 className="hw-title">Pads · Kit {KITS[project.kit].label}</h2>
+              <div className="hw-pads-title">
+                <h2 className="hw-title">Pads · Kit {KITS[project.kit].label}</h2>
+                {midiButton}
+              </div>
               <div className="hw-seg" role="group" aria-label="Kit di batteria">
                 {KIT_IDS.map((k) => (
                   <button

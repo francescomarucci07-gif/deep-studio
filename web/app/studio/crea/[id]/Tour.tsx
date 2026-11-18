@@ -50,7 +50,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Pad e kit",
-    text: "A sinistra ci sono i pad e i kit di batteria. Clicca un pad, oppure usa le lettere della tastiera del computer, per suonarlo. Con Registra acceso quello che suoni si scrive nel pattern: prima senti quattro click di count-in, poi si parte.",
+    text: "A sinistra ci sono i pad e i kit di batteria. Clicca un pad, oppure usa le lettere della tastiera del computer, per suonarlo. Con Registra acceso quello che suoni si scrive nel pattern: prima senti quattro click di count-in, poi si parte. Hai una tastiera MIDI? Collegala e premi MIDI.",
     target: ".console-side",
     view: "beat",
   },

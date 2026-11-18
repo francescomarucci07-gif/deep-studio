@@ -130,7 +130,7 @@ export class Engine {
   }
 
   // senza slot suona con il suono del pattern che stai modificando
-  async preview(id: ChannelId, opts: { note?: number; chord?: Chord; slot?: Slot } = {}) {
+  async preview(id: ChannelId, opts: { note?: number; chord?: Chord; slot?: Slot; level?: number } = {}) {
     await this.ready;
     await this.ctx.resume();
     this.graph.preview(id, this.ctx.currentTime + 0.01, { ...opts, slot: opts.slot ?? this.getPlayback().editing });

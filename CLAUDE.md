@@ -113,6 +113,10 @@ cd web && npm run dev
 - **Velocity**: `pattern.vel` (chiavi `hat3`, `b5`, `l5` = tutte le note del lead dello step, `c2` = accordi del
   battito; 0.1–1, `VEL_DEFAULT` 0.8 = come prima e non si salva; `velGain` = v/0.8). Nel Beat il pulsante Vel: trascini
   su e giù sulle barre (il clic non accende step). Coach: campo `velocity` in `scrivi_pattern` (`crea-v21`).
+- **Tastiera MIDI** (`lib/daw/midi.ts`, Web MIDI: Chrome/Edge, non Safari): pulsante MIDI accanto al titolo dei pad;
+  nel Roll suona lo strumento della scheda (`playKey` con `midi`, nota portata nell'estensione con `fold`), altrove i
+  tasti 35–51 suonano la batteria (mappa General MIDI, `gmDrum`). Con REC scrive nota, lunghezza (quanto tieni il
+  tasto, `releaseKey`) e velocity (`midiVel`: 1–127 → 0.1–1). Si ricollega da solo se il permesso è già dato.
 - **Segnala un problema** (`Segnala.tsx`): pulsante Segnala nella barra delle viste (sul telefono sotto il coach);
   salva messaggio, vista, progetto e dati tecnici (browser, schermo) in `segnalazioni` (RLS: ognuno le sue; 30 al
   giorno). Si leggono da Supabase → Table editor → segnalazioni. (La tabella `feedback` è un'altra cosa: M4.)
@@ -181,7 +185,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 "Cose da sapere").
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
-- Studio: ✱ tastiera MIDI vera (Web MIDI: suonare e registrare nel Roll); pattern da 2 o 4 battute; ✱ export MIDI e
+- Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; pattern da 2 o 4 battute; ✱ export MIDI e
   degli stem (ponte verso FL); più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
   comodo (selezione multipla, copia/incolla, trasposizione, quantize, velocity per nota); automazioni di volume, send,
   plugin e bus; send verso i bus e bus dentro bus; metronomo durante la registrazione.

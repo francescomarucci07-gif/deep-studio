@@ -2447,3 +2447,20 @@ ol.ds-led-row {
   padding: 0 6px;
   font-size: 9px;
 }
+
+/* il titolo dei pad e il pulsante MIDI sulla stessa riga; la lucina lampeggia a ogni nota che arriva */
+.hw-pads-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.hw-midi {
+  min-height: 22px;
+  padding: 0 7px;
+  font-size: 10px;
+}
+.hw-midi[data-hit="true"] .hw-btn-led {
+  background: var(--hw-led-green);
+  box-shadow: 0 0 6px var(--hw-led-green);
+}

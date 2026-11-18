@@ -385,14 +385,16 @@ export class Graph {
   }
 
   // un colpo di prova con il suono del pattern "slot" (quello che stai modificando)
-  preview(id: ChannelId, t: number, opts: { note?: number; chord?: Chord; slot?: Slot } = {}) {
+  // level: la forza (1 = normale), per esempio dalla velocity di una tastiera MIDI
+  preview(id: ChannelId, t: number, opts: { note?: number; chord?: Chord; slot?: Slot; level?: number } = {}) {
     const p = this.getProject();
     const pat = p.patterns[opts.slot ?? "A"];
     const stepDur = 60 / p.bpm / 4;
-    if (id === "bass") this.bassNote(t, opts.note ?? 33, stepDur * 2, soundOf(p, pat, "bass"));
-    else if (id === "lead") this.leadNote(t, opts.note ?? 69, stepDur * 2, soundOf(p, pat, "lead"));
-    else if (id === "chords") this.chord(t, opts.chord ?? { root: 9, type: "min7" }, stepDur * 8, soundOf(p, pat, "chords"));
-    else this.drum(id, t);
+    const lv = opts.level ?? 1;
+    if (id === "bass") this.bassNote(t, opts.note ?? 33, stepDur * 2, soundOf(p, pat, "bass"), lv);
+    else if (id === "lead") this.leadNote(t, opts.note ?? 69, stepDur * 2, soundOf(p, pat, "lead"), lv);
+    else if (id === "chords") this.chord(t, opts.chord ?? { root: 9, type: "min7" }, stepDur * 8, soundOf(p, pat, "chords"), lv);
+    else this.drum(id, t, lv);
   }
 
   // quanti step mancano alla prossima nota (ricominciando dall'inizio della battuta)

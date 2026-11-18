@@ -97,7 +97,11 @@ cd web && npm run dev
   Serve `ANTHROPIC_API_KEY` tra le variabili di Vercel. Voce in/out con la Web Speech API del browser.
 - **Studio nel browser** (`/studio/crea/[id]`): `web/lib/daw/project.ts` (formato del progetto v2: pattern
   A–P + canzone da 16 a 256 battute; lead polifonico, fino a 6 note per step; fino a 3 accordi per battito; `normalize()` converte i progetti v1; `describe()` per il coach), `web/lib/daw/graph.ts` (suoni sintetizzati, kit di batteria in `kits.ts`, mixer, sidechain: usato
-  in tempo reale e per l'export), `web/lib/daw/engine.ts` (l'orologio del sequencer, swing, pattern/song), `Daw.tsx` (UI, salvataggio automatico in `projects`). Coach dello studio:
+  in tempo reale e per l'export), `web/lib/daw/engine.ts` (l'orologio del sequencer, swing, pattern/song). L'interfaccia sta in
+  `app/studio/crea/[id]/`: `useStudio.tsx` (la logica: stato, motore, tastiera, MIDI, Annulla, export, salvataggio
+  automatico in `projects`), `Daw.tsx` (mette insieme le viste), una vista per file (`TopBar`, `SidePanel`, `BeatView`,
+  `RollView`, `SongView`, `AutoView`, `MixerView`; ognuna riceve `studio` e prende solo quello che usa), `ui.ts`
+  (costanti). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
   `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone, scrivi_effetti con i plugin); plugin degli insert in `lib/daw/plugins.ts`; streaming condiviso in `lib/coach/stream.ts`.
 - **Tour guidato** (`web/app/studio/crea/[id]/Tour.tsx`): 14 tappe scritte a mano (`TOUR`), evidenzia la parte

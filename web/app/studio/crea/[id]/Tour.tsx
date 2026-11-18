@@ -56,7 +56,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Le note: basso, lead, accordi",
-    text: "Nel Roll scrivi le note. Bass è il basso, Lead la melodia, Chord gli accordi. Clicca nella griglia per mettere una nota e trascina verso destra per allungarla, come nel piano roll di FL; un clic su una nota la toglie. Oppure suona con la tastiera: Z X C V B N M sono Do Re Mi Fa Sol La Si. In alto scegli su quale pattern stai lavorando.",
+    text: "Nel Roll scrivi le note. Bass è il basso, Lead la melodia, Chord gli accordi. Clicca nella griglia per mettere una nota e trascina verso destra per allungarla, come nel piano roll di FL; un clic su una nota la toglie. Con Ctrl e trascina selezioni più note: poi le frecce le spostano, Ctrl+C e Ctrl+V le copiano, Ctrl+D le duplica. Oppure suona con la tastiera: Z X C V B N M sono Do Re Mi Fa Sol La Si. In alto scegli su quale pattern stai lavorando.",
     target: '[data-panel="roll"]',
     view: "roll",
   },

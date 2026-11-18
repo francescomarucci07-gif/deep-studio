@@ -588,6 +588,11 @@ export function Daw({
         if (!e.repeat) togglePlay();
         return;
       }
+      // nel Roll: selezione, frecce, Canc, Ctrl+C/X/V/D/A
+      if (!typing(e.target) && !e.altKey && rollKeyRef.current(e)) {
+        e.preventDefault();
+        return;
+      }
       // Ctrl+Z annulla, Ctrl+Y o Ctrl+Shift+Z ripete (Cmd sul Mac); mentre scrivi resta l'annulla del testo
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !typing(e.target)) {
         const k = e.key.toLowerCase();
@@ -906,7 +911,19 @@ export function Daw({
   // La nota nuova prende la lunghezza dell'ultima che hai disegnato (il "pennello").
   const brushLen = useRef(1);
   const drag = useRef<{ r: RollId; note: number; start: number; len: number; existed: boolean; moved: boolean } | null>(null);
-  const rollDown = (r: RollId, i: number, note: number) => {
+  // Selezione nel Roll (come FL): Ctrl o Shift + trascina = riquadro; poi frecce, Canc, Ctrl+C/X/V/D (vedi rollKey).
+  // Le note selezionate sono "step:nota" (lo step dall'inizio del pattern).
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const box = useRef<{ s0: number; n0: number } | null>(null);
+  const clip = useRef<{ r: RollId; items: { s: number; n: number; len: number; vel?: number }[] } | null>(null);
+  useEffect(() => setSel(new Set()), [editing, roll]);
+  const rollDown = (r: RollId, i: number, note: number, e?: { ctrlKey: boolean; shiftKey: boolean; metaKey: boolean }) => {
+    if (e && (e.ctrlKey || e.shiftKey || e.metaKey)) {
+      box.current = { s0: i, n0: note };
+      setSel(boxSel(r, i, note, i, note));
+      return;
+    }
+    if (sel.size) setSel(new Set()); // un clic normale toglie la selezione, come in FL
     const at = noteAt(r, i, note);
     if (at >= 0) {
       drag.current = { r, note, start: at, len: noteLen(pat, r, at, note), existed: true, moved: false };
@@ -918,8 +935,26 @@ export function Daw({
     if (!playing) void engine().preview(r, { note });
     drag.current = { r, note, start: i, len, existed: false, moved: false };
   };
+  // le note (inizio) dentro un riquadro di step e altezze
+  const boxSel = (r: RollId, s0: number, n0: number, s1: number, n1: number) => {
+    const cur = projectRef.current.patterns[playbackRef.current.editing];
+    const [sa, sb] = [Math.min(s0, s1), Math.max(s0, s1)];
+    const [na, nb] = [Math.min(n0, n1), Math.max(n0, n1)];
+    const out = new Set<string>();
+    for (let st = sa; st <= sb; st++) {
+      const list = r === "lead" ? cur.lead[st] : cur.bass[st] === null ? [] : [cur.bass[st] as number];
+      for (const n of list) if (n >= na && n <= nb) out.add(`${st}:${n}`);
+    }
+    return out;
+  };
   useEffect(() => {
     const move = (e: PointerEvent) => {
+      if (box.current) {
+        const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>(".daw-roll [data-step][data-note]");
+        const r = rollRef.current;
+        if (cell && r !== "chords") setSel(boxSel(r, box.current.s0, box.current.n0, Number(cell.dataset.step), Number(cell.dataset.note)));
+        return;
+      }
       const d = drag.current;
       if (!d) return;
       const cell = document.elementFromPoint(e.clientX, e.clientY)?.closest<HTMLElement>(".daw-roll [data-step]");
@@ -933,6 +968,7 @@ export function Daw({
       update((p) => setNoteLen(p.patterns[playbackRef.current.editing], d.r, d.start, d.note, len));
     };
     const up = () => {
+      box.current = null;
       const d = drag.current;
       drag.current = null;
       if (!d) return;
@@ -948,6 +984,90 @@ export function Daw({
       window.removeEventListener("pointercancel", up);
     };
   }, [update]);
+
+  // Le operazioni sulla selezione del Roll. Le note si tolgono e si rimettono nel posto nuovo: prima tutte le note,
+  // poi le lunghezze (così una nota lunga non copre per sbaglio quella dopo). La velocity segue lo step.
+  const rollRef = useRef<RollTab>(roll);
+  rollRef.current = roll;
+  const selItems = (r: RollId) => {
+    const cur = projectRef.current.patterns[playbackRef.current.editing];
+    return [...sel].map((k) => {
+      const [st, n] = k.split(":").map(Number);
+      const v = cur.vel?.[`${r === "lead" ? "l" : "b"}${st}`];
+      return { s: st, n, len: noteLen(cur, r, st, n), ...(v !== undefined ? { vel: v } : {}) };
+    });
+  };
+  const placeNotes = (r: RollId, items: { s: number; n: number; len: number; vel?: number }[], remove: { s: number; n: number }[] = []) => {
+    const lo = OCTAVES[r].low, hi = OCTAVES[r].high;
+    const cur = projectRef.current.patterns[playbackRef.current.editing];
+    const ok = items.filter((x) => x.s >= 0 && x.s < cur.bass.length && x.n >= lo && x.n <= hi);
+    lastEdit.current = 0; // un comando da tastiera è sempre un passo a sé di Annulla
+    update((p) => {
+      const pp = p.patterns[playbackRef.current.editing];
+      for (const x of remove) {
+        setNoteLen(pp, r, x.s, x.n, 1);
+        if (r === "lead") pp.lead[x.s] = pp.lead[x.s].filter((m) => m !== x.n);
+        else if (pp.bass[x.s] === x.n) pp.bass[x.s] = null;
+      }
+      for (const x of ok) {
+        if (r === "lead") {
+          if (!pp.lead[x.s].includes(x.n) && pp.lead[x.s].length < LEAD_VOICES) pp.lead[x.s] = [...pp.lead[x.s], x.n].sort((a, b) => a - b);
+        } else {
+          if (pp.bass[x.s] !== null) setNoteLen(pp, "bass", x.s, pp.bass[x.s] as number, 1);
+          pp.bass[x.s] = x.n;
+        }
+        if (x.vel !== undefined) setVel(pp, `${r === "lead" ? "l" : "b"}${x.s}`, x.vel);
+      }
+      for (const x of ok) setNoteLen(pp, r, x.s, x.n, x.len);
+    });
+    setSel(new Set(ok.map((x) => `${x.s}:${x.n}`)));
+  };
+  // i tasti del Roll (solo con il Roll aperto sul computer): true = tasto usato
+  const rollKey = (e: KeyboardEvent) => {
+    if (view !== "roll" || roll === "chords" || keyMode !== "keys") return false;
+    const r = roll as RollId;
+    const ctrl = e.ctrlKey || e.metaKey;
+    const k = e.key.toLowerCase();
+    if (ctrl && k === "a") {
+      setSel(boxSel(r, 0, 0, pat.bass.length - 1, 127));
+      return true;
+    }
+    if (ctrl && k === "v" && clip.current?.r === r) {
+      placeNotes(r, clip.current.items);
+      return true;
+    }
+    if (!sel.size) return false;
+    const items = selItems(r);
+    if (k === "escape") setSel(new Set());
+    else if (k === "delete" || k === "backspace") {
+      placeNotes(r, [], items);
+      setSel(new Set());
+    } else if (ctrl && (k === "c" || k === "x")) {
+      clip.current = { r, items };
+      if (k === "x") {
+        placeNotes(r, [], items);
+        setSel(new Set());
+      }
+    } else if (ctrl && k === "d") {
+      // duplica subito dopo la selezione
+      const from = Math.min(...items.map((x) => x.s));
+      const span = Math.max(...items.map((x) => x.s + x.len)) - from;
+      placeNotes(r, items.map((x) => ({ ...x, s: x.s + span })));
+    } else if (k === "arrowup" || k === "arrowdown" || k === "arrowleft" || k === "arrowright") {
+      const big = e.shiftKey;
+      const dn = k === "arrowup" ? (big ? 12 : 1) : k === "arrowdown" ? (big ? -12 : -1) : 0;
+      const ds = k === "arrowright" ? (big ? 4 : 1) : k === "arrowleft" ? (big ? -4 : -1) : 0;
+      const moved = items.map((x) => ({ ...x, s: x.s + ds, n: x.n + dn }));
+      const lo = OCTAVES[r].low, hi = OCTAVES[r].high;
+      // se anche una sola nota uscirebbe (dalla battuta o dall'estensione) non sposto niente
+      if (moved.some((x) => x.s < 0 || x.s >= pat.bass.length || x.n < lo || x.n > hi)) return true;
+      placeNotes(r, moved, items);
+      if (dn && !playing) void engine().preview(r, { note: moved[0].n });
+    } else return false;
+    return true;
+  };
+  const rollKeyRef = useRef(rollKey);
+  rollKeyRef.current = rollKey;
 
   const setFx = (c: ChannelId, patch: Partial<ChannelFx>) =>
     update((p) => {
@@ -2446,7 +2566,10 @@ export function Daw({
             aria-label={`Piano roll · ${ROLL_TABS.find((t) => t.id === roll)?.label}`}
           >
             <div className="hw-seq-head">
-              <h2 className="hw-title">
+              <h2
+                className="hw-title"
+                title="Premi e trascina: disegni o allunghi una nota. Ctrl o Shift + trascina: selezioni. Frecce: sposti (Shift = ottava o battito). Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+D (duplica), Ctrl+A (tutto), Canc."
+              >
                 Piano roll · {ROLL_TABS.find((t) => t.id === roll)?.label}
               </h2>
               <div className="hw-patterns hw-roll-patterns" role="group" aria-label="Pattern nel piano roll">
@@ -2571,6 +2694,8 @@ export function Daw({
                           aria-pressed={head}
                           aria-label={`${noteName(note)} step ${i + 1}${head && len > 1 ? `, lunga ${len} step` : ""}`}
                           data-step={i}
+                          data-note={note}
+                          data-selected={head && sel.has(`${i}:${note}`)}
                           data-tail={!head && at >= 0}
                           data-last={at >= 0 && at + len - 1 === i}
                           data-long={head && len > 1}
@@ -2579,7 +2704,7 @@ export function Daw({
                           onPointerDown={(e) => {
                             if (e.button !== 0) return;
                             e.preventDefault();
-                            rollDown(roll, i, note);
+                            rollDown(roll, i, note, e);
                           }}
                           // Invio o spazio da tastiera (detail = 0): il clic del mouse lo gestisce rollDown
                           onClick={(e) => e.detail === 0 && setNote(roll, i, note)}

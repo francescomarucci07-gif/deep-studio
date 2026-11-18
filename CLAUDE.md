@@ -198,8 +198,9 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
 - Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
-  degli stem~~ **fatto il 18 nov**; più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
-  comodo (selezione multipla, copia/incolla, trasposizione, quantize, velocity per nota); automazioni di volume, send,
+  degli stem~~ **fatto il 18 nov**; più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); ~~Roll più
+  comodo~~ **fatto il 18 nov** (Ctrl/Shift + trascina seleziona; frecce sposta, Shift = ottava o battito; Ctrl+C/X/V/D/A,
+  Canc; `rollKey` e `placeNotes` in `Daw.tsx`; ogni comando è un passo di Annulla; restano quantize e velocity per nota); automazioni di volume, send,
   plugin e bus; send verso i bus e bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
   `graph.click`, non entra nell'export).
 - Coach: ~~lezioni guidate~~ **fatte il 18 nov**; parere in tempo reale (es. basso che

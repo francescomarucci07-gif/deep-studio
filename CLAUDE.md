@@ -81,6 +81,11 @@ supabase start
 
 # dashboard
 cd web && npm run dev
+
+# test dello studio (dalla cartella web)
+npm test                     # Vitest: la logica di lib/daw (tests/unit), meno di un secondo
+npx playwright install chromium   # solo la prima volta sul tuo PC: il browser dei test
+npm run test:e2e             # Playwright: build + studio vero nel browser (tests/e2e), ~1-2 minuti
 ```
 
 ## Cose da sapere
@@ -147,6 +152,10 @@ cd web && npm run dev
   alla prima modifica, prima di ogni modifica del coach, ogni 10 minuti e a mano (`lib/daw/versions.ts`).
 - **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
+- **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi; `vitest.config.mts`);
+  `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
+  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala`;
+  la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
   `retry_job(id)`; tutti gli altri cambi di stato li fa il worker.
@@ -212,7 +221,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   copre il kick).
 - Prodotto: pagina delle segnalazioni nel sito (solo per Francesco); link di ascolto pubblico; email di accesso con
   SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).
-- Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); test Playwright nel repo; M2 worker su Modal (serve Spencer).
+- Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

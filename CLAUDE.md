@@ -113,6 +113,10 @@ cd web && npm run dev
 - **Velocity**: `pattern.vel` (chiavi `hat3`, `b5`, `l5` = tutte le note del lead dello step, `c2` = accordi del
   battito; 0.1–1, `VEL_DEFAULT` 0.8 = come prima e non si salva; `velGain` = v/0.8). Nel Beat il pulsante Vel: trascini
   su e giù sulle barre (il clic non accende step). Coach: campo `velocity` in `scrivi_pattern` (`crea-v21`).
+- **Pattern lunghi**: `pattern.bars` 1, 2 o 4 (`patBars`, `patSteps`, `setPatternBars` in `project.ts`; ADR); step e
+  battiti contati dall'inizio del pattern. Nella canzone caselle di fila = battute del pattern (`barOf`, usato da motore,
+  export, MIDI). Beat e Roll mostrano una battuta alla volta (schede 1–4, seguono il Play); selettore "bat." accanto a
+  Svuota e nel Roll. Coach: `lunghezza_battute` in `scrivi_pattern` (`crea-v22`).
 - **Tastiera MIDI** (`lib/daw/midi.ts`, Web MIDI: Chrome/Edge, non Safari): pulsante MIDI accanto al titolo dei pad;
   nel Roll suona lo strumento della scheda (`playKey` con `midi`, nota portata nell'estensione con `fold`), altrove i
   tasti 35–51 suonano la batteria (mappa General MIDI, `gmDrum`). Con REC scrive nota, lunghezza (quanto tieni il
@@ -189,7 +193,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 "Cose da sapere").
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
-- Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; pattern da 2 o 4 battute; ~~export MIDI e
+- Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
   degli stem~~ **fatto il 18 nov**; più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
   comodo (selezione multipla, copia/incolla, trasposizione, quantize, velocity per nota); automazioni di volume, send,
   plugin e bus; send verso i bus e bus dentro bus; metronomo durante la registrazione.

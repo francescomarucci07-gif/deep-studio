@@ -410,14 +410,17 @@ export class Graph {
   // quanti step mancano alla prossima nota della battuta; l'ultima nota tiene fino a fine battuta
   // (non oltre: in Song la battuta dopo può essere un altro pattern, con altre note)
   private stepsToNext(line: (number | null)[], s: number) {
-    for (let k = s + 1; k < STEPS; k++) if (line[k] !== null) return k - s;
-    return STEPS - s;
+    // dentro la battuta dello step (anche nei pattern lunghi la nota legata si ferma a fine battuta)
+    const end = (Math.floor(s / STEPS) + 1) * STEPS;
+    for (let k = s + 1; k < end; k++) if (line[k] !== null) return k - s;
+    return end - s;
   }
 
   // il pad tiene fino al prossimo accordo della battuta (o fino alla fine della battuta)
   private beatsToNextChord(pat: Pattern, b: number) {
-    for (let k = b + 1; k < BEATS; k++) if (pat.chords[k].length) return k - b;
-    return BEATS - b;
+    const end = (Math.floor(b / BEATS) + 1) * BEATS; // fino a fine battuta, come prima
+    for (let k = b + 1; k < end; k++) if (pat.chords[k].length) return k - b;
+    return end - b;
   }
 
   // Risposta all'impulso di una stanza: rumore stereo che si spegne in modo esponenziale

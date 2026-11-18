@@ -4,7 +4,7 @@
 // I suoni stanno in graph.ts, condivisi con l'export WAV.
 import { Graph } from "./graph";
 import { loadLimiter } from "./limiter";
-import { STEPS, songLength, type ChannelId, type Chord, type Project, type Slot } from "./project";
+import { STEPS, barOf, patBars, songLength, type ChannelId, type Chord, type Project, type Slot } from "./project";
 
 const LOOKAHEAD_S = 0.1;
 const TICK_MS = 25;
@@ -20,6 +20,7 @@ export class Engine {
   private bar = 0;
   private nextTime = 0;
   private loopFrom = 0;
+  private loop = 0; // in modalità pattern: quante battute sono passate (per i pattern lunghi)
   // gli ultimi step programmati, con il loro orario: servono a registrare sullo step più vicino
   private recent: { t: number; step: number; slot: Slot | null }[] = [];
   // count-in: i click programmati e i timer del conto, da fermare se premi Stop durante il conto
@@ -61,6 +62,7 @@ export class Engine {
     this.recent = [];
     this.bar = fromBar;
     this.loopFrom = fromBar;
+    this.loop = 0;
     const t0 = this.ctx.currentTime + 0.05;
     const beat = 60 / this.getProject().bpm;
     for (let i = 0; i < countIn; i++) {
@@ -147,17 +149,23 @@ export class Engine {
       const back = this.loopFrom < len ? this.loopFrom : 0; // il marker, se è dentro la canzone
       const bar = song ? (this.bar < len ? this.bar : back) : 0;
       const slot = song ? p.song[bar] : editing;
+      // la battuta del pattern che suona adesso (pattern lunghi): in song dalle caselle di fila, in pattern dal giro
+      const k = slot ? (song ? barOf(p, p.song, bar) : this.loop % patBars(p.patterns[slot])) : 0;
+      const ps = k * STEPS + s; // lo step contato dall'inizio del pattern
       // swing: gli step in levare (2, 4, 6… contando da 1) arrivano un po' dopo
       const t = this.nextTime + (s % 2 === 1 ? p.swing * stepDur : 0);
       if (song && s === 0) this.graph.automateBar(bar, this.nextTime, STEPS * stepDur, songLength(p) - 1);
-      if (slot) this.graph.playStep(p.patterns[slot], s, t, stepDur);
-      this.recent.push({ t, step: s, slot });
+      if (slot) this.graph.playStep(p.patterns[slot], ps, t, stepDur);
+      this.recent.push({ t, step: ps, slot });
       if (this.recent.length > 32) this.recent.shift();
       const delay = Math.max(0, (t - this.ctx.currentTime) * 1000);
-      setTimeout(() => this.timer && this.onStep(s, bar, slot), delay);
+      setTimeout(() => this.timer && this.onStep(ps, bar, slot), delay);
       this.nextTime += stepDur;
       this.step = (s + 1) % STEPS;
-      if (this.step === 0) this.bar = bar + 1 < len ? bar + 1 : back;
+      if (this.step === 0) {
+        this.bar = bar + 1 < len ? bar + 1 : back;
+        this.loop++;
+      }
     }
   }
 }

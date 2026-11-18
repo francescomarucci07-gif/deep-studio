@@ -2511,3 +2511,22 @@ ol.ds-led-row {
   background: color-mix(in srgb, var(--ds-accent) 18%, transparent);
   outline: none;
 }
+
+/* pattern lunghi: lunghezza (1, 2, 4 battute) e le schede delle battute; quella che suona ha la lucina */
+.hw-bars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.hw-bars-len {
+  min-height: 30px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+.hw-bars-tab {
+  min-width: 26px;
+  padding: 0 6px;
+}
+.hw-bars-tab[data-playing="true"] {
+  box-shadow: inset 0 -2px 0 var(--hw-led-green);
+}

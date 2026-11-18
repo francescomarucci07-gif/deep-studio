@@ -305,3 +305,15 @@ Opzione 2, tenendo il percorso "analizza un mix" che esiste già (serve a chi pr
 - Opzione scartata: note come oggetti {nota, lunghezza} dentro `bass`/`lead` (più pulito, ma cambiava tutto il codice
   che legge le note: motore, coach, Beat, registrazione).
 - Una nota non va oltre la battuta e non copre la nota dopo (stessa altezza nel lead; qualsiasi nel basso, che è mono).
+
+## Aggiornamento 18 nov 2026 · pattern da 2 o 4 battute
+
+- Un pattern ha `bars` = 1, 2 o 4 (manca = 1); le sue righe sono lunghe 16 × bars step (gli accordi 4 × bars battiti)
+  e gli step si contano dall'inizio del pattern, anche nelle chiavi di lunghezze e velocity.
+- Canzone: ogni casella resta una battuta. Più caselle di fila con lo stesso pattern lungo suonano le sue battute una
+  dopo l'altra (`barOf`: si contano le caselle uguali prima); il pennello della Song dipinge tutte le battute in un
+  colpo. In modalità Pattern il motore gira su tutte le battute.
+- Allungare copia le battute che ci sono; accorciare toglie le battute in più (con conferma se c'erano note).
+- Opzione scartata: caselle della canzone che durano quanto il pattern (come le clip della playlist di FL). Più
+  fedele a FL, ma cambiava il significato di battuta in automazioni, marker, export e misure.
+- Progetti di prima: tutti i pattern da 1 battuta, identici.

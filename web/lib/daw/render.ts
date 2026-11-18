@@ -3,7 +3,7 @@
 import { Graph } from "./graph";
 import { loadLimiter } from "./limiter";
 import { truePeak } from "./measure";
-import { CHANNEL_IDS, STEPS, songLength, type ChannelId, type Project, type Slot } from "./project";
+import { CHANNEL_IDS, STEPS, barOf, songLength, type ChannelId, type Project, type Slot } from "./project";
 
 export const SAMPLE_RATE = 44100;
 const TAIL_S = 2.5; // coda dopo l'ultima battuta: riverbero e release degli accordi
@@ -33,9 +33,10 @@ export async function renderAudio(p0: Project, what: RenderWhat, stem?: ChannelI
   bars.forEach((slot, b) => {
     if (what.song) graph.automateBar(b, 0.05 + b * STEPS * stepDur, STEPS * stepDur, bars.length - 1);
     if (!slot) return;
+    const k = barOf(p, bars, b); // la battuta del pattern (pattern lunghi)
     for (let s = 0; s < STEPS; s++) {
       const t = 0.05 + (b * STEPS + s) * stepDur + (s % 2 === 1 ? p.swing * stepDur : 0);
-      graph.playStep(p.patterns[slot], s, t, stepDur);
+      graph.playStep(p.patterns[slot], k * STEPS + s, t, stepDur);
     }
   });
   const buf = await ctx.startRendering();

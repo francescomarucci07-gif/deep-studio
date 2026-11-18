@@ -50,6 +50,11 @@ import {
   maxLen,
   setNoteLen,
   setVel,
+  barOf,
+  patBars,
+  setPatternBars,
+  PATTERN_BARS,
+  type PatternBars,
   velOf,
   velGain,
   VEL_DEFAULT,
@@ -738,7 +743,7 @@ export function Daw({
   const hasNote = (r: RollId, i: number, note: number) => (r === "lead" ? pat.lead[i].includes(note) : pat.bass[i] === note);
   // gli step coperti dalla coda di una nota lunga (per le righe Bass e Lead del Beat)
   const holds = { bass: new Set<number>(), lead: new Set<number>() };
-  for (let i = 0; i < STEPS; i++) {
+  for (let i = 0; i < pat.bass.length; i++) {
     const b = pat.bass[i];
     if (b !== null) for (let k = 1; k < noteLen(pat, "bass", i, b); k++) holds.bass.add(i + k);
     for (const m of pat.lead[i]) for (let k = 1; k < noteLen(pat, "lead", i, m); k++) holds.lead.add(i + k);
@@ -789,6 +794,68 @@ export function Daw({
       window.removeEventListener("pointercancel", up);
     };
   });
+  // Pattern lunghi: Beat e Roll mostrano una battuta alla volta (vb). Gli indici restano dall'inizio del pattern.
+  const nBars = patBars(pat);
+  const [viewBar, setViewBar] = useState(0);
+  const vb = Math.min(viewBar, nBars - 1);
+  const cols = Array.from({ length: STEPS }, (_, j) => vb * STEPS + j);
+  const beatCols = Array.from({ length: BEATS }, (_, j) => vb * BEATS + j);
+  // durante il Play del pattern che stai guardando, la vista segue la battuta che suona (come in FL)
+  const playingBar = step >= 0 && playingSlot === editing ? Math.floor(step / STEPS) : -1;
+  useEffect(() => {
+    if (playingBar >= 0) setViewBar(playingBar);
+  }, [playingBar]);
+  useEffect(() => setViewBar(0), [editing]);
+  const changeBars = (n: PatternBars) => {
+    if (n === nBars) return;
+    // accorciando si perdono le battute in più: chiedo solo se c'è qualcosa
+    if (n < nBars) {
+      const cut = pat.drums.kick.length;
+      const from = STEPS * n;
+      const lost =
+        DRUMS.some(({ id }) => pat.drums[id].slice(from, cut).some(Boolean)) ||
+        pat.bass.slice(from).some((x) => x !== null) ||
+        pat.lead.slice(from).some((x) => x.length) ||
+        pat.chords.slice(BEATS * n).some((x) => x.length);
+      if (lost && !window.confirm(`Il pattern ${editing} passa a ${n} battut${n === 1 ? "a" : "e"}: le note nelle battute dopo si perdono. Va bene?`)) return;
+    }
+    update((p) => setPatternBars(p.patterns[editing], n));
+    if (n < nBars) setViewBar(0);
+  };
+  const barControls = (
+    <span className="hw-bars" role="group" aria-label={`Lunghezza del pattern ${editing}`}>
+      <label className="hw-visually-hidden" htmlFor={`bars-${editing}`}>
+        Battute del pattern
+      </label>
+      <select
+        id={`bars-${editing}`}
+        className="hw-select hw-bars-len"
+        value={nBars}
+        title="Quante battute è lungo il pattern (allungando, le battute si copiano)"
+        onChange={(e) => changeBars(Number(e.target.value) as PatternBars)}
+      >
+        {PATTERN_BARS.map((n) => (
+          <option key={n} value={n}>
+            {n} bat.
+          </option>
+        ))}
+      </select>
+      {nBars > 1 &&
+        Array.from({ length: nBars }, (_, k) => (
+          <button
+            key={k}
+            type="button"
+            className="hw-btn hw-btn--small hw-bars-tab"
+            aria-pressed={vb === k}
+            data-playing={playingBar === k}
+            title={`Battuta ${k + 1} del pattern ${editing}`}
+            onClick={() => setViewBar(k)}
+          >
+            {k + 1}
+          </button>
+        ))}
+    </span>
+  );
   // la nota che copre lo step i (con la sua coda): lo step in cui comincia, oppure -1
   const noteAt = (r: RollId, i: number, note: number) => {
     for (let j = i; j >= 0; j--) if (hasNote(r, j, note)) return j + noteLen(pat, r, j, note) > i ? j : -1;
@@ -1137,13 +1204,23 @@ export function Daw({
   const clearPattern = () => {
     if (isEmptyPattern(pat) || !window.confirm(`Svuoto il pattern ${editing}?`)) return;
     update((p) => {
-      p.patterns[editing] = { ...emptyPattern(), ...(p.patterns[editing].sounds ? { sounds: p.patterns[editing].sounds } : {}) };
+      p.patterns[editing] = {
+        ...emptyPattern(patBars(p.patterns[editing])),
+        ...(p.patterns[editing].sounds ? { sounds: p.patterns[editing].sounds } : {}),
+      };
     });
   };
   // canzone come la playlist di FL: clic = metti il pattern del pennello, clic sullo stesso = svuota
   const paintBar = (b: number) =>
     update((p) => {
-      p.song[b] = p.song[b] === brush ? null : brush;
+      const n = patBars(p.patterns[brush]);
+      if (p.song[b] === brush) {
+        const start = b - barOf(p, p.song, b);
+        for (let i = start; i < start + n && i < p.song.length && p.song[i] === brush; i++) p.song[i] = null;
+      } else {
+        // un pattern lungo occupa le sue battute (finché c'è posto nella fila)
+        for (let i = b; i < b + n && i < p.song.length; i++) p.song[i] = brush;
+      }
     });
   const shown = visibleSlots(project, editing);
   // i pulsanti dei pattern: nel Beat e nel Roll (per cambiare pattern senza uscire dal Roll)
@@ -1208,13 +1285,14 @@ export function Daw({
               {" · "}
               {playingSlot ? `PAT ${playingSlot}` : "PAT -"}
               <br />
-              STEP {step >= 0 ? two(step + 1) : "--"}/16 ·{" "}
+              STEP {step >= 0 ? two((step % STEPS) + 1) : "--"}/16
+              {patBars(project.patterns[playingSlot ?? editing]) > 1 && step >= 0 ? `·${Math.floor(step / STEPS) + 1}` : ""} ·{" "}
               {save === "errore" ? "NON SALVATO" : save === "salvato" ? "SALVATO" : "SALVO…"}
             </span>
           </div>
           <div className="hw-lcd-dots" aria-hidden="true">
             {Array.from({ length: STEPS }, (_, i) => (
-              <span key={i} data-on={i === step} />
+              <span key={i} data-on={i === step % STEPS} />
             ))}
           </div>
         </div>
@@ -1359,7 +1437,7 @@ export function Daw({
           <section className="hw-panel hw-pads-panel" aria-label="Drum pad">
             <div className="hw-seq-head">
               <div className="hw-pads-title">
-                <h2 className="hw-title">Pads · Kit {KITS[project.kit].label}</h2>
+                <h2 className="hw-title">Kit {KITS[project.kit].label}</h2>
                 {midiButton}
               </div>
               <div className="hw-seg" role="group" aria-label="Kit di batteria">
@@ -1659,7 +1737,7 @@ export function Daw({
           {/* ---- step sequencer: ogni riga ha il colore del suo strumento ---- */}
           <section className="hw-panel hw-seq" data-panel="beat" aria-label="Step sequencer">
             <div className="hw-seq-head">
-              <h2 className="hw-title">Step sequencer · Pattern {editing}</h2>
+              <h2 className="hw-title">Beat · Pattern {editing}</h2>
               <div className="hw-patterns" role="group" aria-label="Pattern da modificare">
                 {patternButtons}
                 <button type="button" className="hw-btn hw-btn--small" disabled={!firstFree} onClick={duplicate}>
@@ -1668,6 +1746,7 @@ export function Daw({
                 <button type="button" className="hw-btn hw-btn--small" onClick={clearPattern}>
                   Svuota
                 </button>
+                {barControls}
                 <button
                   type="button"
                   className="hw-btn hw-btn--small"
@@ -1692,12 +1771,12 @@ export function Daw({
                     </button>
                     {soloButton(d, label)}
                   </div>
-                  {pat.drums[d].map((on, i) => (
+                  {cols.map((i) => [pat.drums[d][i], i] as const).map(([on, i]) => (
                     <button
                       key={i}
                       type="button"
                       className="hw-key"
-                      data-group={Math.floor(i / 4)}
+                      data-group={Math.floor((i % STEPS) / 4)}
                       aria-pressed={on}
                       aria-label={`${label} step ${i + 1}`}
                       data-now={i === step && playingSlot === editing}
@@ -1717,11 +1796,11 @@ export function Daw({
                   </button>
                   {soloButton("bass", "Bass")}
                 </div>
-                {pat.bass.map((n, i) => (
+                {cols.map((i) => [pat.bass[i], i] as const).map(([n, i]) => (
                   <span
                     key={i}
                     className="hw-key hw-key--note"
-                    data-group={Math.floor(i / 4)}
+                    data-group={Math.floor((i % STEPS) / 4)}
                     data-on={n !== null}
                     data-hold={n === null && holds.bass.has(i)}
                     data-now={i === step && playingSlot === editing}
@@ -1748,11 +1827,11 @@ export function Daw({
                   </button>
                   {soloButton("lead", "Lead")}
                 </div>
-                {pat.lead.map((n, i) => (
+                {cols.map((i) => [pat.lead[i], i] as const).map(([n, i]) => (
                   <span
                     key={i}
                     className="hw-key hw-key--note hw-key--lead"
-                    data-group={Math.floor(i / 4)}
+                    data-group={Math.floor((i % STEPS) / 4)}
                     data-on={n.length > 0}
                     data-hold={n.length === 0 && holds.lead.has(i)}
                     data-now={i === step && playingSlot === editing}
@@ -1774,7 +1853,7 @@ export function Daw({
                   </button>
                   {soloButton("chords", "Chord")}
                 </div>
-                {pat.chords.map((c, b) => (
+                {beatCols.map((b) => [pat.chords[b], b] as const).map(([c, b]) => (
                   <span
                     key={b}
                     className="hw-key hw-key--note hw-key--chord"
@@ -1884,7 +1963,10 @@ export function Daw({
                     aria-label={`Battuta ${b + 1}: ${s ? `pattern ${s}` : "vuota"}. Clic: ${s === brush ? "svuota" : `metti ${brush}`}`}
                     onClick={() => paintBar(b)}
                   >
-                    <span className="hw-bar-slot">{s ?? "–"}</span>
+                    <span className="hw-bar-slot">
+                      {s ?? "–"}
+                      {s && patBars(project.patterns[s]) > 1 && <sub>{barOf(project, project.song, b) + 1}</sub>}
+                    </span>
                   </button>
                 </div>
               ))}
@@ -2323,6 +2405,7 @@ export function Daw({
               </h2>
               <div className="hw-patterns hw-roll-patterns" role="group" aria-label="Pattern nel piano roll">
                 {patternButtons}
+                {barControls}
               </div>
               <div className="hw-patterns" role="group" aria-label="Strumento nel piano roll">
                 {ROLL_TABS.map((r) => (
@@ -2379,7 +2462,7 @@ export function Daw({
                     >
                       {NOTE_NAMES[root]}
                     </button>
-                    {Array.from({ length: BEATS }, (_, b) => {
+                    {beatCols.map((b) => {
                       // gli accordi del battito con questa fondamentale (di solito uno)
                       const here = pat.chords[b].filter((x) => x.root === root);
                       const on = here.length > 0;
@@ -2430,7 +2513,7 @@ export function Daw({
                     >
                       {noteName(note)}
                     </button>
-                    {Array.from({ length: STEPS }, (_, i) => {
+                    {cols.map((i) => {
                       const head = hasNote(roll, i, note);
                       const at = head ? i : noteAt(roll, i, note);
                       const len = at >= 0 ? noteLen(pat, roll, at, note) : 0;

@@ -41,14 +41,14 @@ import {
 const stepList = (label: string) => ({
   type: "array",
   description: `Step (1–16) in cui suona ${label}. Lista vuota = non suona.`,
-  items: { type: "integer", minimum: 1, maximum: STEPS },
+  items: { type: "integer", minimum: 1, maximum: STEPS * 4 },
 });
 
 // la lunghezza di una nota, in step (come nel piano roll): resta dentro la battuta e non copre la nota dopo
 const LEN_FIELD = {
   type: "integer",
   minimum: 1,
-  maximum: STEPS,
+  maximum: STEPS * 4,
   description: "Quanti step dura la nota (1 = uno step, 4 = un quarto, 16 = la battuta). Senza = uno step (con Legato/808 long tiene fino alla nota dopo).",
 };
 
@@ -60,6 +60,12 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
     type: "object",
     properties: {
       nome: { type: "string", description: "Titolo breve di quello che scrivi, es. 'Trap half-time' o 'Drop'." },
+      lunghezza_battute: {
+        type: "integer",
+        enum: [1, 2, 4],
+        description:
+          "Quante battute è lungo il pattern (default 1). Con 2 o 4 gli step vanno da 1 a 32 o 64 (step 17 = primo della seconda battuta) e i battiti degli accordi da 1 a 8 o 16. Nella canzone un pattern lungo occupa 2 o 4 battute di fila: scrivilo in tante battute consecutive quante sono le sue. Usalo per melodie e bassline che rispondono (domanda e risposta), o per variazioni a fine giro.",
+      },
       slot: { type: "string", enum: [...SLOTS], description: "Dove scriverlo. Se non lo dici, nel pattern che il producer sta modificando." },
       bpm: { type: "number", minimum: 60, maximum: 200 },
       swing: { type: "number", minimum: 0, maximum: 0.5, description: "0 = dritto, 0.1–0.2 = groove house." },
@@ -75,7 +81,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
         items: {
           type: "object",
           properties: {
-            step: { type: "integer", minimum: 1, maximum: STEPS },
+            step: { type: "integer", minimum: 1, maximum: STEPS * 4 },
             nota: { type: "integer", minimum: BASS_LOW, maximum: BASS_HIGH },
             lunghezza: LEN_FIELD,
           },
@@ -105,7 +111,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
         items: {
           type: "object",
           properties: {
-            battito: { type: "integer", minimum: 1, maximum: BEATS },
+            battito: { type: "integer", minimum: 1, maximum: BEATS * 4 },
             radice: { type: "integer", minimum: 0, maximum: 11 },
             tipo: { type: "string", enum: [...CHORD_TYPES] },
           },
@@ -124,7 +130,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
         items: {
           type: "object",
           properties: {
-            step: { type: "integer", minimum: 1, maximum: STEPS },
+            step: { type: "integer", minimum: 1, maximum: STEPS * 4 },
             nota: { type: "integer", minimum: LEAD_LOW, maximum: LEAD_HIGH },
             lunghezza: LEN_FIELD,
           },
@@ -146,7 +152,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
           type: "object",
           properties: {
             riga: { type: "string", enum: [...DRUMS.map((d) => d.id), "basso", "melodia", "accordi"] },
-            step: { type: "integer", minimum: 1, maximum: STEPS },
+            step: { type: "integer", minimum: 1, maximum: STEPS * 4 },
             valore: { type: "number", minimum: 0.1, maximum: 1 },
           },
           required: ["riga", "step", "valore"],
@@ -293,9 +299,9 @@ type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc",
   suoni_solo_qui?: unknown;
 };
 
-const steps = (v: unknown) => {
-  const on = Array(STEPS).fill(false);
-  if (Array.isArray(v)) for (const s of v) if (Number.isInteger(s) && s >= 1 && s <= STEPS) on[s - 1] = true;
+const steps = (v: unknown, n = STEPS) => {
+  const on = Array(n).fill(false);
+  if (Array.isArray(v)) for (const s of v) if (Number.isInteger(s) && s >= 1 && s <= n) on[s - 1] = true;
   return on;
 };
 
@@ -312,13 +318,17 @@ export function createStudioWriter(current: Project, editing: Slot) {
     const i = (raw && typeof raw === "object" ? raw : {}) as PatternInput & { battute?: unknown };
     if (name === "scrivi_pattern") {
       const slot: Slot = isSlot(i.slot) ? i.slot : editing;
+      // pattern lunghi: 1, 2 o 4 battute
+      const lb = (i as { lunghezza_battute?: unknown }).lunghezza_battute;
+      const nb = lb === 2 || lb === 4 ? lb : 1;
+      const N = STEPS * nb;
       // note per step (normalize poi scarta quelle fuori dall'estensione dello strumento)
       // il lead: tutte le note con lo stesso step suonano insieme (normalize ne tiene al massimo 6)
       const poly = (list: unknown) => {
-        const out: number[][] = Array.from({ length: STEPS }, () => []);
+        const out: number[][] = Array.from({ length: N }, () => []);
         if (Array.isArray(list)) {
           for (const n of list as { step?: unknown; nota?: unknown }[]) {
-            if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && (n.step as number) >= 1 && (n.step as number) <= STEPS) {
+            if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && (n.step as number) >= 1 && (n.step as number) <= N) {
               out[(n.step as number) - 1].push(n.nota as number);
             }
           }
@@ -326,10 +336,10 @@ export function createStudioWriter(current: Project, editing: Slot) {
         return out;
       };
       const line = (list: unknown) => {
-        const out: (number | null)[] = Array(STEPS).fill(null);
+        const out: (number | null)[] = Array(N).fill(null);
         if (Array.isArray(list)) {
           for (const n of list as { step?: unknown; nota?: unknown }[]) {
-            if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && (n.step as number) >= 1 && (n.step as number) <= STEPS) {
+            if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && (n.step as number) >= 1 && (n.step as number) <= N) {
               out[(n.step as number) - 1] = n.nota as number;
             }
           }
@@ -338,10 +348,10 @@ export function createStudioWriter(current: Project, editing: Slot) {
       };
       const bass = line(i.basso);
       // più accordi con lo stesso battito si sovrappongono (normalize ne tiene al massimo 3)
-      const chords: unknown[][] = Array.from({ length: BEATS }, () => []);
+      const chords: unknown[][] = Array.from({ length: BEATS * nb }, () => []);
       if (Array.isArray(i.accordi)) {
         for (const c of i.accordi as { battito?: unknown; radice?: unknown; tipo?: unknown }[]) {
-          if (Number.isInteger(c?.battito) && (c.battito as number) >= 1 && (c.battito as number) <= BEATS) {
+          if (Number.isInteger(c?.battito) && (c.battito as number) >= 1 && (c.battito as number) <= BEATS * nb) {
             chords[(c.battito as number) - 1].push({ root: c.radice, type: c.tipo });
           }
         }
@@ -389,7 +399,8 @@ export function createStudioWriter(current: Project, editing: Slot) {
       const pattern: Pattern = {
         vel,
         len,
-        drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id])])) as Pattern["drums"],
+        ...(nb > 1 ? { bars: nb } : {}),
+        drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(i[id], N)])) as Pattern["drums"],
         bass,
         chords: chords as Pattern["chords"], // normalize scarta radici e tipi non validi
         lead: poly(i.melodia),

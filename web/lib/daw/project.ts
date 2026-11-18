@@ -145,7 +145,60 @@ export type Pattern = {
   sounds?: Sounds; // il suono proprio di questo pattern (basso, accordi, lead); manca = quello del progetto
   len?: Record<string, number>; // lunghezza in step delle note lunghe (chiavi di lenKey); manca = nota di uno step
   vel?: Record<string, number>; // velocity (forza) dei colpi e delle note, 0.1–1; manca = VEL_DEFAULT
+  bars?: PatternBars; // quante battute è lungo il pattern (manca = 1); le righe sono lunghe STEPS × bars
 };
+
+// Pattern lunghi (come in FL): 1, 2 o 4 battute. Gli step si contano dall'inizio del pattern (0–63), i battiti degli
+// accordi pure (0–15). Nella canzone ogni casella è una battuta: più caselle di fila con lo stesso pattern lungo
+// suonano le sue battute una dopo l'altra (vedi barOf).
+export const PATTERN_BARS = [1, 2, 4] as const;
+export type PatternBars = (typeof PATTERN_BARS)[number];
+export const patBars = (pat: Pattern): PatternBars => pat.bars ?? 1;
+export const patSteps = (pat: Pattern) => STEPS * patBars(pat);
+// quale battuta del pattern suona alla battuta b di una fila (la canzone, o il piano dell'export): conto le caselle
+// uguali di fila prima di b
+export function barOf(p: Project, row: (Slot | null)[], b: number) {
+  const s = row[b];
+  if (!s) return 0;
+  let k = 0;
+  for (let i = b - 1; i >= 0 && row[i] === s; i--) k++;
+  return k % patBars(p.patterns[s]);
+}
+// Cambia la lunghezza di un pattern. Allungando copia le battute che ci sono (un groove da 1 battuta portato a 2 suona
+// uguale: poi cambi la seconda); accorciando toglie le battute in più, con le loro lunghezze e velocity.
+export function setPatternBars(pat: Pattern, n: PatternBars) {
+  const old = patBars(pat);
+  if (n === old) return;
+  const from = STEPS * old;
+  const to = STEPS * n;
+  const grow = <T,>(a: T[], size: number, copy: (x: T) => T) => Array.from({ length: size }, (_, i) => copy(a[i % a.length]));
+  for (const { id } of DRUMS) pat.drums[id] = grow(pat.drums[id], to, (x) => x);
+  pat.bass = grow(pat.bass, to, (x) => x);
+  pat.lead = grow(pat.lead, to, (x) => [...x]);
+  pat.chords = grow(pat.chords, (to / STEPS) * BEATS, (x) => x.map((c) => ({ ...c })));
+  // le chiavi di lunghezze e velocity hanno lo step dentro: le copio sulle battute nuove, o tolgo quelle fuori
+  const remap = (rec: Record<string, number> | undefined) => {
+    if (!rec) return undefined;
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(rec)) {
+      const m = /^([a-z]+)(\d+)(:\d+)?$/.exec(k);
+      if (!m) continue;
+      const i = Number(m[2]);
+      const per = m[1] === "c" ? (old * BEATS) : from; // gli accordi si contano a battiti
+      const lim = m[1] === "c" ? (n * BEATS) : to;
+      for (let j = i; j < lim; j += per) if (j < lim) out[`${m[1]}${j}${m[3] ?? ""}`] = v;
+    }
+    return Object.keys(out).length ? out : undefined;
+  };
+  const len = remap(pat.len);
+  const vel = remap(pat.vel);
+  if (len) pat.len = len;
+  else delete pat.len;
+  if (vel) pat.vel = vel;
+  else delete pat.vel;
+  if (n === 1) delete pat.bars;
+  else pat.bars = n;
+}
 
 // Velocity: quanto forte suona un colpo o una nota, come la forza su un tasto. 0.8 = normale (i progetti di prima),
 // 1 = accento (+1,9 dB), sotto = più piano. Chiavi: "hat3" = l'hi-hat dello step 4, "b5" = il basso dello step 6,
@@ -168,10 +221,10 @@ function velKeyLive(pat: Pattern, key: string) {
   const m = /^(openhat|kick|clap|hat|perc|b|l|c)(\d+)$/.exec(key);
   if (!m) return false;
   const i = Number(m[2]);
-  if (m[1] === "b") return i < STEPS && pat.bass[i] !== null;
-  if (m[1] === "l") return i < STEPS && pat.lead[i].length > 0;
-  if (m[1] === "c") return i < BEATS && pat.chords[i].length > 0;
-  return i < STEPS && pat.drums[m[1] as DrumId][i];
+  if (m[1] === "b") return i < pat.bass.length && pat.bass[i] !== null;
+  if (m[1] === "l") return i < pat.lead.length && pat.lead[i].length > 0;
+  if (m[1] === "c") return i < pat.chords.length && pat.chords[i].length > 0;
+  return i < pat.bass.length && pat.drums[m[1] as DrumId][i];
 }
 
 // Lunghezza delle note (basso e lead), in step. Chiave: "b5" = la nota di basso dello step 6; "l5:72" = il Do5
@@ -183,10 +236,11 @@ export const noteLen = (pat: Pattern, r: NoteInst, step: number, note: number) =
 // la lunghezza più lunga possibile: fino a fine battuta, e senza coprire la nota dopo (stessa altezza; nel basso,
 // che è mono, qualsiasi nota)
 export function maxLen(pat: Pattern, r: NoteInst, step: number, note: number) {
-  for (let k = step + 1; k < STEPS; k++) {
+  const end = pat.bass.length; // fino alla fine del pattern (anche lungo)
+  for (let k = step + 1; k < end; k++) {
     if (r === "bass" ? pat.bass[k] !== null : pat.lead[k].includes(note)) return k - step;
   }
-  return STEPS - step;
+  return end - step;
 }
 // scrive una lunghezza (1 = nota corta: la chiave sparisce)
 export function setNoteLen(pat: Pattern, r: NoteInst, step: number, note: number, len: number) {
@@ -240,12 +294,14 @@ export function noteName(midi: number) {
 
 const on = (...steps: number[]) => Array.from({ length: STEPS }, (_, i) => steps.includes(i));
 
-export function emptyPattern(): Pattern {
+export function emptyPattern(bars: PatternBars = 1): Pattern {
+  const n = STEPS * bars;
   return {
-    drums: Object.fromEntries(DRUMS.map(({ id }) => [id, on()])) as Pattern["drums"],
-    bass: Array(STEPS).fill(null),
-    chords: Array.from({ length: BEATS }, () => [] as Chord[]),
-    lead: emptyLead(),
+    drums: Object.fromEntries(DRUMS.map(({ id }) => [id, Array(n).fill(false)])) as Pattern["drums"],
+    bass: Array(n).fill(null),
+    chords: Array.from({ length: BEATS * bars }, () => [] as Chord[]),
+    lead: Array.from({ length: n }, () => [] as number[]),
+    ...(bars > 1 ? { bars } : {}),
   };
 }
 
@@ -418,7 +474,9 @@ function normLead(raw: unknown, d = DEFAULT_LEAD): LeadSound {
 
 function normalizePattern(raw: unknown): Pattern {
   const r = (raw && typeof raw === "object" ? raw : {}) as Partial<Pattern>;
-  const steps = (a: unknown) => Array.from({ length: STEPS }, (_, i) => (Array.isArray(a) ? a[i] === true : false));
+  const bars: PatternBars = PATTERN_BARS.includes(r.bars as PatternBars) ? (r.bars as PatternBars) : 1;
+  const n = STEPS * bars;
+  const steps = (a: unknown) => Array.from({ length: n }, (_, i) => (Array.isArray(a) ? a[i] === true : false));
   // il suono proprio solo per gli strumenti che ce l'hanno: gli altri seguono il progetto
   const o = (r.sounds && typeof r.sounds === "object" ? r.sounds : {}) as Sounds;
   const sounds: Sounds = {
@@ -428,14 +486,15 @@ function normalizePattern(raw: unknown): Pattern {
   };
   const pat: Pattern = {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(r.drums?.[id])])) as Pattern["drums"],
-    bass: notes(r.bass, BASS_LOW, BASS_HIGH),
-    chords: Array.from({ length: BEATS }, (_, i) => chordLayers(Array.isArray(r.chords) ? r.chords[i] : null)),
-    lead: leadNotes(r.lead),
+    bass: notes(r.bass, BASS_LOW, BASS_HIGH, n),
+    chords: Array.from({ length: BEATS * bars }, (_, i) => chordLayers(Array.isArray(r.chords) ? r.chords[i] : null)),
+    lead: leadNotes(r.lead, n),
     ...(Object.keys(sounds).length ? { sounds } : {}),
+    ...(bars > 1 ? { bars } : {}),
   };
   // lunghezze: solo per note che esistono, intere, dentro la battuta e senza coprire la nota dopo
   const lens = r.len && typeof r.len === "object" ? (r.len as Record<string, unknown>) : {};
-  for (let st = 0; st < STEPS; st++) {
+  for (let st = 0; st < n; st++) {
     const b = pat.bass[st];
     const bl = b === null ? undefined : lens[lenKey("bass", st, b)];
     if (b !== null && typeof bl === "number" && Number.isFinite(bl)) setNoteLen(pat, "bass", st, b, bl);
@@ -451,8 +510,8 @@ function normalizePattern(raw: unknown): Pattern {
 }
 
 // il lead: per ogni step un elenco di note (i progetti di prima avevano una nota o null: diventa [nota] o [])
-function leadNotes(a: unknown): number[][] {
-  return Array.from({ length: STEPS }, (_, i) => {
+function leadNotes(a: unknown, n = STEPS): number[][] {
+  return Array.from({ length: n }, (_, i) => {
     const v = Array.isArray(a) ? a[i] : null;
     const list = Array.isArray(v) ? v : v === null || v === undefined ? [] : [v];
     const ok = list.filter((n): n is number => typeof n === "number" && n >= LEAD_LOW && n <= LEAD_HIGH).map(Math.round);
@@ -461,8 +520,8 @@ function leadNotes(a: unknown): number[][] {
 }
 
 // una nota MIDI per step, dentro l'estensione dello strumento; tutto il resto diventa null
-function notes(a: unknown, lo: number, hi: number) {
-  return Array.from({ length: STEPS }, (_, i) => {
+function notes(a: unknown, lo: number, hi: number, n = STEPS) {
+  return Array.from({ length: n }, (_, i) => {
     const n = Array.isArray(a) ? a[i] : null;
     return typeof n === "number" && n >= lo && n <= hi ? Math.round(n) : null;
   });
@@ -592,7 +651,7 @@ export function describe(p: Project, title: string, editing: Slot) {
       (id) => `${id} filtro ${p.fx[id].filter.toFixed(2)} (${filterLabel(p.fx[id].filter)}) rev ${p.fx[id].reverb.toFixed(2)} dly ${p.fx[id].delay.toFixed(2)}`,
     ).join("; ")}; master filtro ${p.masterFilter.toFixed(2)} (${filterLabel(p.masterFilter)}).`,
     `Basso: suono ${BASS_WAVES[p.bassSound.wave].label} (${BASS_WAVES[p.bassSound.wave].hint}), filtro ${Math.round(p.bassSound.cutoff)} Hz, note ${p.bassSound.length === "lunga" ? "lunghe (808)" : "corte"}.`,
-    "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti). x = colpo, . = vuoto. Nelle note, (4) = lunga 4 step; senza numero = uno step.",
+    "Ogni pattern è una battuta da 16 step (1 step = 1/16; step 1, 5, 9, 13 sono i quarti), oppure 2 o 4 battute (32 o 64 step) se lo dice la sua scheda. x = colpo, . = vuoto. Nelle note, (4) = lunga 4 step; senza numero = uno step.",
     `Il producer sta modificando il pattern ${editing}.`,
   ];
   // i pattern vuoti in una riga sola: con 16 pattern il messaggio resta corto
@@ -601,7 +660,7 @@ export function describe(p: Project, title: string, editing: Slot) {
   for (const s of SLOTS) {
     const pat = p.patterns[s];
     if (isEmptyPattern(pat)) continue;
-    lines.push(`Pattern ${s}:`);
+    lines.push(`Pattern ${s}${patBars(pat) > 1 ? ` (${patBars(pat)} battute: step 1–${patSteps(pat)}, battiti 1–${patBars(pat) * BEATS}; nella canzone occupa ${patBars(pat)} battute di fila)` : ""}:`);
     for (const { id, label } of DRUMS) lines.push(`  ${label.padEnd(9)} ${pat.drums[id].map((x) => (x ? "x" : ".")).join("")}`);
     const ln = (r: NoteInst, i: number, n: number) => (noteLen(pat, r, i, n) > 1 ? `(${noteLen(pat, r, i, n)})` : "");
     const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}${ln("bass", i, n)}`)).filter(Boolean);

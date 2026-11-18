@@ -2,7 +2,7 @@
 // Un file MIDI è una lista di eventi nel tempo: "accendi la nota 60 con forza 100", "spegnila". Il tempo si conta in
 // tick: qui 96 per quarto, quindi uno step (1/16) = 24 tick. La batteria va sul canale 10 con le note General MIDI.
 // Lo swing non si scrive: in FL si rimette con lo swing del Channel rack.
-import { CHORD_STYLES, STEPS, chordNotes, noteLen, soundOf, velOf, type Pattern, type Project, type Slot } from "./project";
+import { CHORD_STYLES, STEPS, barOf, chordNotes, noteLen, soundOf, velOf, type Pattern, type Project, type Slot } from "./project";
 import { KITS } from "./kits";
 
 const PPQ = 96;
@@ -37,8 +37,9 @@ const v127 = (v: number) => Math.max(1, Math.min(127, Math.round(v * 127)));
 
 // quanti step mancano alla prossima nota della battuta (per le note "legate" e per l'808 long)
 function toNext(line: (number | null)[], s: number) {
-  for (let k = s + 1; k < STEPS; k++) if (line[k] !== null) return k - s;
-  return STEPS - s;
+  const end = (Math.floor(s / STEPS) + 1) * STEPS; // dentro la battuta, come nello studio
+  for (let k = s + 1; k < end; k++) if (line[k] !== null) return k - s;
+  return end - s;
 }
 
 // la nota della batteria General MIDI; la perc dipende dal kit (conga, rim o cowbell)
@@ -55,12 +56,14 @@ export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<Arr
     if (!slot) return;
     const pat: Pattern = p.patterns[slot];
     const start = b * STEPS * STEP;
+    const off = barOf(p, bars, b) * STEPS; // la battuta del pattern (pattern lunghi)
     const bs = soundOf(p, pat, "bass");
     const ls = soundOf(p, pat, "lead");
     const cs = soundOf(p, pat, "chords");
     const leadLine = pat.lead.map((n) => (n.length ? n[0] : null));
-    for (let s = 0; s < STEPS; s++) {
-      const at = start + s * STEP;
+    for (let j = 0; j < STEPS; j++) {
+      const s = off + j; // lo step dall'inizio del pattern
+      const at = start + j * STEP;
       const bn = pat.bass[s];
       if (bn !== null) {
         const L = noteLen(pat, "bass", s, bn);
@@ -80,8 +83,9 @@ export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<Arr
       }
       if (s % 4 === 0 && pat.chords[s / 4].length) {
         const beat = s / 4;
-        let next = 4;
-        for (let k = beat + 1; k < 4; k++) if (pat.chords[k].length) { next = k; break; }
+        const end = (Math.floor(beat / 4) + 1) * 4; // fine della battuta
+        let next = end;
+        for (let k = beat + 1; k < end; k++) if (pat.chords[k].length) { next = k; break; }
         const steps = CHORD_STYLES[cs.style].hold ? (next - beat) * 4 : 2;
         const notes = [...new Set(pat.chords[beat].flatMap(chordNotes))];
         for (const n of notes) note(ev.chords, 2, n, at, steps * STEP - 2, v127(velOf(pat, `c${beat}`)));

@@ -44,7 +44,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Pattern diversi",
-    text: "Un pattern è un blocco di una battuta, e ne hai 16, da A a P. Scegli una lettera e scrivi qualcosa di diverso: per esempio A per il groove e B per il break. Duplica copia il pattern nel primo libero, così fai una variazione in un attimo.",
+    text: "Un pattern è un blocco di una battuta, e ne hai 16, da A a P. Scegli una lettera e scrivi qualcosa di diverso: per esempio A per il groove e B per il break. Duplica copia il pattern nel primo libero, così fai una variazione in un attimo. Accanto scegli quante battute è lungo, 1, 2 o 4, per melodie e bassline più lunghe.",
     target: '[data-panel="beat"] .hw-patterns',
     view: "beat",
   },

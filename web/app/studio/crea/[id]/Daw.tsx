@@ -201,6 +201,18 @@ export function Daw({
   const [rec, setRec] = useState(false);
   // count-in: una battuta di click (4) prima di registrare; la scelta resta nel browser
   const [countInOn, setCountInOn] = useState(true);
+  const [metroOn, setMetroOn] = useState(false); // metronomo durante il Play (scelta salvata nel browser)
+  const metroRef = useRef(false);
+  metroRef.current = metroOn;
+  useEffect(() => setMetroOn(stored("ds-metro") === "1"), []);
+  useEffect(() => {
+    if (engineRef.current) engineRef.current.metronome = metroOn;
+  }, [metroOn]);
+  const toggleMetro = () =>
+    setMetroOn((o) => {
+      store("ds-metro", o ? "0" : "1");
+      return !o;
+    });
   const [counting, setCounting] = useState(0); // 4, 3, 2, 1 durante il conto, 0 = niente
   useEffect(() => setCountInOn(stored("ds-count-in") !== "0"), []);
   const toggleCountIn = () =>
@@ -306,6 +318,7 @@ export function Daw({
       );
       engineRef.current.setSolo(soloRef.current); // il motore nasce al primo suono: parte con il solo già scelto
       engineRef.current.onCount = setCounting;
+      engineRef.current.metronome = metroRef.current;
     }
     return engineRef.current;
   }, []);
@@ -1576,6 +1589,16 @@ export function Daw({
                 >
                   <span className="hw-btn-led" />
                   1234
+                </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-pressed={metroOn}
+                  title="Metronomo: un click su ogni battito mentre suona (non entra nell'export)"
+                  onClick={toggleMetro}
+                >
+                  <span className="hw-btn-led" />
+                  Metro
                 </button>
               </div>
               <p className="hw-keys-map">

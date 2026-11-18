@@ -28,6 +28,8 @@ export class Engine {
   private countTimers: ReturnType<typeof setTimeout>[] = [];
   // durante il count-in lo studio riceve 4, 3, 2, 1 e poi 0 quando parte la battuta
   onCount?: (n: number) => void;
+  // metronomo: un click su ogni battito mentre suona (più acuto sull'1); come il count-in, non entra nell'export
+  metronome = false;
 
   constructor(
     private getProject: () => Project,
@@ -152,6 +154,7 @@ export class Engine {
       // la battuta del pattern che suona adesso (pattern lunghi): in song dalle caselle di fila, in pattern dal giro
       const k = slot ? (song ? barOf(p, p.song, bar) : this.loop % patBars(p.patterns[slot])) : 0;
       const ps = k * STEPS + s; // lo step contato dall'inizio del pattern
+      if (this.metronome && s % 4 === 0) this.graph.click(this.nextTime, s === 0);
       // swing: gli step in levare (2, 4, 6… contando da 1) arrivano un po' dopo
       const t = this.nextTime + (s % 2 === 1 ? p.swing * stepDur : 0);
       if (song && s === 0) this.graph.automateBar(bar, this.nextTime, STEPS * stepDur, songLength(p) - 1);

@@ -200,7 +200,8 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 - Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
   degli stem~~ **fatto il 18 nov**; più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); Roll più
   comodo (selezione multipla, copia/incolla, trasposizione, quantize, velocity per nota); automazioni di volume, send,
-  plugin e bus; send verso i bus e bus dentro bus; metronomo durante la registrazione.
+  plugin e bus; send verso i bus e bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
+  `graph.click`, non entra nell'export).
 - Coach: ~~lezioni guidate~~ **fatte il 18 nov**; parere in tempo reale (es. basso che
   copre il kick).
 - Prodotto: pagina delle segnalazioni nel sito (solo per Francesco); link di ascolto pubblico; email di accesso con

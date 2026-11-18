@@ -23,6 +23,7 @@ import {
   BUS_IDS,
   BUS_UNITY,
   MIX_TARGETS,
+  isBus,
   type BassSound,
   type ChordSound,
   type LeadSound,
@@ -54,6 +55,7 @@ export class Graph {
   // basso e accordi hanno ciascuno il suo "duck": il sidechain del kick li abbassa, ovunque vadano
   private ducks: GainNode[] = [];
   private master: GainNode;
+  private masterVol: GainNode; // il volume del master (1 = normale): lo muove solo l'automazione del volume
   // routing: l'ultimo nodo di ogni canale, e dove è collegato adesso (master o un bus)
   private outs = {} as Record<ChannelId, AudioNode>;
   private routes: Partial<Record<ChannelId, Out>> = {};
@@ -106,7 +108,8 @@ export class Graph {
     this.out = ctx.createGain();
     this.limiter = createFallbackLimiter(ctx);
     const masterFilter = this.djFilter();
-    master.connect(masterFilter.lp);
+    this.masterVol = ctx.createGain();
+    master.connect(this.masterVol).connect(masterFilter.lp);
     if (opts.dry) {
       masterFilter.hp.connect(this.out).connect(ctx.destination);
     } else {
@@ -238,11 +241,17 @@ export class Graph {
     const now = this.ctx.currentTime;
     const set = (param: AudioParam, v: number) =>
       immediate ? param.setValueAtTime(v, now) : param.setTargetAtTime(v, now, 0.01);
+    // un volume automatizzato (in modalità song) lo muove automateBar; mute e solo vincono sempre
+    const fader = (param: AudioParam, v: number, automated: boolean, silenced: boolean) => {
+      if (automated && !silenced && this.automating) return;
+      if (automated) param.cancelScheduledValues(now); // via la rampa dell'automazione
+      set(param, silenced ? 0 : v);
+    };
     for (const id of CHANNEL_IDS) {
       const c = p.mixer[id];
       // solo: se qualche canale è in solo, gli altri tacciono (anche i loro send, che partono dopo il fader)
       const silenced = c.muted || (this.solo.size > 0 && !this.solo.has(id));
-      set(this.channels[id].gain, silenced ? 0 : c.volume);
+      fader(this.channels[id].gain, c.volume, !!p.volAuto?.[id], silenced);
       set(this.sends[id].reverb.gain, p.fx[id].reverb);
       set(this.sends[id].delay.gain, p.fx[id].delay * DELAY_MAX);
     }
@@ -250,7 +259,7 @@ export class Graph {
     // i bus: fader (0.8 = volume invariato) e mute; il solo dei canali non li tocca (sono di passaggio)
     for (const b of BUS_IDS) {
       const bus = p.buses[b];
-      set(this.buses[b].fader.gain, bus.muted ? 0 : bus.volume / BUS_UNITY);
+      fader(this.buses[b].fader.gain, bus.volume / BUS_UNITY, !!p.volAuto?.[b], bus.muted);
     }
     // routing: ricollego un canale solo se la sua uscita è cambiata
     for (const id of CHANNEL_IDS) {
@@ -261,6 +270,7 @@ export class Graph {
       node.connect(out === "master" ? this.master : this.buses[out].input);
       this.routes[id] = out;
     }
+    fader(this.masterVol.gain, 1, !!p.volAuto?.master, false);
     this.applyInserts(immediate);
     // i filtri con un'automazione, in modalità song, li muove automateBar
     for (const t of AUTO_TARGETS) {
@@ -315,6 +325,33 @@ export class Graph {
   // Inizio della battuta "bar": ogni filtro automatizzato scorre dal suo valore a quello della battuta dopo
   automateBar(bar: number, t: number, barDur: number, lastBar: number) {
     const p = this.getProject();
+    // volume: scorre in linea retta dal valore della battuta a quello della dopo (il fader è lineare)
+    for (const target of MIX_TARGETS) {
+      const lane = p.volAuto?.[target];
+      if (!lane) continue;
+      let param: AudioParam;
+      let base: number;
+      let scale = 1;
+      if (target === "master") {
+        param = this.masterVol.gain;
+        base = 1;
+      } else if (isBus(target)) {
+        if (p.buses[target].muted) continue;
+        param = this.buses[target].fader.gain;
+        base = p.buses[target].volume;
+        scale = 1 / BUS_UNITY;
+      } else {
+        const c = p.mixer[target];
+        if (c.muted || (this.solo.size > 0 && !this.solo.has(target))) continue; // muto o fuori dal solo: resta zitto
+        param = this.channels[target].gain;
+        base = c.volume;
+      }
+      const v0 = laneValue(lane, bar, base);
+      const v1 = bar + 1 <= lastBar ? laneValue(lane, bar + 0.999, base) : v0;
+      param.cancelScheduledValues(t);
+      param.setValueAtTime(v0 * scale, t);
+      param.linearRampToValueAtTime(v1 * scale, t + barDur - 0.001); // 1 ms prima: vedi il filtro qui sotto
+    }
     for (const target of AUTO_TARGETS) {
       const lane = p.automation[target];
       if (!lane) continue;

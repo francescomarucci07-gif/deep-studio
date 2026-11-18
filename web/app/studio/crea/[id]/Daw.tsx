@@ -40,6 +40,7 @@ import {
   laneValue,
   BUS_IDS,
   BUS_UNITY,
+  MIX_TARGETS,
   CHANNEL_IDS,
   isBus,
   type BusId,
@@ -345,7 +346,7 @@ export function Daw({
   useEffect(() => () => engineRef.current?.close(), []);
   useEffect(() => {
     engineRef.current?.applyMixer();
-  }, [project.mixer, project.bpm, project.fx, project.masterFilter, project.automation, project.inserts]);
+  }, [project.mixer, project.bpm, project.fx, project.masterFilter, project.automation, project.volAuto, project.inserts, project.buses]);
 
   // Annulla / Ripeti: una pila dei progetti di prima (come i fogli di un blocco). Le modifiche fatte di seguito
   // in meno di mezzo secondo (un trascinamento, un fader che scorre) diventano un passo solo.
@@ -1075,14 +1076,31 @@ export function Daw({
     });
 
   // automazione: un punto per battuta (null = nessun punto). Una corsia senza punti sparisce.
-  const lane = project.automation[autoTarget];
-  const autoBase = autoTarget === "master" ? project.masterFilter : project.fx[autoTarget].filter; // prima del primo punto
+  // Cosa si automatizza: il filtro (master e canali) o il volume (master, canali e bus)
+  const [autoParam, setAutoParam] = useState<"filter" | "volume">("filter");
+  const [volTarget, setVolTarget] = useState<MixTarget>("master");
+  const isVol = autoParam === "volume";
+  const lane = isVol ? project.volAuto?.[volTarget] : project.automation[autoTarget];
+  // prima del primo punto vale la manopola o il fader
+  const autoBase = isVol
+    ? volTarget === "master"
+      ? 1
+      : isBus(volTarget)
+        ? project.buses[volTarget].volume
+        : project.mixer[volTarget as ChannelId].volume
+    : autoTarget === "master"
+      ? project.masterFilter
+      : project.fx[autoTarget].filter;
+  const autoMin = isVol ? 0 : -1;
+  const autoLabel = (v: number) => (isVol ? pct(v) : filterLabel(v));
   const setPoint = (b: number, v: number | null) =>
     update((p) => {
-      const l = p.automation[autoTarget] ?? Array(p.song.length).fill(null);
+      const lanes = (isVol ? (p.volAuto ??= {}) : p.automation) as Partial<Record<string, (number | null)[]>>;
+      const key = isVol ? volTarget : autoTarget;
+      const l = lanes[key] ?? Array(p.song.length).fill(null);
       l[b] = v;
-      if (l.some((x) => x !== null)) p.automation[autoTarget] = l;
-      else delete p.automation[autoTarget];
+      if (l.some((x) => x !== null)) lanes[key] = l;
+      else delete lanes[key];
     });
   // durante il play la striscia dell'automazione segue la battuta che suona (solo in orizzontale)
   const autoScroll = useRef<HTMLDivElement>(null);
@@ -1101,13 +1119,15 @@ export function Daw({
     const from = project.song.length - 4;
     const full =
       project.song.slice(from).some(Boolean) ||
-      AUTO_TARGETS.some((t) => project.automation[t]?.slice(from).some((v) => v !== null));
+      AUTO_TARGETS.some((t) => project.automation[t]?.slice(from).some((v) => v !== null)) ||
+      MIX_TARGETS.some((t) => project.volAuto?.[t]?.slice(from).some((v) => v !== null));
     if (full && !window.confirm(`Le battute ${from + 1}–${project.song.length} non sono vuote: le tolgo?`)) return;
     update((p) => resizeSong(p, p.song.length - 4));
   };
   const clearLane = () =>
     update((p) => {
-      delete p.automation[autoTarget];
+      if (isVol) delete p.volAuto?.[volTarget];
+      else delete p.automation[autoTarget];
     });
 
   // plugin negli insert: il canale di cui vedi il rack e le modifiche agli slot
@@ -2149,24 +2169,54 @@ export function Daw({
           {/* ---- automazioni dei filtri, battuta per battuta ---- */}
           <section className="hw-panel hw-auto" data-panel="auto" aria-label="Automazione">
             <div className="hw-seq-head">
-              <h2 className="hw-title">Automazione · filtro</h2>
+              <h2 className="hw-title">Automazione · {isVol ? "volume" : "filtro"}</h2>
               <div className="hw-patterns">
-                <label className="hw-visually-hidden" htmlFor="auto-target">
-                  Cosa automatizzare
-                </label>
-                <select
-                  id="auto-target"
-                  className="hw-select"
-                  value={autoTarget}
-                  onChange={(e) => setAutoTarget(e.target.value as AutoTarget)}
-                >
-                  {AUTO_TARGETS.map((t) => (
-                    <option key={t} value={t}>
-                      {project.automation[t] ? "● " : ""}
-                      {t === "master" ? "Master" : CHANNELS.find((c) => c.id === t)?.label}
-                    </option>
+                <div className="hw-seg" role="group" aria-label="Cosa automatizzare">
+                  {(["filter", "volume"] as const).map((k) => (
+                    <button
+                      key={k}
+                      type="button"
+                      className="hw-btn hw-btn--small"
+                      aria-pressed={autoParam === k}
+                      onClick={() => setAutoParam(k)}
+                    >
+                      <span className="hw-btn-led" />
+                      {k === "filter" ? "Filtro" : "Volume"}
+                    </button>
                   ))}
-                </select>
+                </div>
+                <label className="hw-visually-hidden" htmlFor="auto-target">
+                  Di quale canale
+                </label>
+                {isVol ? (
+                  <select
+                    id="auto-target"
+                    className="hw-select"
+                    value={volTarget}
+                    onChange={(e) => setVolTarget(e.target.value as MixTarget)}
+                  >
+                    {MIX_TARGETS.filter((t) => !isBus(t) || project.buses[t].shown || project.volAuto?.[t]).map((t) => (
+                      <option key={t} value={t}>
+                        {project.volAuto?.[t] ? "● " : ""}
+                        {t === "master" ? "Master" : isBus(t) ? `Bus ${project.buses[t].name}` : CHANNELS.find((c) => c.id === t)?.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <select
+                    id="auto-target"
+                    className="hw-select"
+                    value={autoTarget}
+                    onChange={(e) => setAutoTarget(e.target.value as AutoTarget)}
+                  >
+                    {AUTO_TARGETS.map((t) => (
+                      <option key={t} value={t}>
+                        {project.automation[t] ? "● " : ""}
+                        {t === "master" ? "Master" : CHANNELS.find((c) => c.id === t)?.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button type="button" className="hw-btn hw-btn--small" disabled={!lane} onClick={clearLane}>
                   Cancella
                 </button>
@@ -2186,7 +2236,7 @@ export function Daw({
                   <polyline
                     points={Array.from({ length: project.song.length + 1 }, (_, b) => {
                       const v = laneValue(lane, Math.min(b, project.song.length - 1), autoBase);
-                      return `${b},${1 - v}`;
+                      return `${b},${isVol ? 2 - 2 * v : 1 - v}`;
                     }).join(" ")}
                   />
                 )}
@@ -2198,25 +2248,35 @@ export function Daw({
                     <input
                       className="hw-auto-fader"
                       type="range"
-                      min={-1}
+                      min={autoMin}
                       max={1}
-                      step={0.02}
+                      step={isVol ? 0.01 : 0.02}
                       value={v ?? laneValue(lane, b, autoBase)}
-                      aria-label={`Battuta ${b + 1}: filtro ${v === null ? "senza punto" : filterLabel(v)}`}
+                      aria-label={`Battuta ${b + 1}: ${isVol ? "volume" : "filtro"} ${v === null ? "senza punto" : autoLabel(v)}`}
                       onChange={(e) => setPoint(b, Number(e.target.value))}
                       onDoubleClick={() => setPoint(b, null)}
                     />
                     <span className="hw-bar-num">{b + 1}</span>
-                    <span className="hw-value">{v === null ? "·" : filterLabel(v)}</span>
+                    <span className="hw-value">{v === null ? "·" : autoLabel(v)}</span>
                   </div>
                 );
               })}
             </div>
             </div>
             <p className="hw-hint">
-              Trascina un cursore per mettere un punto, doppio clic per toglierlo: tra due punti il filtro scorre da
-              solo. In alto = si apre verso il passa-alto, in basso = si chiude (passa-basso), al centro spento. Suona in{" "}
-              <strong>Song</strong> e nell&apos;export. Esempio di build: battuta 5 in basso, battuta 8 al centro, drop alla 9.
+              {isVol ? (
+                <>
+                  Volume: trascina un cursore per mettere un punto, doppio clic per toglierlo; tra due punti il volume
+                  scorre da solo (fade-in, fade-out). In alto = fader al massimo. Mute e Solo vincono sempre.
+                </>
+              ) : (
+                <>
+                  Filtro: trascina un cursore per mettere un punto, doppio clic per toglierlo: tra due punti il filtro scorre
+                  da solo. In alto = si apre verso il passa-alto, in basso = si chiude (passa-basso), al centro spento.
+                  Esempio di build: battuta 5 in basso, battuta 8 al centro, drop alla 9.
+                </>
+              )}{" "}
+              Suona in <strong>Song</strong> e nell&apos;export.
             </p>
           </section>
 

@@ -80,7 +80,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Le automazioni",
-    text: "In Auto disegni come cambia un filtro lungo la canzone. Per esempio, un filtro che si apre piano piano nel build-up, prima del drop.",
+    text: "In Auto disegni come cambiano il filtro o il volume lungo la canzone. Per esempio, un filtro che si apre piano piano nel build-up prima del drop, o un fade-in nell'intro.",
     target: '[data-panel="auto"]',
     view: "auto",
   },

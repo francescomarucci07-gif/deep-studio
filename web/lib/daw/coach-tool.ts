@@ -192,7 +192,7 @@ const SONG_TOOL: Anthropic.Beta.BetaTool = {
 const FX_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_effetti",
   description:
-    "Imposta volume ed effetti dei canali (volume del fader, filtro DJ, riverbero, delay a 3/16), il routing nei bus (gruppi del mixer, come in FL), i plugin negli insert (per esempio un chorus sul lead) e scrive le automazioni del filtro nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
+    "Imposta volume ed effetti dei canali (volume del fader, filtro DJ, riverbero, delay a 3/16), il routing nei bus (gruppi del mixer, come in FL), i plugin negli insert (per esempio un chorus sul lead) e scrive le automazioni del filtro e del volume nella canzone (per esempio il build: il filtro del master che si apre nelle battute prima del drop). Gli effetti valgono per tutta la traccia; le automazioni suonano in modalità Song e nell'export. Prima di chiamarlo spiega cosa fai e perché.",
   input_schema: {
     type: "object",
     properties: {
@@ -224,7 +224,13 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
         items: {
           type: "object",
           properties: {
-            bersaglio: { type: "string", enum: [...AUTO_TARGETS] },
+            parametro: {
+              type: "string",
+              enum: ["filtro", "volume"],
+              description:
+                "filtro (default; valori -1…1, bersagli master e canali) o volume (valori 0–1 come il fader; bersagli master, canali e bus bus1…bus4; per il master 1 = normale, per un bus 0.8 = invariato). Il volume serve per fade-in, fade-out e per far entrare uno strumento piano piano.",
+            },
+            bersaglio: { type: "string", enum: [...MIX_TARGETS] },
             punti: {
               type: "array",
               items: {
@@ -428,6 +434,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
       const mixer = structuredClone(project.mixer);
       let masterFilter = project.masterFilter;
       const automation = { ...project.automation };
+      const volAuto = { ...project.volAuto };
       if (Array.isArray(raw.effetti)) {
         for (const e of raw.effetti as { canale?: unknown; volume?: unknown; filtro?: unknown; riverbero?: unknown; delay?: unknown }[]) {
           const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
@@ -454,8 +461,9 @@ export function createStudioWriter(current: Project, editing: Slot) {
             if (Number.isInteger(pt?.battuta)) size = Math.max(size, songSize(pt.battuta as number));
           }
         }
-        for (const a of raw.automazioni as { bersaglio?: unknown; punti?: unknown }[]) {
-          if (!AUTO_TARGETS.includes(a?.bersaglio as (typeof AUTO_TARGETS)[number])) continue;
+        for (const a of raw.automazioni as { bersaglio?: unknown; punti?: unknown; parametro?: unknown }[]) {
+          const vol = a?.parametro === "volume";
+          if (vol ? !MIX_TARGETS.includes(a?.bersaglio as MixTarget) : !AUTO_TARGETS.includes(a?.bersaglio as (typeof AUTO_TARGETS)[number])) continue;
           const lane: (number | null)[] = Array(size).fill(null);
           if (Array.isArray(a.punti)) {
             for (const pt of a.punti as { battuta?: unknown; valore?: unknown }[]) {
@@ -465,7 +473,8 @@ export function createStudioWriter(current: Project, editing: Slot) {
               }
             }
           }
-          automation[a.bersaglio as (typeof AUTO_TARGETS)[number]] = lane; // normalize toglie le corsie vuote
+          if (vol) volAuto[a.bersaglio as MixTarget] = lane;
+          else automation[a.bersaglio as (typeof AUTO_TARGETS)[number]] = lane; // normalize toglie le corsie vuote
           lanes++;
         }
       }
@@ -505,7 +514,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
           }
         }
       }
-      project = normalize({ ...project, song, fx, mixer, masterFilter, automation, inserts, buses });
+      project = normalize({ ...project, song, fx, mixer, masterFilter, automation, volAuto, inserts, buses });
       names.push(label(raw.nome, "effetti"));
       return `Effetti scritti${lanes ? ` (${lanes} automazion${lanes === 1 ? "e" : "i"})` : ""}${plugins ? ` (${plugins} plugin)` : ""}${routed ? ` (${routed} canali instradati)` : ""}: ${label(raw.nome, "effetti")}`;
     }

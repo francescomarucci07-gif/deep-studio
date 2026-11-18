@@ -280,6 +280,8 @@ export type Project = {
   fx: Record<ChannelId, ChannelFx>;
   masterFilter: number; // -1…1, come i filtri dei canali
   automation: Partial<Record<AutoTarget, Lane>>;
+  // automazioni del volume (fader 0–1 per battuta; per i bus BUS_UNITY = volume invariato, per il master 1 = normale)
+  volAuto?: Partial<Record<MixTarget, Lane>>;
   inserts: Record<MixTarget, (PluginSlot | null)[]>; // i plugin di master, canali e bus, INSERT_SLOTS slot
   buses: Record<BusId, Bus>;
   sidechain: boolean; // il kick abbassa il basso
@@ -375,6 +377,28 @@ export function resizeSong(p: Project, bars: number) {
     if (l.some((v) => v !== null)) p.automation[t] = l;
     else delete p.automation[t];
   }
+  for (const t of MIX_TARGETS) {
+    const lane = p.volAuto?.[t];
+    if (!lane || !p.volAuto) continue;
+    const l = fit(lane) as Lane;
+    if (l.some((v) => v !== null)) p.volAuto[t] = l;
+    else delete p.volAuto[t];
+  }
+}
+
+// le corsie di automazione: un valore (o null) per battuta, dentro min…1; le corsie senza punti spariscono
+function cleanLanes<T extends string>(raw: unknown, targets: readonly T[], bars: number, min: number) {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  return Object.fromEntries(
+    targets.flatMap((t) => {
+      const lane = r[t];
+      if (!Array.isArray(lane)) return [];
+      const clean = Array.from({ length: bars }, (_, i) =>
+        typeof lane[i] === "number" && Number.isFinite(lane[i]) ? Math.max(min, Math.min(1, lane[i] as number)) : null,
+      );
+      return clean.some((v) => v !== null) ? [[t, clean]] : [];
+    }),
+  ) as Partial<Record<T, Lane>>;
 }
 
 // la durata della canzone in secondi (fino all'ultima battuta usata)
@@ -425,6 +449,7 @@ export function starterProject(): Project {
     },
     masterFilter: 0,
     automation: {},
+    volAuto: {},
     inserts: emptyInserts(),
     sidechain: true,
     mixer: {
@@ -582,16 +607,8 @@ export function normalize(raw: unknown): Project {
       }),
     ) as Project["fx"],
     masterFilter: clamp(r.masterFilter, -1, 1, 0),
-    automation: Object.fromEntries(
-      AUTO_TARGETS.flatMap((t) => {
-        const lane = r.automation?.[t];
-        if (!Array.isArray(lane)) return [];
-        const clean = Array.from({ length: song.length }, (_, i) =>
-          typeof lane[i] === "number" && Number.isFinite(lane[i]) ? Math.max(-1, Math.min(1, lane[i] as number)) : null,
-        );
-        return clean.some((v) => v !== null) ? [[t, clean]] : [];
-      }),
-    ),
+    automation: cleanLanes(r.automation, AUTO_TARGETS, song.length, -1),
+    volAuto: cleanLanes(r.volAuto, MIX_TARGETS, song.length, 0),
     inserts: Object.fromEntries(
       MIX_TARGETS.map((t) => [t, Array.from({ length: INSERT_SLOTS }, (_, i) => normalizeSlot(r.inserts?.[t]?.[i]))]),
     ) as Project["inserts"],
@@ -704,7 +721,15 @@ export function describe(p: Project, title: string, editing: Slot) {
                 .join(" ")}`,
           )
           .join("; ")}`
-      : "Automazioni: nessuna.",
+      : "Automazioni del filtro: nessuna.",
+  );
+  const vols = MIX_TARGETS.filter((t) => p.volAuto?.[t]);
+  lines.push(
+    vols.length
+      ? `Automazioni del volume (fader 0–1; bus: ${BUS_UNITY} = invariato; master: 1 = normale): ${vols
+          .map((t) => `${t}: ${(p.volAuto?.[t] as Lane).flatMap((v, b) => (v === null ? [] : [`${b + 1}=${v.toFixed(2)}`])).join(" ")}`)
+          .join("; ")}`
+      : "Automazioni del volume: nessuna.",
   );
   // i plugin negli slot (solo quelli pieni)
   const plugins = MIX_TARGETS.flatMap((t) =>

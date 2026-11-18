@@ -176,10 +176,13 @@ export const LESSONS: Lesson[] = [
     outro: "Hai fatto tutto il percorso: groove, basso, armonia, struttura e mix. Ora fammi sentire cosa crei!",
     steps: [
       {
-        text: "Nella pagina Auto disegna un'automazione del filtro con almeno 2 punti (per esempio un filtro che si apre).",
+        text: "Nella pagina Auto disegna un'automazione con almeno 2 punti: un filtro che si apre, o il volume che sale (fade-in).",
         hint: "Scegli Master, clicca due battute diverse e trascina il valore: tra i due punti il filtro scorre.",
         view: "auto",
-        done: (c) => Object.values(c.project.automation).some((l) => (l ?? []).filter((v) => v !== null).length >= 2),
+        done: (c) =>
+          [...Object.values(c.project.automation), ...Object.values(c.project.volAuto ?? {})].some(
+            (l) => (l ?? []).filter((v) => v !== null).length >= 2,
+          ),
       },
       {
         text: "Metti un plugin su un canale o sul master: per esempio un Delay sul lead o un Compressore sul bus Drums.",

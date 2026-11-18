@@ -101,7 +101,8 @@ cd web && npm run dev
   `app/studio/crea/[id]/`: `useStudio.tsx` (la logica: stato, motore, tastiera, MIDI, Annulla, export, salvataggio
   automatico in `projects`), `Daw.tsx` (mette insieme le viste), una vista per file (`TopBar`, `SidePanel`, `BeatView`,
   `RollView`, `SongView`, `AutoView`, `MixerView`; ognuna riceve `studio` e prende solo quello che usa), `ui.ts`
-  (costanti). Coach dello studio:
+  (costanti); pezzi di logica a sé: `useHistory.ts` (Annulla/Ripeti), `useMidi.tsx` (tastiera MIDI), `useExport.ts`
+  (Mix WAV, stem, MIDI). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
   `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone, scrivi_effetti con i plugin); plugin degli insert in `lib/daw/plugins.ts`; streaming condiviso in `lib/coach/stream.ts`.
 - **Tour guidato** (`web/app/studio/crea/[id]/Tour.tsx`): 14 tappe scritte a mano (`TOUR`), evidenzia la parte
@@ -211,7 +212,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   copre il kick).
 - Prodotto: pagina delle segnalazioni nel sito (solo per Francesco); link di ascolto pubblico; email di accesso con
   SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).
-- Codice: dividere `Daw.tsx` (oltre 2.500 righe) in componenti; test Playwright nel repo; M2 worker su Modal (serve Spencer).
+- Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); test Playwright nel repo; M2 worker su Modal (serve Spencer).
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
 registrazione quantizzata, lead polifonico (6 voci), accordi sovrapposti (3 per battito), limiter, 16 pattern,

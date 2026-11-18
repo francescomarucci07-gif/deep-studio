@@ -2,7 +2,15 @@
 
 // La pagina Mixer: canali, bus, master, routing e il rack dei plugin (insert).
 import { Knob } from "@/components/hw/Knob";
-import { INSERT_SLOTS, PLUGINS, PLUGIN_GROUPS, PLUGIN_TYPES, defaultSlot, isPluginType, pluginParams } from "@/lib/daw/plugins";
+import {
+  INSERT_SLOTS,
+  PLUGINS,
+  PLUGIN_GROUPS,
+  PLUGIN_TYPES,
+  defaultSlot,
+  isPluginType,
+  pluginParams,
+} from "@/lib/daw/plugins";
 import { BUS_IDS, BUS_UNITY, type Out, filterLabel } from "@/lib/daw/project";
 import { CHANNELS, pct } from "./ui";
 import type { Studio } from "./useStudio";

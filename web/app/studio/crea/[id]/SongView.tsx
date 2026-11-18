@@ -1,7 +1,16 @@
 "use client";
 
 // La pagina Song: la canzone battuta per battuta, il pennello dei pattern e il marker di partenza.
-import { MAX_SONG_BARS, MIN_SONG_BARS, barOf, isEmptyPattern, patBars, slotColor, songLength, songSeconds } from "@/lib/daw/project";
+import {
+  MAX_SONG_BARS,
+  MIN_SONG_BARS,
+  barOf,
+  isEmptyPattern,
+  patBars,
+  slotColor,
+  songLength,
+  songSeconds,
+} from "@/lib/daw/project";
 import { clock } from "./ui";
 import type { Studio } from "./useStudio";
 

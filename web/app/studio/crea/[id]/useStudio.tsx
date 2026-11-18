@@ -7,15 +7,80 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Engine } from "@/lib/daw/engine";
 import { KEY_NOTES, OCTAVES, fold, keyNote, keyRoot } from "@/lib/daw/keyboard";
 import { type Measures, measure } from "@/lib/daw/measure";
-import { connectMidi, gmDrum, midiGranted, midiSupported } from "@/lib/daw/midi";
-import { projectToMidi } from "@/lib/daw/midifile";
 import { INSERT_SLOTS, type PluginSlot } from "@/lib/daw/plugins";
-import { AUTO_TARGETS, type AutoTarget, BASS_LOW, BEATS, BUS_IDS, type BusId, CHANNEL_IDS, CHORD_LAYERS, type ChannelFx, type ChannelId, type Chord, type ChordType, DRUMS, type DrumId, LEAD_VOICES, MIX_TARGETS, type MixTarget, type Out, PATTERN_BARS, type PatternBars, type Project, SLOTS, SOUND_KEY, STEPS, type Slot, type SoundInst, type Sounds, VEL_DEFAULT, VEL_MIN, barOf, chordName, emptyPattern, filterLabel, isBus, isEmptyPattern, maxLen, normalize, noteLen, noteName, patBars, resizeSong, setNoteLen, setPatternBars, setVel, slotColor, songLength, soundOf, velGain, velOf, visibleSlots } from "@/lib/daw/project";
-import { SAMPLE_RATE, encodeWav, renderAudio, renderPlan } from "@/lib/daw/render";
+import {
+  AUTO_TARGETS,
+  type AutoTarget,
+  BASS_LOW,
+  BEATS,
+  BUS_IDS,
+  type BusId,
+  CHANNEL_IDS,
+  CHORD_LAYERS,
+  type ChannelFx,
+  type ChannelId,
+  type Chord,
+  type ChordType,
+  DRUMS,
+  type DrumId,
+  LEAD_VOICES,
+  MIX_TARGETS,
+  type MixTarget,
+  type Out,
+  PATTERN_BARS,
+  type PatternBars,
+  type Project,
+  SLOTS,
+  SOUND_KEY,
+  STEPS,
+  type Slot,
+  type SoundInst,
+  type Sounds,
+  VEL_DEFAULT,
+  VEL_MIN,
+  barOf,
+  chordName,
+  emptyPattern,
+  filterLabel,
+  isBus,
+  isEmptyPattern,
+  maxLen,
+  normalize,
+  noteLen,
+  noteName,
+  patBars,
+  resizeSong,
+  setNoteLen,
+  setPatternBars,
+  setVel,
+  slotColor,
+  songLength,
+  soundOf,
+  velGain,
+  velOf,
+  visibleSlots,
+} from "@/lib/daw/project";
+import { SAMPLE_RATE, renderAudio, renderPlan } from "@/lib/daw/render";
 import { AUTO_EVERY_MS, type Version, loadVersion, saveVersion } from "@/lib/daw/versions";
-import { storeZip } from "@/lib/daw/zip";
 import { createClient } from "@/lib/supabase/client";
-import { CHANNELS, PADS, type RollId, type RollTab, type SaveState, VIEWS, type ViewId, isDrum, isView, midiVel, pct, store, stored } from "./ui";
+import {
+  CHANNELS,
+  PADS,
+  type RollId,
+  type RollTab,
+  type SaveState,
+  VIEWS,
+  type ViewId,
+  isDrum,
+  isView,
+  midiVel,
+  pct,
+  store,
+  stored,
+} from "./ui";
+import { useExport } from "./useExport";
+import { useHistory } from "./useHistory";
+import { useMidi } from "./useMidi";
 
 export type StudioProps = {
   id: string;
@@ -179,43 +244,8 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     engineRef.current?.applyMixer();
   }, [project.mixer, project.bpm, project.fx, project.masterFilter, project.automation, project.volAuto, project.inserts, project.buses]);
 
-  // Annulla / Ripeti: una pila dei progetti di prima (come i fogli di un blocco). Le modifiche fatte di seguito
-  // in meno di mezzo secondo (un trascinamento, un fader che scorre) diventano un passo solo.
-  const past = useRef<Project[]>([]);
-  const future = useRef<Project[]>([]);
-  const lastEdit = useRef(0);
-  const [hist, setHist] = useState({ undo: 0, redo: 0 });
-  const syncHist = useCallback(() => setHist({ undo: past.current.length, redo: future.current.length }), []);
-  // force: un passo a sé (il coach, una versione ripristinata), mai unito alle modifiche vicine
-  const remember = useCallback(
-    (force = false) => {
-      const now = performance.now();
-      if (force || now - lastEdit.current > 450) {
-        past.current.push(projectRef.current);
-        if (past.current.length > 100) past.current.shift();
-        future.current = [];
-        syncHist();
-      }
-      lastEdit.current = force ? 0 : now;
-    },
-    [syncHist],
-  );
-  const undoEdit = useCallback(() => {
-    const prev = past.current.pop();
-    if (!prev) return;
-    future.current.push(projectRef.current);
-    lastEdit.current = 0;
-    setProject(prev);
-    syncHist();
-  }, [syncHist]);
-  const redoEdit = useCallback(() => {
-    const next = future.current.pop();
-    if (!next) return;
-    past.current.push(projectRef.current);
-    lastEdit.current = 0;
-    setProject(next);
-    syncHist();
-  }, [syncHist]);
+  // Annulla / Ripeti (useHistory.ts)
+  const { lastEdit, hist, remember, undoEdit, redoEdit } = useHistory(projectRef, setProject);
 
   const update = useCallback(
     (fn: (p: Project) => void) => {
@@ -471,68 +501,8 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     };
   }, [togglePlay, hitPad, chooseView, playKey, releaseKey, undoEdit, redoEdit]);
 
-  // Tastiera MIDI: nel Roll (sul computer) suona lo strumento della scheda, come la tastiera del computer;
-  // nelle altre viste i tasti bassi (35–51, mappa General MIDI) suonano la batteria, come i pad di un controller.
-  const [midiState, setMidiState] = useState<{ on: boolean; names: string[]; error: string }>({ on: false, names: [], error: "" });
-  const [midiHit, setMidiHit] = useState(false);
-  // il controllo si fa nel browser, dopo il caricamento: sul server il MIDI non esiste
-  const [midiOk, setMidiOk] = useState(false);
-  const midiStop = useRef<(() => void) | null>(null);
-  const midiRef = useRef({ playKey, hitPad, releaseKey });
-  midiRef.current = { playKey, hitPad, releaseKey };
-  const startMidi = useCallback(async () => {
-    if (midiStop.current) return;
-    try {
-      midiStop.current = await connectMidi({
-        on: (note, vel, at) => {
-          const m = midiRef.current;
-          if (keysRef.current.keyMode === "keys") m.playKey(`midi${note}`, at, { note, vel });
-          else {
-            const d = gmDrum(note);
-            if (d) m.hitPad(d, at, vel);
-          }
-          setMidiHit(true);
-          setTimeout(() => setMidiHit(false), 120);
-        },
-        off: (note, at) => midiRef.current.releaseKey(`midi${note}`, at),
-        devices: (names) => setMidiState({ on: true, names, error: "" }),
-      });
-      store("ds-midi", "1");
-    } catch {
-      setMidiState({ on: false, names: [], error: "Il browser non ha dato il permesso per il MIDI" });
-    }
-  }, []);
-  useEffect(() => {
-    setMidiOk(midiSupported());
-    // permesso già dato in una visita precedente: mi ricollego da solo
-    if (midiSupported() && stored("ds-midi") === "1") void midiGranted().then((ok) => {
-        if (ok) void startMidi();
-      });
-    return () => midiStop.current?.();
-  }, [startMidi]);
-  const midiButton = (
-    <button
-      type="button"
-      className="hw-btn hw-btn--small hw-midi"
-      aria-pressed={midiState.on}
-      data-hit={midiHit}
-      disabled={!midiOk}
-      title={
-        !midiOk
-          ? "Questo browser non legge le tastiere MIDI: usa Chrome o Edge"
-          : midiState.error ||
-            (midiState.on
-              ? midiState.names.length
-                ? `Collegata: ${midiState.names.join(", ")}. Nel Roll suona lo strumento; altrove i tasti bassi suonano la batteria.`
-                : "MIDI acceso: collega una tastiera USB"
-              : "Collega una tastiera MIDI (USB): suoni e registri con lunghezza e forza dei tasti")
-      }
-      onClick={() => void startMidi()}
-    >
-      <span className="hw-btn-led" />
-      MIDI{midiState.on && midiState.names.length ? ` ${midiState.names.length}` : ""}
-    </button>
-  );
+  // Tastiera MIDI (useMidi.tsx): il pulsante MIDI e i tasti che arrivano
+  const midiButton = useMidi(keysRef, { playKey, hitPad, releaseKey });
 
   // una "fotografia" nella cronologia (la lista nel pannello si aggiorna)
   const snapshot = useCallback(
@@ -1082,77 +1052,15 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
   };
 
   // Export WAV: in Song tutta la canzone, in Pattern 4 giri del loop che stai modificando
-  // Export: il mix in WAV, gli stem (un WAV per strumento, in uno zip) o le note in MIDI, da portare in FL
-  const [exportMenu, setExportMenu] = useState(false);
-  const [exportMsg, setExportMsg] = useState("");
-  const fileBase = () => {
-    const name = (titleRef.current.trim() || "deep-studio").replace(/[^\p{L}\p{N} _-]+/gu, "").trim() || "deep-studio";
-    return `${name}${songMode ? "" : ` - pattern ${editing}`}`;
-  };
-  const download = (blob: Blob, file: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = file;
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-  };
-  // il menu si chiude con un clic fuori o con Esc
-  useEffect(() => {
-    if (!exportMenu) return;
-    const close = (e: Event) => {
-      if (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as HTMLElement).closest(".hw-export")) setExportMenu(false);
-    };
-    window.addEventListener("pointerdown", close);
-    window.addEventListener("keydown", close);
-    return () => {
-      window.removeEventListener("pointerdown", close);
-      window.removeEventListener("keydown", close);
-    };
-  }, [exportMenu]);
-  const exportWhat = () => (songMode ? ({ song: true } as const) : ({ song: false, slot: editing } as const));
-  const runExport = async (job: () => Promise<void>) => {
-    setExportMenu(false);
-    setExporting("sì");
-    try {
-      await job();
-      setExporting("no");
-      setExported(true);
-    } catch (e) {
-      console.error("export", e);
-      setExporting("errore");
-    } finally {
-      setExportMsg("");
-    }
-  };
-  const exportWav = () =>
-    runExport(async () => download(encodeWav(await renderAudio(projectRef.current, exportWhat())), `${fileBase()}.wav`));
-  // gli stem: solo gli strumenti che suonano davvero (non muti e con almeno un colpo o una nota nell'export)
-  const exportStems = () =>
-    runExport(async () => {
-      const p = projectRef.current;
-      const pats = [...new Set(renderPlan(p, exportWhat()).filter((x): x is Slot => x !== null))].map((x) => p.patterns[x]);
-      const plays = (c: ChannelId) =>
-        !p.mixer[c].muted &&
-        pats.some((pt) =>
-          c === "bass" ? pt.bass.some((n) => n !== null) : c === "lead" ? pt.lead.some((n) => n.length) : c === "chords" ? pt.chords.some((x) => x.length) : pt.drums[c].some(Boolean),
-        );
-      const list = CHANNELS.filter((c) => plays(c.id));
-      const files: { name: string; data: Uint8Array }[] = [];
-      for (const [k, c] of list.entries()) {
-        setExportMsg(`Stem ${k + 1}/${list.length}`);
-        const wav = encodeWav(await renderAudio(p, exportWhat(), c.id));
-        files.push({ name: `${String(k + 1).padStart(2, "0")} ${c.label}.wav`, data: new Uint8Array(await wav.arrayBuffer()) });
-      }
-      download(storeZip(files), `${fileBase()} - stem.zip`);
-    });
-  const exportMidi = () =>
-    runExport(async () => {
-      const p = projectRef.current;
-      download(new Blob([projectToMidi(p, renderPlan(p, exportWhat()))], { type: "audio/midi" }), `${fileBase()}.mid`);
-    });
+  // Export (useExport.ts): Mix WAV, stem e MIDI
+  const { exportMenu, setExportMenu, exportMsg, exportWav, exportStems, exportMidi } = useExport({
+    projectRef,
+    titleRef,
+    songMode,
+    editing,
+    setExporting,
+    onDone: () => setExported(true),
+  });
 
   // "Fammi un parere": renderizzo come l'export, misuro nel browser e mando le misure al coach
   const listen = async () => {

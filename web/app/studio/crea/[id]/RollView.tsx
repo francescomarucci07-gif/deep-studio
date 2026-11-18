@@ -2,7 +2,21 @@
 
 // La pagina Roll: il piano roll di Bass, Lead e Chord, con i synth e i suoni.
 import { Knob } from "@/components/hw/Knob";
-import { BASS_WAVES, CHORD_LAYERS, CHORD_STYLES, CHORD_TYPES, type ChordStyle, type ChordType, LEAD_SOUNDS, LEAD_WAVES, NOTE_NAMES, type Wave, chordName, noteLen, noteName } from "@/lib/daw/project";
+import {
+  BASS_WAVES,
+  CHORD_LAYERS,
+  CHORD_STYLES,
+  CHORD_TYPES,
+  type ChordStyle,
+  type ChordType,
+  LEAD_SOUNDS,
+  LEAD_WAVES,
+  NOTE_NAMES,
+  type Wave,
+  chordName,
+  noteLen,
+  noteName,
+} from "@/lib/daw/project";
 import { CHORD_ROOTS, ROLLS, ROLL_TABS, TYPE_LABEL, isSharp } from "./ui";
 import type { Studio } from "./useStudio";
 

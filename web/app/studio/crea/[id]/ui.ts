@@ -1,6 +1,15 @@
 // Costanti e piccole funzioni dello studio (Daw.tsx e le sue viste): viste, pad, canali, righe del Roll, scritte.
 import { type KeyInstrument } from "@/lib/daw/keyboard";
-import { BASS_HIGH, BASS_LOW, type ChannelId, type ChordType, DRUMS, type DrumId, LEAD_HIGH, LEAD_LOW } from "@/lib/daw/project";
+import {
+  BASS_HIGH,
+  BASS_LOW,
+  type ChannelId,
+  type ChordType,
+  DRUMS,
+  type DrumId,
+  LEAD_HIGH,
+  LEAD_LOW,
+} from "@/lib/daw/project";
 
 export type SaveState = "salvato" | "modificato" | "salvo" | "errore";
 

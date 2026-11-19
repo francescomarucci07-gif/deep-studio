@@ -14,7 +14,8 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     trace: "off",
     viewport: { width: 1366, height: 650 },
-    launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] },
+    // PW_CHROMIUM: il percorso di un Chromium già installato, se non è quello che scarica `npx playwright install`
+    launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"], executablePath: process.env.PW_CHROMIUM || undefined },
   },
   webServer: {
     command: `npx next build && npx next start -p ${PORT}`,

@@ -8,7 +8,7 @@ test("bus: nuovo bus, rinomina, due canali dentro, plugin sul bus, poi lo tolgo"
   await vista(page, "Mixer");
   const nomi = () => page.locator(".hw-strip--bus .hw-bus-name").evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
   expect(await nomi()).toEqual(["Drums"]);
-  await expect(page.locator(".hw-strip--bus .hw-bus-in").first()).toHaveText("Kick · Clap · Hi-hat · Open hat · Perc");
+  await expect(page.locator(".hw-strip--bus .hw-bus-in").first()).toHaveText("Kick · Clap · Hi-hat · Open hat · Perc · Tom · Shaker");
 
   await page.locator("#out-lead").selectOption({ label: "+ Nuovo bus" });
   expect(await nomi()).toEqual(["Drums", "Bus 2"]);
@@ -54,7 +54,7 @@ test("automazioni del volume: bersagli, valori da 0 a 1, ritorno al filtro", asy
   await pannello.locator(".hw-btn", { hasText: "Volume" }).click();
   await expect(pannello.locator(".hw-title")).toHaveText(/volume/i);
   expect(await page.locator("#auto-target option").allInnerTexts()).toEqual(
-    ["Master", "Kick", "Clap", "Hi-hat", "Open hat", "Perc", "Bass", "Chords", "Lead", "Bus Drums"],
+    ["Master", "Kick", "Clap", "Hi-hat", "Open hat", "Perc", "Tom", "Shaker", "Bass", "Chords", "Lead", "Bus Drums"],
   );
   await page.locator("#auto-target").selectOption("lead");
   const f = (b: number) => page.locator(".hw-auto-fader").nth(b);

@@ -1,4 +1,4 @@
-// I kit di batteria: stessi quattro strumenti (kick, clap, hat, perc), timbri diversi.
+// I kit di batteria: stessi strumenti (kick, clap, hat, perc, tom, shaker), timbri diversi.
 // Tutto sintetizzato come prima: ogni kit è solo una tabella di numeri che graph.ts legge a ogni colpo.
 
 export const KIT_IDS = ["house", "909", "808", "trap", "deep", "techno"] as const;
@@ -28,6 +28,15 @@ export type Kit = {
     level: number;
   };
   perc: "conga" | "rim" | "cowbell";
+  tom: {
+    start: number; // Hz all'attacco
+    end: number; // Hz dopo la discesa
+    decay: number; // secondi della coda
+  };
+  shaker: {
+    center: number; // dove "frusciano" i semi: più alto = più fine
+    decay: number; // secondi
+  };
 };
 
 export const KITS: Record<KitId, Kit> = {
@@ -38,6 +47,8 @@ export const KITS: Record<KitId, Kit> = {
     clap: { tone: 1500, tail: 0.32, body: 0 },
     hat: { closed: 0.055, open: 0.38, center: 10000, cut: 7000, level: 0.85 },
     perc: "conga",
+    tom: { start: 190, end: 120, decay: 0.32 },
+    shaker: { center: 7000, decay: 0.07 },
   },
   "909": {
     label: "909",
@@ -46,6 +57,8 @@ export const KITS: Record<KitId, Kit> = {
     clap: { tone: 1200, tail: 0.24, body: 0.25 },
     hat: { closed: 0.04, open: 0.3, center: 11500, cut: 8500, level: 0.9 },
     perc: "rim",
+    tom: { start: 220, end: 150, decay: 0.26 },
+    shaker: { center: 8000, decay: 0.05 },
   },
   "808": {
     label: "808",
@@ -54,6 +67,8 @@ export const KITS: Record<KitId, Kit> = {
     clap: { tone: 1000, tail: 0.4, body: 0 },
     hat: { closed: 0.07, open: 0.45, center: 8500, cut: 6500, level: 0.8 },
     perc: "cowbell",
+    tom: { start: 160, end: 95, decay: 0.55 },
+    shaker: { center: 6500, decay: 0.09 },
   },
   trap: {
     label: "Trap",
@@ -62,6 +77,8 @@ export const KITS: Record<KitId, Kit> = {
     clap: { tone: 1800, tail: 0.18, body: 0.6 },
     hat: { closed: 0.03, open: 0.26, center: 10500, cut: 8000, level: 0.8 },
     perc: "rim",
+    tom: { start: 150, end: 80, decay: 0.6 },
+    shaker: { center: 8500, decay: 0.04 },
   },
   deep: {
     label: "Deep",
@@ -70,6 +87,8 @@ export const KITS: Record<KitId, Kit> = {
     clap: { tone: 1250, tail: 0.38, body: 0 },
     hat: { closed: 0.05, open: 0.42, center: 8800, cut: 6200, level: 0.7 },
     perc: "conga",
+    tom: { start: 170, end: 110, decay: 0.38 },
+    shaker: { center: 6000, decay: 0.08 },
   },
   techno: {
     label: "Techno",
@@ -78,6 +97,8 @@ export const KITS: Record<KitId, Kit> = {
     clap: { tone: 1650, tail: 0.2, body: 0.3 },
     hat: { closed: 0.03, open: 0.25, center: 12000, cut: 9500, level: 0.85 },
     perc: "rim",
+    tom: { start: 200, end: 130, decay: 0.22 },
+    shaker: { center: 9000, decay: 0.045 },
   },
 };
 

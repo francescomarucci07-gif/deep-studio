@@ -18,6 +18,7 @@ import {
   BEATS,
   CHORD_TYPES,
   DRUMS,
+  type DrumId,
   SLOTS,
   MAX_SONG_BARS,
   MIN_SONG_BARS,
@@ -74,7 +75,9 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       clap: stepList("il clap (o snare)"),
       hat: stepList("l'hi-hat chiuso"),
       openhat: stepList("l'open hat"),
-      perc: stepList("la perc"),
+      perc: stepList("la perc (conga, rim o cowbell secondo il kit)"),
+      tom: stepList("il tom (fill prima del drop, groove tribali)"),
+      shaker: stepList("lo shaker (sedicesimi leggeri che danno movimento)"),
       basso: {
         type: "array",
         description: `Note della bassline: una per step. MIDI da ${BASS_LOW} (La1) a ${BASS_HIGH} (La2): 33 La, 34 La#, 35 Si, 36 Do, 37 Do#, 38 Re, 39 Re#, 40 Mi, 41 Fa, 42 Fa#, 43 Sol, 44 Sol#, 45 La.`,
@@ -283,7 +286,7 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
 
 export const STUDIO_TOOLS = [PATTERN_TOOL, SONG_TOOL, FX_TOOL];
 
-type PatternInput = Partial<Record<"kick" | "clap" | "hat" | "openhat" | "perc", unknown>> & {
+type PatternInput = Partial<Record<DrumId, unknown>> & {
   nome?: unknown;
   slot?: unknown;
   bpm?: unknown;

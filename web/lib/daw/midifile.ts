@@ -2,7 +2,7 @@
 // Un file MIDI è una lista di eventi nel tempo: "accendi la nota 60 con forza 100", "spegnila". Il tempo si conta in
 // tick: qui 96 per quarto, quindi uno step (1/16) = 24 tick. La batteria va sul canale 10 con le note General MIDI.
 // Lo swing non si scrive: in FL si rimette con lo swing del Channel rack.
-import { CHORD_STYLES, STEPS, barOf, chordNotes, noteLen, soundOf, velOf, type Pattern, type Project, type Slot } from "./project";
+import { CHORD_STYLES, DRUMS, STEPS, barOf, chordNotes, noteLen, soundOf, velOf, type Pattern, type Project, type Slot } from "./project";
 import { KITS } from "./kits";
 
 const PPQ = 96;
@@ -43,7 +43,7 @@ function toNext(line: (number | null)[], s: number) {
 }
 
 // la nota della batteria General MIDI; la perc dipende dal kit (conga, rim o cowbell)
-const GM = { kick: 36, clap: 39, hat: 42, openhat: 46 } as const;
+const GM = { kick: 36, clap: 39, hat: 42, openhat: 46, tom: 47, shaker: 70 } as const;
 const GM_PERC = { conga: 63, rim: 37, cowbell: 56 } as const;
 
 export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<ArrayBuffer> {
@@ -76,7 +76,7 @@ export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<Arr
         note(ev.lead, 1, m, at, steps * STEP - 2, v127(velOf(pat, `l${s}`)));
       }
       const kit = KITS[p.kit] ?? KITS.house;
-      for (const d of ["kick", "clap", "hat", "openhat", "perc"] as const) {
+      for (const { id: d } of DRUMS) {
         if (!pat.drums[d][s]) continue;
         const n = d === "perc" ? GM_PERC[kit.perc] : GM[d];
         note(ev.drums, 9, n, at, STEP / 2, v127(velOf(pat, `${d}${s}`)));

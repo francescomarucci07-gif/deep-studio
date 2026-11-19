@@ -8,7 +8,10 @@ describe("gmDrum", () => {
     expect(gmDrum(38)).toBe("clap");
     expect(gmDrum(42)).toBe("hat");
     expect(gmDrum(46)).toBe("openhat");
-    expect(gmDrum(45)).toBe("perc");
+    expect(gmDrum(44)).toBe("shaker");
+    expect(gmDrum(45)).toBe("tom");
+    expect(gmDrum(41)).toBe("tom");
+    expect(gmDrum(49)).toBe("perc");
     expect(gmDrum(60)).toBeNull();
     expect(gmDrum(30)).toBeNull();
   });

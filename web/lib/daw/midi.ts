@@ -2,6 +2,8 @@
 // messaggi grezzi, 3 numeri per ogni tasto. Il primo dice cosa succede (0x90 = tasto giù, 0x80 = tasto su; un
 // "tasto giù" con forza 0 vale come "tasto su"), il secondo quale nota (60 = Do4), il terzo quanto forte (1–127).
 
+import type { DrumId } from "./project";
+
 export type MidiHandlers = {
   on: (note: number, velocity: number, at: number) => void; // at: event.timeStamp, come i tasti del computer
   off: (note: number, at: number) => void;
@@ -47,13 +49,17 @@ export async function connectMidi(h: MidiHandlers): Promise<() => void> {
   };
 }
 
-// I pad di batteria con la mappa General MIDI (quella dei pad dei controller): 36 kick, 37–40 rullante e clap,
-// 42/44 hat chiuso, 46 hat aperto, le altre percussioni (41, 43, 45, 47–51) sulla perc. Fuori da 35–51: niente.
-export function gmDrum(note: number): "kick" | "clap" | "hat" | "openhat" | "perc" | null {
+// I pad di batteria con la mappa General MIDI (quella dei 16 pad dei controller, 36–51): 35/36 kick, 37–40 rullante e
+// clap, 42 hat chiuso, 44 (pedal hat, un "chick" corto) shaker, 46 hat aperto, i tom (41, 43, 45, 47, 48, 50) sul tom,
+// piatti (49, 51) sulla perc. Fuori da 35–51 niente: chi suona una tastiera intera fuori dal Roll non fa casino.
+const TOMS = [41, 43, 45, 47, 48, 50];
+export function gmDrum(note: number): DrumId | null {
   if (note === 35 || note === 36) return "kick";
   if (note >= 37 && note <= 40) return "clap";
-  if (note === 42 || note === 44) return "hat";
+  if (note === 42) return "hat";
+  if (note === 44) return "shaker";
   if (note === 46) return "openhat";
-  if (note >= 41 && note <= 51) return "perc";
+  if (TOMS.includes(note)) return "tom";
+  if (note === 49 || note === 51) return "perc";
   return null;
 }

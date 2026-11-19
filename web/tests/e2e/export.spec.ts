@@ -23,7 +23,12 @@ function wav(b: Buffer) {
     const id = b.toString("ascii", i, i + 4);
     const size = b.readUInt32LE(i + 4);
     if (id === "fmt ") fmt = { ch: b.readUInt16LE(i + 10), rate: b.readUInt32LE(i + 12), bits: b.readUInt16LE(i + 22) };
-    if (id === "data") return { ...fmt, sec: size / (fmt.rate * fmt.ch * (fmt.bits / 8)) };
+    if (id === "data") {
+      // il picco: il campione a 24 bit più forte, da 0 a 1
+      let peak = 0;
+      for (let k = i + 8; k + 2 < i + 8 + size; k += 3) peak = Math.max(peak, Math.abs(b.readIntLE(k, 3)));
+      return { ...fmt, sec: size / (fmt.rate * fmt.ch * (fmt.bits / 8)), peak: peak / 2 ** 23 };
+    }
     i += 8 + size;
   }
   throw new Error("WAV senza dati");
@@ -51,9 +56,10 @@ test("MIDI, stem e mix si scaricano e sono file validi", async ({ page }) => {
     const w = wav(z.subarray(i + 30 + len, i + 30 + len + size));
     expect(w).toMatchObject({ ch: 2, rate: 44100, bits: 24 });
     expect(w.sec).toBeCloseTo(10.55, 1); // 4 giri di una battuta a 120 BPM + la coda
+    expect(w.peak, `${nomi.at(-1)} non è muto`).toBeGreaterThan(0.005);
     i += 30 + len + size;
   }
-  expect(nomi).toEqual(["01 Kick.wav", "02 Clap.wav", "03 Hi-hat.wav", "04 Bass.wav", "05 Chords.wav", "06 Lead.wav"]);
+  expect(nomi).toEqual(["01 Kick.wav", "02 Clap.wav", "03 Hi-hat.wav", "04 Tom.wav", "05 Shaker.wav", "06 Bass.wav", "07 Chords.wav", "08 Lead.wav"]);
 
   const mix = await scarica(page, "Mix WAV");
   expect(mix.nome).toBe("Prova export - pattern A.wav");

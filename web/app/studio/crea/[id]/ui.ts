@@ -74,6 +74,8 @@ export const PADS: { id: ChannelId; label: string; key: string; color: string }[
   { id: "hat", label: "Hi-hat", key: "c", color: "yellow" },
   { id: "openhat", label: "Open hat", key: "v", color: "yellow" },
   { id: "perc", label: "Perc", key: "b", color: "teal" },
+  { id: "tom", label: "Tom", key: ".", color: "orange" },
+  { id: "shaker", label: "Shaker", key: "-", color: "teal" },
   { id: "bass", label: "Bass", key: "n", color: "green" },
   { id: "chords", label: "Chord", key: "m", color: "purple" },
   { id: "lead", label: "Lead", key: ",", color: "blue" },

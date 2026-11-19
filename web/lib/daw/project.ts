@@ -16,7 +16,11 @@ export const DRUMS = [
   { id: "hat", label: "Hi-hat" },
   { id: "openhat", label: "Open hat" },
   { id: "perc", label: "Perc" },
+  { id: "tom", label: "Tom" },
+  { id: "shaker", label: "Shaker" },
 ] as const;
+// le righe di batteria aggiunte dopo (19 nov): nei progetti di prima seguono il routing del kick
+const NEW_DRUMS: DrumId[] = ["tom", "shaker"];
 export type DrumId = (typeof DRUMS)[number]["id"];
 export type ChannelId = DrumId | "bass" | "chords" | "lead";
 
@@ -128,7 +132,7 @@ export type MixTarget = AutoTarget | BusId;
 // Effetti di ogni canale. filter: -1…1 come il filtro di un mixer da DJ (sinistra = passa-basso,
 // il suono si chiude; destra = passa-alto, si assottiglia; 0 = spento). reverb e delay: 0…1 di send.
 export type ChannelFx = { filter: number; reverb: number; delay: number };
-export const CHANNEL_IDS: ChannelId[] = ["kick", "clap", "hat", "openhat", "perc", "bass", "chords", "lead"];
+export const CHANNEL_IDS: ChannelId[] = [...DRUMS.map((d) => d.id), "bass", "chords", "lead"];
 
 // Automazioni: il filtro del master o di un canale, un valore (o null) per ogni battuta della canzone.
 // Tra due punti il valore scorre in modo graduale; prima del primo e dopo l'ultimo resta fermo.
@@ -218,7 +222,7 @@ export function setVel(pat: Pattern, key: string, v: number) {
 }
 // la chiave esiste solo se c'è qualcosa che suona lì
 function velKeyLive(pat: Pattern, key: string) {
-  const m = /^(openhat|kick|clap|hat|perc|b|l|c)(\d+)$/.exec(key);
+  const m = /^(openhat|kick|clap|hat|perc|tom|shaker|b|l|c)(\d+)$/.exec(key);
   if (!m) return false;
   const i = Number(m[2]);
   if (m[1] === "b") return i < pat.bass.length && pat.bass[i] !== null;
@@ -426,7 +430,7 @@ export function starterProject(): Project {
     patterns: {
       ...(Object.fromEntries(SLOTS.map((s) => [s, emptyPattern()])) as Project["patterns"]),
       A: {
-        drums: { kick: on(0, 4, 8, 12), clap: on(4, 12), hat: on(2, 6, 10, 14), openhat: on(), perc: on() },
+        drums: { kick: on(0, 4, 8, 12), clap: on(4, 12), hat: on(2, 6, 10, 14), openhat: on(), perc: on(), tom: on(), shaker: on() },
         bass,
         chords: [[{ root: 9, type: "min7" }], [], [], []],
         lead: emptyLead(),
@@ -443,6 +447,8 @@ export function starterProject(): Project {
       hat: { filter: 0, reverb: 0.04, delay: 0 },
       openhat: { filter: 0, reverb: 0.12, delay: 0 },
       perc: { filter: 0, reverb: 0.25, delay: 0.15 },
+      tom: { filter: 0, reverb: 0.2, delay: 0 },
+      shaker: { filter: 0, reverb: 0.1, delay: 0 },
       bass: { filter: 0, reverb: 0, delay: 0 },
       chords: { filter: 0, reverb: 0.3, delay: 0 },
       lead: { filter: 0, reverb: 0.18, delay: 0.5 },
@@ -458,6 +464,8 @@ export function starterProject(): Project {
       hat: { volume: 0.45, muted: false, out: "bus1" },
       openhat: { volume: 0.4, muted: false, out: "bus1" },
       perc: { volume: 0.5, muted: false, out: "bus1" },
+      tom: { volume: 0.5, muted: false, out: "bus1" },
+      shaker: { volume: 0.35, muted: false, out: "bus1" },
       bass: { volume: 0.7, muted: false, out: "master" },
       chords: { volume: 0.45, muted: false, out: "master" },
       lead: { volume: 0.5, muted: false, out: "master" },
@@ -466,6 +474,7 @@ export function starterProject(): Project {
   };
 }
 
+const outOf = (v: unknown): Out => (isBus(v) ? v : "master");
 const clamp = (v: unknown, lo: number, hi: number, d: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
 
@@ -619,8 +628,9 @@ export function normalize(raw: unknown): Project {
         {
           volume: clamp(r.mixer?.[id]?.volume, 0, 1, d.mixer[id].volume),
           muted: r.mixer?.[id]?.muted === true,
-          // i progetti di prima non hanno il routing: tutto al master, come suonavano
-          out: isBus(r.mixer?.[id]?.out) ? (r.mixer?.[id]?.out as BusId) : "master",
+          // i progetti di prima non hanno il routing: tutto al master, come suonavano. Tom e shaker, che prima non
+          // c'erano, escono dove esce il kick (di solito il bus Drums)
+          out: outOf(r.mixer?.[id]?.out ?? (NEW_DRUMS.includes(id as DrumId) && !r.mixer?.[id] ? r.mixer?.kick?.out : undefined)),
         },
       ]),
     ) as Project["mixer"],

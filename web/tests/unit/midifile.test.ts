@@ -48,6 +48,15 @@ function parse(bytes: Uint8Array) {
 }
 
 describe("projectToMidi", () => {
+  it("tom e shaker: note General MIDI 47 e 70 sul canale 10", () => {
+    const p = normalize({ version: 2, patterns: { A: { drums: { tom: [true], shaker: [false, true] } } } });
+    const drums = parse(projectToMidi(p, ["A"])).tracks[4].on;
+    expect(drums.map((d) => [d.tick, d.note, d.ch])).toEqual([
+      [0, 47, 9],
+      [24, 70, 9],
+    ]);
+  });
+
   it("tipo 1, 96 tick per quarto, tempo, una traccia per strumento", () => {
     const p = { ...starterProject(), bpm: 120 };
     const { ppq, tracks } = parse(projectToMidi(p, ["A"]));

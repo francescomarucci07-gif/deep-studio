@@ -124,3 +124,17 @@ describe("canzone", () => {
     expect(p.volAuto?.lead).toHaveLength(32);
   });
 });
+
+describe("tom e shaker nei progetti di prima", () => {
+  it("righe vuote e routing come il kick", () => {
+    const p = normalize({ version: 2, patterns: { A: { drums: { kick: [true] } } }, mixer: { kick: { volume: 0.9, out: "bus1" } } });
+    expect(p.patterns.A.drums.tom).toHaveLength(16);
+    expect(p.patterns.A.drums.shaker.some(Boolean)).toBe(false);
+    expect(p.mixer.tom.out).toBe("bus1");
+    expect(p.mixer.shaker.out).toBe("bus1");
+  });
+  it("senza routing restano sul master, come gli altri canali", () => {
+    const p = normalize({ version: 2, patterns: {} , bpm: 124 });
+    expect(p.mixer.tom.out).toBe("master");
+  });
+});

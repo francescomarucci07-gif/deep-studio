@@ -41,7 +41,7 @@ import { INSERT_SLOTS, PLUGINS, type PluginInstance } from "./plugins";
 const mtof = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
 // Posizione nello stereo di ogni canale
-const PAN: Record<ChannelId, number> = { kick: 0, clap: 0, hat: 0.18, openhat: -0.15, perc: -0.28, bass: 0, chords: 0, lead: 0.05 };
+const PAN: Record<ChannelId, number> = { kick: 0, clap: 0, hat: 0.18, openhat: -0.15, perc: -0.28, tom: 0.22, shaker: 0.3, bass: 0, chords: 0, lead: 0.05 };
 const DELAY_MAX = 0.6; // send del delay al massimo della manopola: oltre, l'eco copre il canale
 
 // Il filtro DJ: un passa-basso e un passa-alto in fila, mossi insieme da un solo valore -1…1
@@ -599,6 +599,24 @@ export class Graph {
         o.start(t);
         o.stop(t + decay + 0.05);
       }
+    } else if (id === "tom") {
+      // tom: come un kick più alto e senza click, la pelle che scende di tono
+      const m = kit.tom;
+      const o = ctx.createOscillator();
+      o.frequency.setValueAtTime(m.start, t);
+      o.frequency.exponentialRampToValueAtTime(m.end, t + m.decay * 0.6);
+      o.connect(this.env(t, 0.75, m.decay, 0.002)).connect(out);
+      o.start(t);
+      o.stop(t + m.decay + 0.05);
+      this.noiseSource(t, 0.03).connect(this.filter("bandpass", m.start * 4, 1)).connect(this.env(t, 0.12, 0.02)).connect(out);
+    } else if (id === "shaker") {
+      // shaker: rumore filtrato in alto, con un attacco un filo morbido (i semi che si muovono)
+      const sh = kit.shaker;
+      this.noiseSource(t, sh.decay + 0.03)
+        .connect(this.filter("bandpass", sh.center, 1.4))
+        .connect(this.filter("highpass", sh.center * 0.6))
+        .connect(this.env(t, 0.55, sh.decay, 0.008))
+        .connect(out);
     } else if (kit.perc === "cowbell") {
       // cowbell della 808: due onde quadre stonate tra loro (540 e 800 Hz) in un passa-banda
       const band = this.filter("bandpass", 900, 2);

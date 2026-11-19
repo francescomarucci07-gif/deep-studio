@@ -2,6 +2,7 @@
 // Funziona con qualunque contesto Web Audio: quello in tempo reale (Engine) e quello offline
 // che renderizza il WAV (render.ts), così il file esportato suona come quello che senti.
 // Tutti i suoni sono sintetizzati: niente campioni da scaricare o licenziare.
+import { bandDb, MASTER_BANDS, type Frame, type MasterBand } from "./listen";
 import {
   AUTO_TARGETS,
   BEATS,
@@ -223,6 +224,37 @@ export class Graph {
 
   // Volumi, mute, effetti e tempo del delay: chiamato a ogni modifica, cambia il suono senza scatti.
   // immediate = subito al valore giusto (export offline: niente rampa all'inizio del file)
+  // Il parere in tempo reale (listen.ts): tre analizzatori, come i meter di un mixer. Kick e basso all'uscita del loro
+  // canale (il basso dopo il sidechain), il master prima del limiter. Non cambiano il suono: ascoltano soltanto.
+  // Nascono alla prima misura, così l'export (che non li usa) non li ha.
+  private taps: { kick: AnalyserNode; bass: AnalyserNode; master: AnalyserNode; buf: Float32Array<ArrayBuffer>; mbuf: Float32Array<ArrayBuffer> } | null = null;
+  listenFrame(): Frame {
+    if (!this.taps) {
+      const make = (from: AudioNode, size: number, smooth: number) => {
+        const a = this.ctx.createAnalyser();
+        a.fftSize = size;
+        a.smoothingTimeConstant = smooth;
+        from.connect(a);
+        return a;
+      };
+      const kick = make(this.outs.kick, 2048, 0.5);
+      const bass = make(this.outs.bass, 2048, 0.5);
+      const master = make(this.out, 4096, 0.8);
+      this.taps = { kick, bass, master, buf: new Float32Array(kick.frequencyBinCount), mbuf: new Float32Array(master.frequencyBinCount) };
+    }
+    const { kick, bass, master, buf, mbuf } = this.taps;
+    const sr = this.ctx.sampleRate;
+    kick.getFloatFrequencyData(buf);
+    const kickLow = bandDb(buf, sr, 30, 150);
+    bass.getFloatFrequencyData(buf);
+    const bassLow = bandDb(buf, sr, 30, 150);
+    master.getFloatFrequencyData(mbuf);
+    const bands = Object.fromEntries(
+      (Object.entries(MASTER_BANDS) as [MasterBand, readonly [number, number]][]).map(([b, [lo, hi]]) => [b, bandDb(mbuf, sr, lo, hi)]),
+    ) as Frame["master"];
+    return { kickLow, bassLow, master: bands, limiterDb: Math.abs(this.limiterDb) };
+  }
+
   // Mette il limiter vero al posto di quello di riserva (dopo loadLimiter). false se non si può.
   useRealLimiter(): boolean {
     if (this.opts.dry) return false; // stem: niente limiter

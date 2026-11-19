@@ -1,7 +1,7 @@
 // Aiuti comuni dei test nel browser: aprire lo studio di prova senza rete e leggere lo stato della griglia.
 import type { Page } from "@playwright/test";
 
-export type Progetto = "starter" | "empty" | "user" | "export" | "tour" | "segnala";
+export type Progetto = "starter" | "empty" | "user" | "export" | "tour" | "segnala" | "pesto";
 
 // apre lo studio con un progetto; il database e il coach rispondono finti, il tour è già visto (tranne con "tour")
 export async function apri(page: Page, p: Progetto = "starter") {

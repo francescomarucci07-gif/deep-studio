@@ -152,15 +152,20 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   (`renderAudio(p, what, stem)`: gli altri canali muti, `Graph` con `dry` = senza plugin del master, colla e limiter;
   in uno zip STORE scritto a mano, `lib/daw/zip.ts`); **MIDI** = file .mid tipo 1 (`lib/daw/midifile.ts`: 96 tick
   per quarto, tracce Bass/Lead/Chords/Lead 2/Drums, batteria sul canale 10 General MIDI, lunghezze e velocity; lo swing no).
+- **Parere in tempo reale** (19 nov): durante il Play `useAscolto.ts` legge ogni 100 ms tre analizzatori (`Graph.listenFrame`:
+  kick e basso sotto 150 Hz all'uscita del canale, master prima del limiter, per banda) e le regole di `lib/daw/listen.ts`
+  (`Listener`, soglie in `LISTEN`, provvisorie, tarate sui progetti di prova) decidono gli avvisi: `kick_basso`, `limiter`,
+  `fango`, `aspro`. Scheda in basso a destra (`Ascolto.tsx`): "Chiedi al coach" manda la domanda con le misure dal vivo
+  (campo `ascolto` a `/api/coach/crea`, non salvato); "Non dirmelo più" in `ds-ascolto-no`. Niente token finché non chiedi.
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
   Python); `Daw.tsx` le manda a `/api/coach/crea` nel campo `misure` (solo per Claude, non salvate).
 - **Cronologia**: `project_versions` (ultime 60 per progetto, trigger di pulizia); il browser salva una versione
   alla prima modifica, prima di ogni modifica del coach, ogni 10 minuti e a mano (`lib/daw/versions.ts`).
 - **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
-- **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi; `vitest.config.mts`);
+- **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen; `vitest.config.mts`);
   `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
-  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala`;
+  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto` (pesto = mix sbagliato apposta);
   la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
@@ -223,8 +228,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   Canc; `rollKey` e `placeNotes` in `Daw.tsx`; ogni comando è un passo di Annulla; restano quantize e velocity per nota); ~~automazioni del volume~~ **fatte il 18 nov** (`volAuto`: master,
   canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); send verso i bus e bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
   `graph.click`, non entra nell'export).
-- Coach: ~~lezioni guidate~~ **fatte il 18 nov**; parere in tempo reale (es. basso che
-  copre il kick).
+- Coach: ~~lezioni guidate~~ **fatte il 18 nov**; ~~parere in tempo reale~~ **fatto il 19 nov** (vedi "Cose da sapere").
 - Prodotto: pagina delle segnalazioni nel sito (solo per Francesco); link di ascolto pubblico; email di accesso con
   SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).
 - Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).

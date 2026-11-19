@@ -2660,3 +2660,44 @@ ol.ds-led-row {
   outline: 2px solid var(--ds-text);
   outline-offset: -2px;
 }
+
+/* Il parere in tempo reale (Ascolto.tsx): l'avviso sta in basso a destra, sopra il coach, e non copre le lezioni */
+.ds-ascolto {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 890;
+  width: min(330px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--ds-warn) 55%, var(--hw-panel-edge));
+  border-radius: 14px;
+  background: var(--ds-surface-raised);
+  color: var(--ds-text);
+  box-shadow: 0 14px 40px rgb(0 0 0 / 0.55);
+}
+.ds-ascolto .ds-tour-text {
+  margin: 6px 0 8px;
+  font-size: 13px;
+}
+.ds-ascolto-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 12px var(--ds-font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ds-ascolto-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ds-warn);
+  box-shadow: 0 0 8px var(--ds-warn);
+}
+/* sul telefono le lezioni stanno in basso: l'avviso sale sopra */
+@media (max-width: 760px) {
+  .ds-ascolto {
+    right: 12px;
+    bottom: 96px;
+  }
+}

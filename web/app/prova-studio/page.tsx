@@ -23,7 +23,24 @@ export default async function ProvaStudio({ searchParams }: { searchParams: Prom
         ? normalize(user)
         : p === "export"
           ? normalize({ ...starter, bpm: 120, swing: 0, patterns: { ...starter.patterns, A: { ...starter.patterns.A, drums: { ...starter.patterns.A.drums, tom: hits(12, 14), shaker: hits(1, 3, 5, 7) }, lead, lead2, len: { "l0:72": 4 }, vel: { hat2: 0.4 } } } })
-          : starter;
+          : p === "pesto"
+            ? // un mix sbagliato apposta (per il parere in tempo reale): basso lungo e forte sulle stesse note del kick,
+              // sidechain spento, tutto al massimo, hat fitti e accordi scuri
+              normalize({
+                ...starter,
+                sidechain: false,
+                bassSound: { wave: "sub", cutoff: 400, length: "lunga" },
+                patterns: {
+                  ...starter.patterns,
+                  A: {
+                    ...starter.patterns.A,
+                    drums: { ...starter.patterns.A.drums, hat: hits(...Array.from({ length: 16 }, (_, i) => i)) },
+                    bass: Array.from({ length: 16 }, (_, i) => (i % 4 === 0 ? 33 : null)),
+                  },
+                },
+                mixer: Object.fromEntries(Object.entries(starter.mixer).map(([k, c]) => [k, { ...c, volume: 1 }])),
+              })
+            : starter;
   return (
     <Daw
       id={p === "segnala" ? "00000000-0000-0000-0000-000000000001" : "prova"}

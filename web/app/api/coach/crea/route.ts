@@ -18,6 +18,7 @@ type Body = {
   title?: string;
   editing?: unknown;
   misure?: unknown; // le misure dell'export calcolate nel browser ("Fammi un parere")
+  ascolto?: unknown; // le misure dal vivo dell'avviso che il producer ha girato al coach (listen.ts)
 };
 
 export async function POST(request: NextRequest) {
@@ -59,7 +60,10 @@ export async function POST(request: NextRequest) {
   // le misure vanno solo a Claude, non nella storia salvata: sono tante e cambiano a ogni export
   const misure = body.misure && typeof body.misure === "object" ? JSON.stringify(body.misure) : "";
   // con 256 battute le misure per battuta sono ~15.000 caratteri: il tetto è più alto, ma resta un tetto
-  const listening = misure.length > 0 && misure.length < 24000 ? `\n\n[Misure dell'export]\n${misure}` : "";
+  const live = body.ascolto && typeof body.ascolto === "object" ? JSON.stringify(body.ascolto) : "";
+  const listening =
+    (misure.length > 0 && misure.length < 24000 ? `\n\n[Misure dell'export]\n${misure}` : "") +
+    (live.length > 0 && live.length < 2000 ? `\n\n[Misure dal vivo, media degli ultimi 4 secondi: dB per banda; kickLow e bassLow = energia sotto 150 Hz all'uscita dei due canali; limiterDb = riduzione del limiter]\n${live}` : "");
 
   const { error: insertError } = await supabase
     .from("coach_messages")

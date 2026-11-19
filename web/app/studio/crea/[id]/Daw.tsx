@@ -2,6 +2,7 @@
 import { CoachChat } from "@/components/CoachChat";
 import { VersionsPanel } from "@/components/hw/VersionsPanel";
 import { SLOTS, isEmptyPattern } from "@/lib/daw/project";
+import { Ascolto } from "./Ascolto";
 import { Lezioni } from "./Lezioni";
 import { Segnala } from "./Segnala";
 import { Tour } from "./Tour";
@@ -57,6 +58,7 @@ export function Daw(props: StudioProps) {
     songMode,
     titleRef,
     toggleCoach,
+    ascolto,
     touring,
     undo,
     versionsTick,
@@ -83,6 +85,17 @@ export function Daw(props: StudioProps) {
           setAsk({ id: Date.now(), text });
         }}
         onTour={() => setTouring(true)}
+      />
+      <Ascolto
+        notice={ascolto.notice}
+        onClose={ascolto.dismiss}
+        onNever={ascolto.never}
+        onAsk={(n) => {
+          setCoachOpen(true);
+          const live = ascolto.summary();
+          setAsk({ id: Date.now(), text: n.ask, ...(live ? { extra: { ascolto: { avviso: n.id, ...live } } } : {}) });
+          ascolto.dismiss();
+        }}
       />
       {/* ---- pannello superiore: marchio, display, trasporto, manopole ---- */}
       <TopBar studio={studio} />

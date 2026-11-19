@@ -51,6 +51,11 @@ export class Engine {
     return this.graph.limiterDb;
   }
 
+  // le misure del mix adesso, per il parere in tempo reale (listen.ts)
+  listenFrame() {
+    return this.graph.listenFrame();
+  }
+
   get playing() {
     return this.timer !== null;
   }

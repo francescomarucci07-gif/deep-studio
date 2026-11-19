@@ -81,6 +81,7 @@ import {
   store,
   stored,
 } from "./ui";
+import { useAscolto } from "./useAscolto";
 import { useExport } from "./useExport";
 import { useHistory } from "./useHistory";
 import { useMidi } from "./useMidi";
@@ -232,6 +233,8 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     engineRef.current?.stop();
     setPlaying(false);
   }, []);
+  // il parere in tempo reale: misura il mix mentre suona e prepara gli avvisi (useAscolto.ts, listen.ts)
+  const ascolto = useAscolto(engineRef, playing);
   const togglePlay = useCallback(() => (engineRef.current?.playing ? stop() : void play()), [play, stop]);
   // REC in alto e "Registra" vicino alla tastiera sono lo stesso interruttore: accendono la registrazione
   // e, se è fermo, fanno partire il Play
@@ -1159,6 +1162,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
           : sounding.drums[c][step]));
 
   return {
+    ascolto,
     addBars,
     applyFromCoach,
     ask,

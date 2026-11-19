@@ -35,6 +35,8 @@ export default async function Studio() {
       .order("created_at", { ascending: false }),
     supabase.from("projects").select("id, title, bpm, updated_at").order("updated_at", { ascending: false }),
   ]);
+  // la tabella admins risponde solo per sé stessi (RLS): c'è una riga = sei admin, vedi il link alle segnalazioni
+  const { data: admin } = user ? await supabase.from("admins").select("user_id").eq("user_id", user.id).maybeSingle() : { data: null };
   const tracks = (data ?? []) as Track[];
   const projects = (projectRows ?? []) as Project[];
 
@@ -51,6 +53,11 @@ export default async function Studio() {
               Nuovo progetto
             </button>
           </form>
+          {admin && (
+            <Link href="/studio/segnalazioni" className="ds-pad">
+              Segnalazioni
+            </Link>
+          )}
           <form action="/auth/esci" method="post">
             <button type="submit" className="ds-pad">
               Esci

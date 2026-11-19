@@ -136,6 +136,19 @@ a {
   padding: var(--ds-space-3) 0;
   border-bottom: 1px solid var(--ds-border);
 }
+/* la pagina delle segnalazioni: il messaggio intero, a capo dove serve */
+.ds-reports > li > div {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.ds-report-msg {
+  margin: 0 0 var(--ds-space-1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ds-reports > li[data-risolta="true"] .ds-report-msg {
+  color: var(--ds-text-faint);
+}
 .ds-list .ds-meta {
   color: var(--ds-text-faint);
   font: var(--ds-text-xs) var(--ds-font-mono);

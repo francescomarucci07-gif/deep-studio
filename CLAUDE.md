@@ -50,7 +50,8 @@ Decisione del 3 nov 2026: `docs/ADR-0001-studio-nel-browser.md` (da confermare c
 analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script di prova P3/P4
 db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach,
             0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions),
-            0006–0007 segnalazioni dallo studio (tabella segnalazioni, limite di 30 al giorno con un trigger)
+            0006–0007 segnalazioni dallo studio (tabella segnalazioni, limite di 30 al giorno con un trigger),
+            0008 admins + segnalazioni lette e segnate risolte dagli admin
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili (palette "Neon morbido"; font Geist, Chakra Petch, Geist Mono
             caricati in app/layout.tsx con next/font). Collegamento a Supabase e Vercel: docs/DEPLOY.md
@@ -143,7 +144,9 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   tasto, `releaseKey`) e velocity (`midiVel`: 1–127 → 0.1–1). Si ricollega da solo se il permesso è già dato.
 - **Segnala un problema** (`Segnala.tsx`): pulsante Segnala nella barra delle viste (sul telefono sotto il coach);
   salva messaggio, vista, progetto e dati tecnici (browser, schermo) in `segnalazioni` (RLS: ognuno le sue; 30 al
-  giorno). Si leggono da Supabase → Table editor → segnalazioni. (La tabella `feedback` è un'altra cosa: M4.)
+  giorno). Si leggono in **/studio/segnalazioni** (solo admin: tabella `admins`, migrazione 0008; link "Segnalazioni" nella
+  pagina Il tuo studio; pulsante Risolta/Riapri = `risolta_at`, l'unica colonna che un admin può cambiare). Un admin nuovo
+  si aggiunge solo dall'SQL editor di Supabase (vedi il commento nella 0008). (La tabella `feedback` è un'altra cosa: M4.)
 - **Mixer e bus**: ogni canale esce sul master o in un bus (`mixer.X.out`); i bus (`buses`, `BUS_IDS`) hanno fader
   (`BUS_UNITY` = 0 dB), mute e 8 insert, poi vanno al master. In `graph.ts` il routing si ricollega in `applyMixer`.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
@@ -194,7 +197,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
 **Per il 14 nov (chiesto da Francesco il 13 nov):**
 - Controllo generale dello studio con Francesco (tutte le viste, suoni, Solo, plugin, export, coach).
 - ~~Link per gli amici~~ **fatto il 14 nov**: https://deep-studio-azure.vercel.app (Accedi con link magico; al primo
-  login si apre subito un progetto con il tour). Le segnalazioni per ora arrivano a Francesco su WhatsApp.
+  login si apre subito un progetto con il tour). Le segnalazioni arrivano in /studio/segnalazioni (dal 19 nov).
 - ~~Pulsante "Segnala un problema"~~ **fatto il 17 nov** (vedi "Cose da sapere").
   Prima segnalazione (17 nov, Francesco): "non riesco a mettere gli effetti sul lead" dal Roll → ~~fatto~~: pulsante FX
   accanto al nome del synth nel Roll (`fxJump` in `Daw.tsx`), apre il Mixer con gli insert di quello strumento.
@@ -229,7 +232,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); send verso i bus e bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
   `graph.click`, non entra nell'export).
 - Coach: ~~lezioni guidate~~ **fatte il 18 nov**; ~~parere in tempo reale~~ **fatto il 19 nov** (vedi "Cose da sapere").
-- Prodotto: pagina delle segnalazioni nel sito (solo per Francesco); link di ascolto pubblico; email di accesso con
+- Prodotto: ~~pagina delle segnalazioni nel sito~~ **fatta il 19 nov** (/studio/segnalazioni); link di ascolto pubblico; email di accesso con
   SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).
 - Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).
 

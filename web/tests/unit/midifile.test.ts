@@ -48,9 +48,19 @@ function parse(bytes: Uint8Array) {
 }
 
 describe("projectToMidi", () => {
+  it("il Lead 2 ha la sua traccia sul canale 4, con lunghezze e velocity sue", () => {
+    const p = normalize({ version: 2, patterns: { A: { lead: [[72]], lead2: [[], [], [79, 84]], len: { "m2:79": 4 }, vel: { m2: 1 } } } });
+    const { tracks } = parse(projectToMidi(p, ["A"]));
+    expect(tracks[2].on.map((n) => [n.tick, n.note, n.ch])).toEqual([[0, 72, 1]]);
+    expect(tracks[4].on.map((n) => [n.tick, n.note, n.vel, n.ch])).toEqual([
+      [48, 79, 127, 3],
+      [48, 84, 127, 3],
+    ]);
+  });
+
   it("tom e shaker: note General MIDI 47 e 70 sul canale 10", () => {
     const p = normalize({ version: 2, patterns: { A: { drums: { tom: [true], shaker: [false, true] } } } });
-    const drums = parse(projectToMidi(p, ["A"])).tracks[4].on;
+    const drums = parse(projectToMidi(p, ["A"])).tracks[5].on;
     expect(drums.map((d) => [d.tick, d.note, d.ch])).toEqual([
       [0, 47, 9],
       [24, 70, 9],
@@ -61,13 +71,13 @@ describe("projectToMidi", () => {
     const p = { ...starterProject(), bpm: 120 };
     const { ppq, tracks } = parse(projectToMidi(p, ["A"]));
     expect(ppq).toBe(96);
-    expect(tracks.map((t) => t.name)).toEqual(["Deep Studio", "Bass", "Lead", "Chords", "Drums"]);
+    expect(tracks.map((t) => t.name)).toEqual(["Deep Studio", "Bass", "Lead", "Chords", "Lead 2", "Drums"]);
     expect(tracks[0].tempo).toBe(120);
   });
 
   it("la batteria va sul canale 10 con le note General MIDI e la velocity", () => {
     const p = normalize({ version: 2, patterns: { A: { drums: { kick: [true], hat: [false, false, true] }, vel: { hat2: 0.4 } } } });
-    const drums = parse(projectToMidi(p, ["A"])).tracks[4].on;
+    const drums = parse(projectToMidi(p, ["A"])).tracks[5].on;
     expect(drums).toEqual([
       { tick: 0, note: 36, vel: 102, ch: 9 },
       { tick: 48, note: 42, vel: 51, ch: 9 },
@@ -79,7 +89,7 @@ describe("projectToMidi", () => {
     kick[0] = true; // battuta 1
     kick[20] = true; // battuta 2, step 5
     const p = normalize({ version: 2, patterns: { A: { bars: 2, drums: { kick } } } });
-    const ticks = parse(projectToMidi(p, ["A", "A"])).tracks[4].on.map((n) => n.tick);
+    const ticks = parse(projectToMidi(p, ["A", "A"])).tracks[5].on.map((n) => n.tick);
     expect(ticks).toEqual([0, 16 * 24 + 4 * 24]);
   });
 });

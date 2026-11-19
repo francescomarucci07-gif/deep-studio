@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   barOf,
+  isEmptyPattern,
   BUS_UNITY,
   maxLen,
   normalize,
@@ -136,5 +137,30 @@ describe("tom e shaker nei progetti di prima", () => {
   it("senza routing restano sul master, come gli altri canali", () => {
     const p = normalize({ version: 2, patterns: {} , bpm: 124 });
     expect(p.mixer.tom.out).toBe("master");
+  });
+});
+
+describe("Lead 2", () => {
+  it("i progetti di prima hanno il Lead 2 vuoto, con suono pluck e canale al master", () => {
+    const p = normalize({ version: 2, patterns: { A: { lead: [[72]] } } });
+    expect(p.patterns.A.lead2.every((n) => n.length === 0)).toBe(true);
+    expect(p.lead2Sound.wave).toBe("pluck");
+    expect(p.mixer.lead2.out).toBe("master");
+  });
+  it("lunghezze e velocity del Lead 2 non si mescolano con quelle del Lead", () => {
+    const p = normalize({
+      version: 2,
+      patterns: { A: { lead: [[72]], lead2: [[72]], len: { "l0:72": 2, "m0:72": 6 }, vel: { l0: 0.5, m0: 1, m3: 1 } } },
+    });
+    const a = p.patterns.A;
+    expect(noteLen(a, "lead", 0, 72)).toBe(2);
+    expect(noteLen(a, "lead2", 0, 72)).toBe(6);
+    expect(a.vel).toEqual({ l0: 0.5, m0: 1 }); // m3: lì il Lead 2 non suona
+  });
+  it("il pattern con solo il Lead 2 non è vuoto, e si allunga a 2 battute", () => {
+    const p = normalize({ version: 2, patterns: { B: { lead2: [[], [76]] } } });
+    expect(isEmptyPattern(p.patterns.B)).toBe(false);
+    setPatternBars(p.patterns.B, 2);
+    expect(p.patterns.B.lead2[17]).toEqual([76]);
   });
 });

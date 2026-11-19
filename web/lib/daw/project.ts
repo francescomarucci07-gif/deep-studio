@@ -22,7 +22,14 @@ export const DRUMS = [
 // le righe di batteria aggiunte dopo (19 nov): nei progetti di prima seguono il routing del kick
 const NEW_DRUMS: DrumId[] = ["tom", "shaker"];
 export type DrumId = (typeof DRUMS)[number]["id"];
-export type ChannelId = DrumId | "bass" | "chords" | "lead";
+export type ChannelId = DrumId | "bass" | "chords" | LeadInst;
+// I due lead (19 nov): stesso synth polifonico, suono, note e canale propri. Nelle chiavi di lunghezze e velocity il
+// lead è "l" (l5, l5:72), il Lead 2 è "m" (m5, m5:72), il basso "b".
+export const LEADS = ["lead", "lead2"] as const;
+export type LeadInst = (typeof LEADS)[number];
+export const isLeadInst = (v: unknown): v is LeadInst => v === "lead" || v === "lead2";
+export const NOTE_PREFIX = { bass: "b", lead: "l", lead2: "m" } as const;
+export const LEAD_LABEL: Record<LeadInst, string> = { lead: "Lead", lead2: "Lead 2" };
 
 // Accordi: uno per battito (4 per battuta). root = nota da 0 (Do) a 11 (Si)
 export const BEATS = 4;
@@ -132,7 +139,7 @@ export type MixTarget = AutoTarget | BusId;
 // Effetti di ogni canale. filter: -1…1 come il filtro di un mixer da DJ (sinistra = passa-basso,
 // il suono si chiude; destra = passa-alto, si assottiglia; 0 = spento). reverb e delay: 0…1 di send.
 export type ChannelFx = { filter: number; reverb: number; delay: number };
-export const CHANNEL_IDS: ChannelId[] = [...DRUMS.map((d) => d.id), "bass", "chords", "lead"];
+export const CHANNEL_IDS: ChannelId[] = [...DRUMS.map((d) => d.id), "bass", "chords", "lead", "lead2"];
 
 // Automazioni: il filtro del master o di un canale, un valore (o null) per ogni battuta della canzone.
 // Tra due punti il valore scorre in modo graduale; prima del primo e dopo l'ultimo resta fermo.
@@ -146,6 +153,7 @@ export type Pattern = {
   bass: (number | null)[]; // una nota MIDI per step, oppure null
   chords: Chord[][]; // per ogni battito gli accordi che suonano insieme (vuoto = continua quello prima o niente), max 3
   lead: number[][]; // la melodia: per ogni step le note MIDI che suonano insieme (vuoto = niente), max 6
+  lead2: number[][]; // il secondo lead, come il primo
   sounds?: Sounds; // il suono proprio di questo pattern (basso, accordi, lead); manca = quello del progetto
   len?: Record<string, number>; // lunghezza in step delle note lunghe (chiavi di lenKey); manca = nota di uno step
   vel?: Record<string, number>; // velocity (forza) dei colpi e delle note, 0.1–1; manca = VEL_DEFAULT
@@ -178,7 +186,7 @@ export function setPatternBars(pat: Pattern, n: PatternBars) {
   const grow = <T,>(a: T[], size: number, copy: (x: T) => T) => Array.from({ length: size }, (_, i) => copy(a[i % a.length]));
   for (const { id } of DRUMS) pat.drums[id] = grow(pat.drums[id], to, (x) => x);
   pat.bass = grow(pat.bass, to, (x) => x);
-  pat.lead = grow(pat.lead, to, (x) => [...x]);
+  for (const r of LEADS) pat[r] = grow(pat[r], to, (x) => [...x]);
   pat.chords = grow(pat.chords, (to / STEPS) * BEATS, (x) => x.map((c) => ({ ...c })));
   // le chiavi di lunghezze e velocity hanno lo step dentro: le copio sulle battute nuove, o tolgo quelle fuori
   const remap = (rec: Record<string, number> | undefined) => {
@@ -206,7 +214,7 @@ export function setPatternBars(pat: Pattern, n: PatternBars) {
 
 // Velocity: quanto forte suona un colpo o una nota, come la forza su un tasto. 0.8 = normale (i progetti di prima),
 // 1 = accento (+1,9 dB), sotto = più piano. Chiavi: "hat3" = l'hi-hat dello step 4, "b5" = il basso dello step 6,
-// "l5" = tutte le note del lead dello step 6, "c2" = gli accordi del battito 3.
+// "l5" = tutte le note del lead dello step 6 ("m5" per il Lead 2), "c2" = gli accordi del battito 3.
 export const VEL_DEFAULT = 0.8;
 export const VEL_MIN = 0.1;
 export const velOf = (pat: Pattern, key: string) => pat.vel?.[key] ?? VEL_DEFAULT;
@@ -222,11 +230,12 @@ export function setVel(pat: Pattern, key: string, v: number) {
 }
 // la chiave esiste solo se c'è qualcosa che suona lì
 function velKeyLive(pat: Pattern, key: string) {
-  const m = /^(openhat|kick|clap|hat|perc|tom|shaker|b|l|c)(\d+)$/.exec(key);
+  const m = /^(openhat|kick|clap|hat|perc|tom|shaker|b|l|m|c)(\d+)$/.exec(key);
   if (!m) return false;
   const i = Number(m[2]);
   if (m[1] === "b") return i < pat.bass.length && pat.bass[i] !== null;
   if (m[1] === "l") return i < pat.lead.length && pat.lead[i].length > 0;
+  if (m[1] === "m") return i < pat.lead2.length && pat.lead2[i].length > 0;
   if (m[1] === "c") return i < pat.chords.length && pat.chords[i].length > 0;
   return i < pat.bass.length && pat.drums[m[1] as DrumId][i];
 }
@@ -234,15 +243,15 @@ function velKeyLive(pat: Pattern, key: string) {
 // Lunghezza delle note (basso e lead), in step. Chiave: "b5" = la nota di basso dello step 6; "l5:72" = il Do5
 // del lead dello step 6. Si salvano solo le note lunghe (2 step o più): le altre suonano come prima
 // (con Legato tengono fino alla nota dopo). Una nota non va oltre la fine della battuta.
-export type NoteInst = "bass" | "lead";
-export const lenKey = (r: NoteInst, step: number, note: number) => (r === "bass" ? `b${step}` : `l${step}:${note}`);
+export type NoteInst = "bass" | LeadInst;
+export const lenKey = (r: NoteInst, step: number, note: number) => (r === "bass" ? `b${step}` : `${NOTE_PREFIX[r]}${step}:${note}`);
 export const noteLen = (pat: Pattern, r: NoteInst, step: number, note: number) => pat.len?.[lenKey(r, step, note)] ?? 1;
 // la lunghezza più lunga possibile: fino a fine battuta, e senza coprire la nota dopo (stessa altezza; nel basso,
 // che è mono, qualsiasi nota)
 export function maxLen(pat: Pattern, r: NoteInst, step: number, note: number) {
   const end = pat.bass.length; // fino alla fine del pattern (anche lungo)
   for (let k = step + 1; k < end; k++) {
-    if (r === "bass" ? pat.bass[k] !== null : pat.lead[k].includes(note)) return k - step;
+    if (r === "bass" ? pat.bass[k] !== null : pat[r][k].includes(note)) return k - step;
   }
   return end - step;
 }
@@ -262,9 +271,9 @@ export function setNoteLen(pat: Pattern, r: NoteInst, step: number, note: number
 export type BassSound = { wave: Wave; cutoff: number; length: NoteLength };
 export type ChordSound = { style: ChordStyle; cutoff: number };
 export type LeadSound = { wave: LeadWave; cutoff: number; length: NoteLength };
-export type SoundInst = "bass" | "chords" | "lead";
-export type Sounds = { bass?: BassSound; chords?: ChordSound; lead?: LeadSound };
-export const SOUND_KEY = { bass: "bassSound", chords: "chordSound", lead: "leadSound" } as const;
+export type SoundInst = "bass" | "chords" | LeadInst;
+export type Sounds = { bass?: BassSound; chords?: ChordSound; lead?: LeadSound; lead2?: LeadSound };
+export const SOUND_KEY = { bass: "bassSound", chords: "chordSound", lead: "leadSound", lead2: "lead2Sound" } as const;
 
 // il suono con cui suona uno strumento in un pattern
 export function soundOf<K extends SoundInst>(p: Project, pat: Pattern, k: K): Required<Sounds>[K] {
@@ -281,6 +290,7 @@ export type Project = {
   bassSound: BassSound; // suoni di base: valgono nei pattern senza suono proprio
   chordSound: ChordSound;
   leadSound: LeadSound;
+  lead2Sound: LeadSound;
   fx: Record<ChannelId, ChannelFx>;
   masterFilter: number; // -1…1, come i filtri dei canali
   automation: Partial<Record<AutoTarget, Lane>>;
@@ -307,6 +317,7 @@ export function emptyPattern(bars: PatternBars = 1): Pattern {
     bass: Array(n).fill(null),
     chords: Array.from({ length: BEATS * bars }, () => [] as Chord[]),
     lead: Array.from({ length: n }, () => [] as number[]),
+    lead2: Array.from({ length: n }, () => [] as number[]),
     ...(bars > 1 ? { bars } : {}),
   };
 }
@@ -314,6 +325,7 @@ export function emptyPattern(bars: PatternBars = 1): Pattern {
 export const isEmptyPattern = (p: Pattern) =>
   p.bass.every((n) => n === null) &&
   p.lead.every((n) => n.length === 0) &&
+  p.lead2.every((n) => n.length === 0) &&
   p.chords.every((c) => c.length === 0) &&
   DRUMS.every(({ id }) => p.drums[id].every((s) => !s));
 
@@ -434,6 +446,7 @@ export function starterProject(): Project {
         bass,
         chords: [[{ root: 9, type: "min7" }], [], [], []],
         lead: emptyLead(),
+        lead2: emptyLead(),
       },
     },
     song: ["A", "A", "A", "A", ...Array(MIN_SONG_BARS - 4).fill(null)],
@@ -441,6 +454,7 @@ export function starterProject(): Project {
     bassSound: { ...DEFAULT_BASS },
     chordSound: { ...DEFAULT_CHORDS },
     leadSound: { ...DEFAULT_LEAD },
+    lead2Sound: { ...DEFAULT_LEAD2 },
     fx: {
       kick: { filter: 0, reverb: 0, delay: 0 },
       clap: { filter: 0, reverb: 0.22, delay: 0 },
@@ -452,6 +466,7 @@ export function starterProject(): Project {
       bass: { filter: 0, reverb: 0, delay: 0 },
       chords: { filter: 0, reverb: 0.3, delay: 0 },
       lead: { filter: 0, reverb: 0.18, delay: 0.5 },
+      lead2: { filter: 0, reverb: 0.25, delay: 0.3 },
     },
     masterFilter: 0,
     automation: {},
@@ -469,6 +484,7 @@ export function starterProject(): Project {
       bass: { volume: 0.7, muted: false, out: "master" },
       chords: { volume: 0.45, muted: false, out: "master" },
       lead: { volume: 0.5, muted: false, out: "master" },
+      lead2: { volume: 0.45, muted: false, out: "master" },
     },
     buses: { ...emptyBuses(), bus1: { ...emptyBuses().bus1, shown: true } },
   };
@@ -481,6 +497,8 @@ const clamp = (v: unknown, lo: number, hi: number, d: number) =>
 const DEFAULT_BASS: BassSound = { wave: "sawtooth", cutoff: 700, length: "corta" };
 const DEFAULT_CHORDS: ChordSound = { style: "pad", cutoff: 1800 };
 const DEFAULT_LEAD: LeadSound = { wave: "sawtooth", cutoff: 2600, length: "corta" };
+// il Lead 2 parte diverso dal primo: un pluck, per contromelodie e arpeggi sopra una lead piena
+const DEFAULT_LEAD2: LeadSound = { wave: "pluck", cutoff: 3200, length: "corta" };
 
 function normBass(raw: unknown, d = DEFAULT_BASS): BassSound {
   const r = (raw ?? {}) as Partial<BassSound>;
@@ -517,12 +535,14 @@ function normalizePattern(raw: unknown): Pattern {
     ...(o.bass ? { bass: normBass(o.bass) } : {}),
     ...(o.chords ? { chords: normChords(o.chords) } : {}),
     ...(o.lead ? { lead: normLead(o.lead) } : {}),
+    ...(o.lead2 ? { lead2: normLead(o.lead2, DEFAULT_LEAD2) } : {}),
   };
   const pat: Pattern = {
     drums: Object.fromEntries(DRUMS.map(({ id }) => [id, steps(r.drums?.[id])])) as Pattern["drums"],
     bass: notes(r.bass, BASS_LOW, BASS_HIGH, n),
     chords: Array.from({ length: BEATS * bars }, (_, i) => chordLayers(Array.isArray(r.chords) ? r.chords[i] : null)),
     lead: leadNotes(r.lead, n),
+    lead2: leadNotes(r.lead2, n),
     ...(Object.keys(sounds).length ? { sounds } : {}),
     ...(bars > 1 ? { bars } : {}),
   };
@@ -532,10 +552,11 @@ function normalizePattern(raw: unknown): Pattern {
     const b = pat.bass[st];
     const bl = b === null ? undefined : lens[lenKey("bass", st, b)];
     if (b !== null && typeof bl === "number" && Number.isFinite(bl)) setNoteLen(pat, "bass", st, b, bl);
-    for (const m of pat.lead[st]) {
-      const v = lens[lenKey("lead", st, m)];
-      if (typeof v === "number" && Number.isFinite(v)) setNoteLen(pat, "lead", st, m, v);
-    }
+    for (const r of LEADS)
+      for (const m of pat[r][st]) {
+        const v = lens[lenKey(r, st, m)];
+        if (typeof v === "number" && Number.isFinite(v)) setNoteLen(pat, r, st, m, v);
+      }
   }
   // velocity: solo per colpi e note che ci sono
   const vels = r.vel && typeof r.vel === "object" ? (r.vel as Record<string, unknown>) : {};
@@ -599,6 +620,7 @@ export function normalize(raw: unknown): Project {
     bassSound: normBass(r.bassSound),
     chordSound: normChords(r.chordSound),
     leadSound: normLead(r.leadSound),
+    lead2Sound: normLead(r.lead2Sound, DEFAULT_LEAD2),
     fx: Object.fromEntries(
       CHANNEL_IDS.map((id) => {
         const f = r.fx?.[id];
@@ -649,7 +671,7 @@ export function normalize(raw: unknown): Project {
 
 // il routing del mixer in una riga: dove esce ogni canale e quali bus ci sono
 function routingLine(p: Project) {
-  const label = (id: ChannelId) => DRUMS.find((d) => d.id === id)?.label ?? { bass: "Bass", chords: "Accordi", lead: "Lead" }[id as "bass"];
+  const label = (id: ChannelId) => DRUMS.find((d) => d.id === id)?.label ?? { bass: "Bass", chords: "Accordi", lead: "Lead", lead2: "Lead 2" }[id as "bass"];
   const shown = BUS_IDS.filter((b) => p.buses[b].shown);
   if (!shown.length) return "Routing: tutti i canali vanno dritti al master (nessun bus).";
   const into = (b: BusId) => CHANNEL_IDS.filter((id) => p.mixer[id].out === b).map(label);
@@ -668,12 +690,15 @@ export function describe(p: Project, title: string, editing: Slot) {
   const ch = (id: ChannelId) => `vol ${pct(p.mixer[id].volume)}${p.mixer[id].muted ? ", MUTO" : ""}`;
   const lines = [
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
-    `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}.`,
+    `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}; Lead 2 ${ch("lead2")}.`,
     `Kit di batteria: ${KITS[p.kit].label} (${KITS[p.kit].hint}).`,
     routingLine(p),
     "Suoni dei synth: quelli qui sotto sono i suoni di base; un pattern con un suono proprio lo dice nella sua scheda.",
     `Accordi: suono ${CHORD_STYLES[p.chordSound.style].label} (${CHORD_STYLES[p.chordSound.style].hint}), filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
-    `Lead: suono ${LEAD_SOUNDS[p.leadSound.wave].label} (${LEAD_SOUNDS[p.leadSound.wave].hint}), filtro ${Math.round(p.leadSound.cutoff)} Hz, note ${p.leadSound.length === "lunga" ? "legate" : "corte"}.`,
+    ...LEADS.map((r) => {
+      const x = p[SOUND_KEY[r]];
+      return `${LEAD_LABEL[r]}: suono ${LEAD_SOUNDS[x.wave].label} (${LEAD_SOUNDS[x.wave].hint}), filtro ${Math.round(x.cutoff)} Hz, note ${x.length === "lunga" ? "legate" : "corte"}.`;
+    }),
     `Effetti (filtro DJ -1…1: negativo = passa-basso, positivo = passa-alto; riverbero e delay 0…1): ${CHANNEL_IDS.map(
       (id) => `${id} filtro ${p.fx[id].filter.toFixed(2)} (${filterLabel(p.fx[id].filter)}) rev ${p.fx[id].reverb.toFixed(2)} dly ${p.fx[id].delay.toFixed(2)}`,
     ).join("; ")}; master filtro ${p.masterFilter.toFixed(2)} (${filterLabel(p.masterFilter)}).`,
@@ -693,14 +718,16 @@ export function describe(p: Project, title: string, editing: Slot) {
     const notes = pat.bass.map((n, i) => (n === null ? null : `${i + 1}:${noteName(n)}${ln("bass", i, n)}`)).filter(Boolean);
     lines.push(`  Bass      ${notes.length ? notes.join(" ") : "nessuna nota"}`);
     lines.push(`  Accordi   ${pat.chords.map((c, b) => `battito ${b + 1}: ${c.length ? c.map(chordName).join(" + ") : "-"}`).join(", ")}`);
-    const lead = pat.lead
-      .map((n, i) => (n.length ? `${i + 1}:${n.map((m) => `${noteName(m)}${ln("lead", i, m)}`).join("+")}` : null))
-      .filter(Boolean);
-    lines.push(`  Lead      ${lead.length ? lead.join(" ") : "nessuna nota"}`);
+    for (const r of LEADS) {
+      const line = pat[r]
+        .map((n, i) => (n.length ? `${i + 1}:${n.map((m) => `${noteName(m)}${ln(r, i, m)}`).join("+")}` : null))
+        .filter(Boolean);
+      lines.push(`  ${LEAD_LABEL[r].padEnd(9)} ${line.length ? line.join(" ") : "nessuna nota"}`);
+    }
     if (pat.vel) {
       const pc = (v: number) => `${Math.round(v * 100)}%`;
       const label = (k: string) =>
-        k.replace(/^b(\d+)$/, (_, n) => `basso ${+n + 1}`).replace(/^l(\d+)$/, (_, n) => `lead ${+n + 1}`).replace(/^c(\d+)$/, (_, n) => `accordi battito ${+n + 1}`).replace(/^([a-z]+)(\d+)$/, (_, d, n) => `${d} ${+n + 1}`);
+        k.replace(/^b(\d+)$/, (_, n) => `basso ${+n + 1}`).replace(/^l(\d+)$/, (_, n) => `lead ${+n + 1}`).replace(/^m(\d+)$/, (_, n) => `lead 2 ${+n + 1}`).replace(/^c(\d+)$/, (_, n) => `accordi battito ${+n + 1}`).replace(/^([a-z]+)(\d+)$/, (_, d, n) => `${d} ${+n + 1}`);
       lines.push(`  Velocity (normale ${pc(VEL_DEFAULT)}, accento 100%): ${Object.entries(pat.vel).map(([k, v]) => `${label(k)}=${pc(v)}`).join(", ")}`);
     }
     const own = pat.sounds;
@@ -709,6 +736,7 @@ export function describe(p: Project, title: string, editing: Slot) {
         own.bass && `basso ${BASS_WAVES[own.bass.wave].label} (filtro ${Math.round(own.bass.cutoff)} Hz, ${own.bass.length})`,
         own.chords && `accordi ${CHORD_STYLES[own.chords.style].label} (filtro ${Math.round(own.chords.cutoff)} Hz)`,
         own.lead && `lead ${LEAD_SOUNDS[own.lead.wave].label} (filtro ${Math.round(own.lead.cutoff)} Hz, ${own.lead.length})`,
+        own.lead2 && `lead 2 ${LEAD_SOUNDS[own.lead2.wave].label} (filtro ${Math.round(own.lead2.cutoff)} Hz, ${own.lead2.length})`,
       ].filter(Boolean);
       lines.push(`  Suono proprio di questo pattern: ${parts.join("; ")}`);
     }

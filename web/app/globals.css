@@ -914,6 +914,11 @@ ol.ds-led-row {
   aspect-ratio: auto;
   min-height: 52px;
 }
+/* i due lead stanno affiancati, mezza fila ciascuno */
+.hw-pad[data-pad="lead"],
+.hw-pad[data-pad="lead2"] {
+  grid-column: auto;
+}
 .hw-pad:hover {
   background: var(--hw-button-hover);
 }
@@ -1029,7 +1034,8 @@ ol.ds-led-row {
 .hw-seq-row[data-row="shaker"] { --key: var(--hw-pad-teal); }
 .hw-seq-row[data-row="tom"] { --key: var(--hw-pad-orange); }
 .hw-seq-row[data-row="bass"] { --key: var(--hw-pad-green); }
-.hw-seq-row[data-row="lead"] { --key: var(--hw-pad-blue); }
+.hw-seq-row[data-row="lead"],
+.hw-seq-row[data-row="lead2"] { --key: var(--hw-pad-blue); }
 .hw-seq-row[data-row="chords"] { --key: var(--hw-pad-purple); }
 .hw-seq-name {
   display: flex;
@@ -2209,7 +2215,7 @@ ol.ds-led-row {
   /* step, piano roll e pad si adattano all'altezza dello schermo */
   .console-stage .hw-key,
   .console-stage .hw-seq-name {
-    height: clamp(22px, calc((100dvh - 400px) / 10), 46px); /* 10 righe: 7 di batteria, Bass, Lead, Chord */
+    height: clamp(20px, calc((100dvh - 400px) / 11), 46px); /* 11 righe: 7 di batteria, Bass, Lead, Lead 2, Chord */
   }
   .console-stage .daw-cell,
   .console-stage .daw-key {
@@ -2229,6 +2235,9 @@ ol.ds-led-row {
   }
   /* schermi bassi (portatili da 650–760 px): pad più bassi, così 10 pad stanno nella colonna senza scorrere */
   @media (max-height: 760px) {
+    .console-stage .hw-seq-grid {
+      gap: 6px;
+    }
     .console-side .hw-pad {
       padding: 4px 8px 8px;
     }

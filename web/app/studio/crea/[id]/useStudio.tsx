@@ -24,6 +24,9 @@ import {
   DRUMS,
   type DrumId,
   LEAD_VOICES,
+  LEADS,
+  NOTE_PREFIX,
+  isLeadInst,
   MIX_TARGETS,
   type MixTarget,
   type Out,
@@ -176,7 +179,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
   const [learnMenu, setLearnMenu] = useState(false); // il menu "Impara" (tour e lezioni)
   const [exported, setExported] = useState(false); // ha esportato o chiesto un parere (per l'ultima lezione)
   const closeReport = useCallback(() => setReporting(false), []);
-  const openRoll = (k: "bass" | "lead" | "chords") => {
+  const openRoll = (k: RollTab) => {
     setRoll(k);
     chooseView("roll");
   };
@@ -271,7 +274,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     return () => mq.removeEventListener("change", on);
   }, []);
   const keyMode: "pad" | "keys" = wide && view === "roll" ? "keys" : "pad";
-  const [octaves, setOctaves] = useState({ bass: OCTAVES.bass.start, lead: OCTAVES.lead.start });
+  const [octaves, setOctaves] = useState({ bass: OCTAVES.bass.start, lead: OCTAVES.lead.start, lead2: OCTAVES.lead2.start });
   const [keyChord, setKeyChord] = useState<ChordType>("min7");
   const [lastKey, setLastKey] = useState("");
   const keyInst = roll;
@@ -279,7 +282,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
   keysRef.current = { keyMode, keyInst, octaves, keyChord };
 
   // le note registrate con il tasto ancora giù: al rilascio prendono la loro lunghezza
-  const held = useRef(new Map<string, { slot: Slot; step: number; note: number; inst: "bass" | "lead"; at: number }>());
+  const held = useRef(new Map<string, { slot: Slot; step: number; note: number; inst: RollId; at: number }>());
   // registrazione: quando il tasto si alza la nota dura quanto l'hai tenuto, arrotondato agli step (da 2 in su)
   const releaseKey = useCallback(
     (code: string, at: number) => {
@@ -334,15 +337,15 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
           update((p) => {
             const pp = p.patterns[slot];
             // lead: la nota si aggiunge a quelle dello step (accordi suonati con più tasti); basso: sostituisce
-            if (inst === "lead") {
-              if (!pp.lead[s].includes(note) && pp.lead[s].length < LEAD_VOICES) {
-                pp.lead[s] = [...pp.lead[s], note].sort((a, b) => a - b);
+            if (isLeadInst(inst)) {
+              if (!pp[inst][s].includes(note) && pp[inst][s].length < LEAD_VOICES) {
+                pp[inst][s] = [...pp[inst][s], note].sort((a, b) => a - b);
               }
             } else {
               if (pp.bass[s] !== null) setNoteLen(pp, "bass", s, pp.bass[s] as number, 1);
               pp.bass[s] = note;
             }
-            if (midi) setVel(pp, `${inst === "lead" ? "l" : "b"}${s}`, midiVel(midi.vel));
+            if (midi) setVel(pp, `${NOTE_PREFIX[inst]}${s}`, midiVel(midi.vel));
           });
           // quando lasci il tasto, la nota diventa lunga quanto l'hai tenuto (vedi onKeyUp)
           held.current.set(code, { slot, step: s, note, inst, at: pressedAt ?? performance.now() });
@@ -358,6 +361,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
   const editPat = project.patterns[editing];
   const bassS = soundOf(project, editPat, "bass");
   const leadS = soundOf(project, editPat, "lead");
+  const lead2S = soundOf(project, editPat, "lead2");
   const chordS = soundOf(project, editPat, "chords");
   // una modifica al suono va dove suona: nel suono proprio del pattern o in quello di base
   const setSound = <K extends SoundInst>(k: K, fn: (x: Required<Sounds>[K]) => void) =>
@@ -403,7 +407,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     );
   };
   // scegli un suono e lo senti subito (dopo che React ha aggiornato il progetto che il motore legge)
-  const tryOut = (c: "bass" | "lead" | "chords") => setTimeout(() => !engineRef.current?.playing && hitPad(c), 30);
+  const tryOut = (c: RollTab) => setTimeout(() => !engineRef.current?.playing && hitPad(c), 30);
   const shiftOctave = (d: number) => {
     if (keyInst === "chords") return;
     const r = OCTAVES[keyInst];
@@ -416,7 +420,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     (c: ChannelId, pressedAt?: number, vel?: number) => {
       const cur = projectRef.current.patterns[playbackRef.current.editing];
       void engine().preview(c, {
-        note: c === "lead" ? (cur.lead.find((n) => n.length)?.[0] ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
+        note: isLeadInst(c) ? (cur[c].find((n) => n.length)?.[0] ?? 69) : (cur.bass.find((n) => n !== null) ?? BASS_LOW),
         chord: cur.chords.find((x) => x.length)?.[0],
         level: vel ? velGain(midiVel(vel)) : 1,
       });
@@ -563,13 +567,13 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
 
   // una nota nel piano roll (basso o lead): clic su una nota accesa = la spegne
   // piano roll: sul basso una nota per step (la nuova sostituisce la vecchia), sul lead più note insieme
-  const hasNote = (r: RollId, i: number, note: number) => (r === "lead" ? pat.lead[i].includes(note) : pat.bass[i] === note);
+  const hasNote = (r: RollId, i: number, note: number) => (isLeadInst(r) ? pat[r][i].includes(note) : pat.bass[i] === note);
   // gli step coperti dalla coda di una nota lunga (per le righe Bass e Lead del Beat)
-  const holds = { bass: new Set<number>(), lead: new Set<number>() };
+  const holds = { bass: new Set<number>(), lead: new Set<number>(), lead2: new Set<number>() };
   for (let i = 0; i < pat.bass.length; i++) {
     const b = pat.bass[i];
     if (b !== null) for (let k = 1; k < noteLen(pat, "bass", i, b); k++) holds.bass.add(i + k);
-    for (const m of pat.lead[i]) for (let k = 1; k < noteLen(pat, "lead", i, m); k++) holds.lead.add(i + k);
+    for (const r of LEADS) for (const m of pat[r][i]) for (let k = 1; k < noteLen(pat, r, i, m); k++) holds[r].add(i + k);
   }
   // Velocity nel Beat (come il graph editor di FL): con il pulsante acceso, premi su un colpo e trascini su e giù per
   // la sua forza; passando sugli altri colpi tenendo premuto li "dipingi". In questa modalità il clic non accende step.
@@ -638,7 +642,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
       const lost =
         DRUMS.some(({ id }) => pat.drums[id].slice(from, cut).some(Boolean)) ||
         pat.bass.slice(from).some((x) => x !== null) ||
-        pat.lead.slice(from).some((x) => x.length) ||
+        LEADS.some((r) => pat[r].slice(from).some((x) => x.length)) ||
         pat.chords.slice(BEATS * n).some((x) => x.length);
       if (lost && !window.confirm(`Il pattern ${editing} passa a ${n} battut${n === 1 ? "a" : "e"}: le note nelle battute dopo si perdono. Va bene?`)) return;
     }
@@ -687,8 +691,8 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
   // mette (con la lunghezza data) o toglie una nota; nel basso, che è mono, una nota nuova sostituisce quella dello step
   const putNote = (p: Project, r: RollId, i: number, note: number, len: number) => {
     const pp = p.patterns[playbackRef.current.editing];
-    if (r === "lead") {
-      if (!pp.lead[i].includes(note)) pp.lead[i] = [...pp.lead[i], note].sort((a, b) => a - b);
+    if (isLeadInst(r)) {
+      if (!pp[r][i].includes(note)) pp[r][i] = [...pp[r][i], note].sort((a, b) => a - b);
     } else {
       if (pp.bass[i] !== null) setNoteLen(pp, "bass", i, pp.bass[i] as number, 1);
       pp.bass[i] = note;
@@ -698,13 +702,13 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
   const dropNote = (p: Project, r: RollId, i: number, note: number) => {
     const pp = p.patterns[playbackRef.current.editing];
     setNoteLen(pp, r, i, note, 1);
-    if (r === "lead") pp.lead[i] = pp.lead[i].filter((n) => n !== note);
+    if (isLeadInst(r)) pp[r][i] = pp[r][i].filter((n) => n !== note);
     else pp.bass[i] = null;
   };
   // con la tastiera (Invio o spazio su una casella): metti o togli una nota, lunga quanto il pennello
   const setNote = (r: RollId, i: number, note: number) => {
     const at = noteAt(r, i, note);
-    if (r === "lead" && at < 0 && pat.lead[i].length >= LEAD_VOICES) return; // già 6 voci su questo step
+    if (isLeadInst(r) && at < 0 && pat[r][i].length >= LEAD_VOICES) return; // già 6 voci su questo step
     update((p) => (at >= 0 ? dropNote(p, r, at, note) : putNote(p, r, i, note, brushLen.current)));
     if (at < 0 && !playing) void engine().preview(r, { note });
   };
@@ -731,7 +735,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
       drag.current = { r, note, start: at, len: noteLen(pat, r, at, note), existed: true, moved: false };
       return;
     }
-    if (r === "lead" && pat.lead[i].length >= LEAD_VOICES) return;
+    if (isLeadInst(r) && pat[r][i].length >= LEAD_VOICES) return;
     const len = Math.min(brushLen.current, maxLen(pat, r, i, note));
     update((p) => putNote(p, r, i, note, len));
     if (!playing) void engine().preview(r, { note });
@@ -744,7 +748,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     const [na, nb] = [Math.min(n0, n1), Math.max(n0, n1)];
     const out = new Set<string>();
     for (let st = sa; st <= sb; st++) {
-      const list = r === "lead" ? cur.lead[st] : cur.bass[st] === null ? [] : [cur.bass[st] as number];
+      const list = isLeadInst(r) ? cur[r][st] : cur.bass[st] === null ? [] : [cur.bass[st] as number];
       for (const n of list) if (n >= na && n <= nb) out.add(`${st}:${n}`);
     }
     return out;
@@ -795,7 +799,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     const cur = projectRef.current.patterns[playbackRef.current.editing];
     return [...sel].map((k) => {
       const [st, n] = k.split(":").map(Number);
-      const v = cur.vel?.[`${r === "lead" ? "l" : "b"}${st}`];
+      const v = cur.vel?.[`${NOTE_PREFIX[r]}${st}`];
       return { s: st, n, len: noteLen(cur, r, st, n), ...(v !== undefined ? { vel: v } : {}) };
     });
   };
@@ -808,17 +812,17 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
       const pp = p.patterns[playbackRef.current.editing];
       for (const x of remove) {
         setNoteLen(pp, r, x.s, x.n, 1);
-        if (r === "lead") pp.lead[x.s] = pp.lead[x.s].filter((m) => m !== x.n);
+        if (isLeadInst(r)) pp[r][x.s] = pp[r][x.s].filter((m) => m !== x.n);
         else if (pp.bass[x.s] === x.n) pp.bass[x.s] = null;
       }
       for (const x of ok) {
-        if (r === "lead") {
-          if (!pp.lead[x.s].includes(x.n) && pp.lead[x.s].length < LEAD_VOICES) pp.lead[x.s] = [...pp.lead[x.s], x.n].sort((a, b) => a - b);
+        if (isLeadInst(r)) {
+          if (!pp[r][x.s].includes(x.n) && pp[r][x.s].length < LEAD_VOICES) pp[r][x.s] = [...pp[r][x.s], x.n].sort((a, b) => a - b);
         } else {
           if (pp.bass[x.s] !== null) setNoteLen(pp, "bass", x.s, pp.bass[x.s] as number, 1);
           pp.bass[x.s] = x.n;
         }
-        if (x.vel !== undefined) setVel(pp, `${r === "lead" ? "l" : "b"}${x.s}`, x.vel);
+        if (x.vel !== undefined) setVel(pp, `${NOTE_PREFIX[r]}${x.s}`, x.vel);
       }
       for (const x of ok) setNoteLen(pp, r, x.s, x.n, x.len);
     });
@@ -972,7 +976,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     setSelSlot(Math.max(0, project.inserts[t].findIndex(Boolean)));
   };
   // dal Roll: apre il Mixer con gli insert di quello strumento (sul telefono scorre fino al rack)
-  const fxJump = (c: "bass" | "lead" | "chords") => {
+  const fxJump = (c: RollTab) => {
     const count = project.inserts[c].filter(Boolean).length;
     return (
       <button
@@ -1146,8 +1150,10 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     flash === c ||
     (sounding !== null &&
       step >= 0 &&
-      (c === "bass" || c === "lead"
-        ? sounding[c][step] !== null
+      (c === "bass"
+        ? sounding.bass[step] !== null
+        : isLeadInst(c)
+        ? sounding[c][step].length > 0
         : c === "chords"
           ? step % 4 === 0 && sounding.chords[step / 4].length > 0
           : sounding.drums[c][step]));
@@ -1209,6 +1215,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     lane,
     lastKey,
     leadS,
+    lead2S,
     learnMenu,
     lightKey,
     limiterDb,

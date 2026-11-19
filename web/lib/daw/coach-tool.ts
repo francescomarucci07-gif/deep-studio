@@ -56,7 +56,7 @@ const LEN_FIELD = {
 const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
   name: "scrivi_pattern",
   description:
-    "Scrive un pattern (una battuta da 16 step: batteria e bassline) in uno dei 16 slot (da A a P) dello studio, sostituendo quello che c'era. Può anche cambiare BPM, swing, sidechain e kit, che valgono per tutta la traccia, e i suoni di basso, accordi e lead: di base valgono per tutti i pattern senza un suono proprio; con suoni_solo_qui = true diventano il suono proprio di questo pattern. I volumi del mixer restano. Usalo quando il producer ti chiede di creare, generare o riscrivere un beat. Prima di chiamarlo spiega in poche frasi cosa costruisci e perché.",
+    "Scrive un pattern (una battuta da 16 step: batteria e bassline) in uno dei 16 slot (da A a P) dello studio, sostituendo quello che c'era. Può anche cambiare BPM, swing, sidechain e kit, che valgono per tutta la traccia, e i suoni di basso, accordi, lead e lead 2: di base valgono per tutti i pattern senza un suono proprio; con suoni_solo_qui = true diventano il suono proprio di questo pattern. I volumi del mixer restano. Usalo quando il producer ti chiede di creare, generare o riscrivere un beat. Prima di chiamarlo spiega in poche frasi cosa costruisci e perché.",
   input_schema: {
     type: "object",
     properties: {
@@ -147,14 +147,31 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       },
       filtro_lead: { type: "number", minimum: 300, maximum: 9000 },
       durata_lead: { type: "string", enum: ["corta", "lunga"], description: "corta = note staccate; lunga = legate." },
-      velocity: {
+      melodia_2: {
         type: "array",
         description:
-          "La forza (velocity) di colpi e note, come lo step sequencer di FL: 0.8 = normale (il default, non serve scriverlo), 1 = accento, 0.4–0.6 = colpo leggero (per esempio gli hat in levare per il groove). riga: lo strumento della batteria, oppure basso, melodia (tutte le note dello step) o accordi (step = battito 1–4). Vale solo dove c'è un colpo o una nota.",
+          "Il Lead 2: un secondo synth come il lead, con canale e suono suoi. Usalo per una contromelodia, un arpeggio o un pluck sopra (o sotto) la melodia principale, o per raddoppiare il lead con un altro timbro. Stesse regole e note di melodia. Lista vuota = niente.",
         items: {
           type: "object",
           properties: {
-            riga: { type: "string", enum: [...DRUMS.map((d) => d.id), "basso", "melodia", "accordi"] },
+            step: { type: "integer", minimum: 1, maximum: STEPS * 4 },
+            nota: { type: "integer", minimum: LEAD_LOW, maximum: LEAD_HIGH },
+            lunghezza: LEN_FIELD,
+          },
+          required: ["step", "nota"],
+        },
+      },
+      onda_lead2: { type: "string", enum: [...LEAD_WAVES], description: "Suono del Lead 2 (stessi suoni del lead; di base pluck)." },
+      filtro_lead2: { type: "number", minimum: 300, maximum: 9000 },
+      durata_lead2: { type: "string", enum: ["corta", "lunga"] },
+      velocity: {
+        type: "array",
+        description:
+          "La forza (velocity) di colpi e note, come lo step sequencer di FL: 0.8 = normale (il default, non serve scriverlo), 1 = accento, 0.4–0.6 = colpo leggero (per esempio gli hat in levare per il groove). riga: lo strumento della batteria, oppure basso, melodia o melodia_2 (tutte le note dello step) o accordi (step = battito 1–4). Vale solo dove c'è un colpo o una nota.",
+        items: {
+          type: "object",
+          properties: {
+            riga: { type: "string", enum: [...DRUMS.map((d) => d.id), "basso", "melodia", "melodia_2", "accordi"] },
             step: { type: "integer", minimum: 1, maximum: STEPS * 4 },
             valore: { type: "number", minimum: 0.1, maximum: 1 },
           },
@@ -164,7 +181,7 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       suoni_solo_qui: {
         type: "boolean",
         description:
-          "true = onda/filtro/durata, stile_accordi/filtro_accordi e onda_lead/filtro_lead/durata_lead che mandi diventano il suono proprio di questo pattern (per esempio un lead diverso solo nel drop); gli altri pattern non cambiano. false o assente = cambiano il suono di base, che vale nei pattern senza suono proprio. Un pattern che ha già un suono proprio lo tiene quando lo riscrivi.",
+          "true = onda/filtro/durata, stile_accordi/filtro_accordi e onda_lead/filtro_lead/durata_lead (e quelli del lead 2) che mandi diventano il suono proprio di questo pattern (per esempio un lead diverso solo nel drop); gli altri pattern non cambiano. false o assente = cambiano il suono di base, che vale nei pattern senza suono proprio. Un pattern che ha già un suono proprio lo tiene quando lo riscrivi.",
       },
 
     },
@@ -302,6 +319,10 @@ type PatternInput = Partial<Record<DrumId, unknown>> & {
   onda_lead?: unknown;
   filtro_lead?: unknown;
   durata_lead?: unknown;
+  melodia_2?: unknown;
+  onda_lead2?: unknown;
+  filtro_lead2?: unknown;
+  durata_lead2?: unknown;
 
   stile_accordi?: unknown;
   filtro_accordi?: unknown;
@@ -372,22 +393,25 @@ export function createStudioWriter(current: Project, editing: Slot) {
         bass: i.onda !== undefined || i.filtro !== undefined || i.durata !== undefined,
         chords: i.stile_accordi !== undefined || i.filtro_accordi !== undefined,
         lead: i.onda_lead !== undefined || i.filtro_lead !== undefined || i.durata_lead !== undefined,
+        lead2: i.onda_lead2 !== undefined || i.filtro_lead2 !== undefined || i.durata_lead2 !== undefined,
       };
       const cur = {
         bass: here ? soundOf(project, old, "bass") : project.bassSound,
         chords: here ? soundOf(project, old, "chords") : project.chordSound,
         lead: here ? soundOf(project, old, "lead") : project.leadSound,
+        lead2: here ? soundOf(project, old, "lead2") : project.lead2Sound,
       };
       const next = {
         bass: { wave: i.onda ?? cur.bass.wave, cutoff: i.filtro ?? cur.bass.cutoff, length: i.durata ?? cur.bass.length },
         chords: { style: i.stile_accordi ?? cur.chords.style, cutoff: i.filtro_accordi ?? cur.chords.cutoff },
         lead: { wave: i.onda_lead ?? cur.lead.wave, cutoff: i.filtro_lead ?? cur.lead.cutoff, length: i.durata_lead ?? cur.lead.length },
+        lead2: { wave: i.onda_lead2 ?? cur.lead2.wave, cutoff: i.filtro_lead2 ?? cur.lead2.cutoff, length: i.durata_lead2 ?? cur.lead2.length },
       };
       const sounds = { ...old.sounds };
-      if (here) for (const k of ["bass", "chords", "lead"] as const) if (given[k]) Object.assign(sounds, { [k]: next[k] });
+      if (here) for (const k of ["bass", "chords", "lead", "lead2"] as const) if (given[k]) Object.assign(sounds, { [k]: next[k] });
       // lunghezze delle note (normalize le tiene dentro la battuta e senza sovrapposizioni)
       const len: Record<string, number> = {};
-      for (const [list, r] of [[i.basso, "bass"], [i.melodia, "lead"]] as const) {
+      for (const [list, r] of [[i.basso, "bass"], [i.melodia, "lead"], [i.melodia_2, "lead2"]] as const) {
         if (!Array.isArray(list)) continue;
         for (const n of list as { step?: unknown; nota?: unknown; lunghezza?: unknown }[]) {
           if (Number.isInteger(n?.step) && Number.isInteger(n?.nota) && typeof n.lunghezza === "number") {
@@ -401,7 +425,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
         for (const v of (i as { velocity: { riga?: unknown; step?: unknown; valore?: unknown }[] }).velocity) {
           if (!Number.isInteger(v?.step) || typeof v.valore !== "number") continue;
           const st = (v.step as number) - 1;
-          const pre = v.riga === "basso" ? "b" : v.riga === "melodia" ? "l" : v.riga === "accordi" ? "c" : DRUMS.some((d) => d.id === v.riga) ? (v.riga as string) : null;
+          const pre = v.riga === "basso" ? "b" : v.riga === "melodia" ? "l" : v.riga === "melodia_2" ? "m" : v.riga === "accordi" ? "c" : DRUMS.some((d) => d.id === v.riga) ? (v.riga as string) : null;
           if (pre) vel[`${pre}${st}`] = v.valore;
         }
       }
@@ -413,6 +437,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
         bass,
         chords: chords as Pattern["chords"], // normalize scarta radici e tipi non validi
         lead: poly(i.melodia),
+        lead2: poly(i.melodia_2),
         ...(Object.keys(sounds).length ? { sounds: sounds as Pattern["sounds"] } : {}),
       };
       project = normalize({
@@ -425,6 +450,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
         bassSound: here ? project.bassSound : next.bass,
         chordSound: here ? project.chordSound : next.chords,
         leadSound: here ? project.leadSound : next.lead,
+        lead2Sound: here ? project.lead2Sound : next.lead2,
       });
       focus = slot;
       const n = `${slot}: ${label(i.nome, "pattern")}`;

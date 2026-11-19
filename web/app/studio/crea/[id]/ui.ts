@@ -9,6 +9,7 @@ import {
   type DrumId,
   LEAD_HIGH,
   LEAD_LOW,
+  isLeadInst,
 } from "@/lib/daw/project";
 
 export type SaveState = "salvato" | "modificato" | "salvo" | "errore";
@@ -52,12 +53,14 @@ export const rows = (lo: number, hi: number) => Array.from({ length: hi - lo + 1
 export const ROLLS = {
   bass: { label: "Bass", rows: rows(BASS_LOW, BASS_HIGH) },
   lead: { label: "Lead", rows: rows(LEAD_LOW, LEAD_HIGH) },
+  lead2: { label: "Lead 2", rows: rows(LEAD_LOW, LEAD_HIGH) },
 } as const;
 export type RollId = keyof typeof ROLLS;
 export type RollTab = KeyInstrument; // bass, lead o chords: è anche lo strumento della tastiera del computer
 export const ROLL_TABS: { id: RollTab; label: string }[] = [
   { id: "bass", label: "Bass" },
   { id: "lead", label: "Lead" },
+  { id: "lead2", label: "Lead 2" },
   { id: "chords", label: "Chord" },
 ];
 export const CHORD_ROOTS = Array.from({ length: 12 }, (_, i) => 11 - i); // Si in alto, Do in basso
@@ -79,14 +82,16 @@ export const PADS: { id: ChannelId; label: string; key: string; color: string }[
   { id: "bass", label: "Bass", key: "n", color: "green" },
   { id: "chords", label: "Chord", key: "m", color: "purple" },
   { id: "lead", label: "Lead", key: ",", color: "blue" },
+  { id: "lead2", label: "Lead 2", key: "'", color: "blue" },
 ];
 export const CHANNELS: { id: ChannelId; label: string }[] = [
   ...DRUMS,
   { id: "bass", label: "Bass" },
   { id: "chords", label: "Chords" },
   { id: "lead", label: "Lead" },
+  { id: "lead2", label: "Lead 2" },
 ];
-export const isDrum = (c: ChannelId): c is DrumId => c !== "bass" && c !== "chords" && c !== "lead";
+export const isDrum = (c: ChannelId): c is DrumId => c !== "bass" && c !== "chords" && !isLeadInst(c);
 export const TYPE_LABEL: Record<ChordType, string> = {
   min: "minore",
   maj: "maggiore",

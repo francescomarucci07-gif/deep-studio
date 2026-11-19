@@ -13,6 +13,8 @@ export default async function ProvaStudio({ searchParams }: { searchParams: Prom
   const starter = starterProject();
   const lead = Array.from({ length: 16 }, () => [] as number[]);
   lead[0] = [72];
+  const lead2 = Array.from({ length: 16 }, () => [] as number[]);
+  lead2[8] = [79];
   const hits = (...at: number[]) => Array.from({ length: 16 }, (_, i) => at.includes(i));
   const data =
     p === "empty"
@@ -20,7 +22,7 @@ export default async function ProvaStudio({ searchParams }: { searchParams: Prom
       : p === "user"
         ? normalize(user)
         : p === "export"
-          ? normalize({ ...starter, bpm: 120, swing: 0, patterns: { ...starter.patterns, A: { ...starter.patterns.A, drums: { ...starter.patterns.A.drums, tom: hits(12, 14), shaker: hits(1, 3, 5, 7) }, lead, len: { "l0:72": 4 }, vel: { hat2: 0.4 } } } })
+          ? normalize({ ...starter, bpm: 120, swing: 0, patterns: { ...starter.patterns, A: { ...starter.patterns.A, drums: { ...starter.patterns.A.drums, tom: hits(12, 14), shaker: hits(1, 3, 5, 7) }, lead, lead2, len: { "l0:72": 4 }, vel: { hat2: 0.4 } } } })
           : starter;
   return (
     <Daw

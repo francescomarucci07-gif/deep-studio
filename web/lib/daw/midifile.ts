@@ -1,8 +1,8 @@
-// Export MIDI: un file .mid standard (tipo 1, una traccia per strumento) da trascinare in FL Studio.
+// Export MIDI: un file .mid standard (tipo 1, una traccia per strumento: Bass, Lead, Chords, Lead 2, Drums) da trascinare in FL Studio.
 // Un file MIDI è una lista di eventi nel tempo: "accendi la nota 60 con forza 100", "spegnila". Il tempo si conta in
 // tick: qui 96 per quarto, quindi uno step (1/16) = 24 tick. La batteria va sul canale 10 con le note General MIDI.
 // Lo swing non si scrive: in FL si rimette con lo swing del Channel rack.
-import { CHORD_STYLES, DRUMS, STEPS, barOf, chordNotes, noteLen, soundOf, velOf, type Pattern, type Project, type Slot } from "./project";
+import { CHORD_STYLES, DRUMS, LEADS, NOTE_PREFIX, STEPS, barOf, chordNotes, noteLen, soundOf, velOf, type Pattern, type Project, type Slot } from "./project";
 import { KITS } from "./kits";
 
 const PPQ = 96;
@@ -47,7 +47,7 @@ const GM = { kick: 36, clap: 39, hat: 42, openhat: 46, tom: 47, shaker: 70 } as 
 const GM_PERC = { conga: 63, rim: 37, cowbell: 56 } as const;
 
 export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<ArrayBuffer> {
-  const ev = { bass: [] as Ev[], lead: [] as Ev[], chords: [] as Ev[], drums: [] as Ev[] };
+  const ev = { bass: [] as Ev[], lead: [] as Ev[], lead2: [] as Ev[], chords: [] as Ev[], drums: [] as Ev[] };
   const note = (list: Ev[], ch: number, n: number, at: number, len: number, vel: number) => {
     list.push({ tick: at, data: [0x90 | ch, n, vel] });
     list.push({ tick: at + Math.max(1, len), data: [0x80 | ch, n, 0] });
@@ -58,9 +58,7 @@ export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<Arr
     const start = b * STEPS * STEP;
     const off = barOf(p, bars, b) * STEPS; // la battuta del pattern (pattern lunghi)
     const bs = soundOf(p, pat, "bass");
-    const ls = soundOf(p, pat, "lead");
     const cs = soundOf(p, pat, "chords");
-    const leadLine = pat.lead.map((n) => (n.length ? n[0] : null));
     for (let j = 0; j < STEPS; j++) {
       const s = off + j; // lo step dall'inizio del pattern
       const at = start + j * STEP;
@@ -70,10 +68,14 @@ export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<Arr
         const steps = L > 1 ? L : bs.length === "lunga" ? toNext(pat.bass, s) : 1;
         note(ev.bass, 0, bn, at, steps * STEP - 2, v127(velOf(pat, `b${s}`)));
       }
-      for (const m of pat.lead[s]) {
-        const L = noteLen(pat, "lead", s, m);
-        const steps = L > 1 ? L : ls.length === "lunga" ? toNext(leadLine, s) : 1;
-        note(ev.lead, 1, m, at, steps * STEP - 2, v127(velOf(pat, `l${s}`)));
+      for (const r of LEADS) {
+        const ls = soundOf(p, pat, r);
+        const line = pat[r].map((n) => (n.length ? n[0] : null));
+        for (const m of pat[r][s]) {
+          const L = noteLen(pat, r, s, m);
+          const steps = L > 1 ? L : ls.length === "lunga" ? toNext(line, s) : 1;
+          note(ev[r], r === "lead" ? 1 : 3, m, at, steps * STEP - 2, v127(velOf(pat, `${NOTE_PREFIX[r]}${s}`)));
+        }
       }
       const kit = KITS[p.kit] ?? KITS.house;
       for (const { id: d } of DRUMS) {
@@ -101,6 +103,7 @@ export function projectToMidi(p: Project, bars: (Slot | null)[]): Uint8Array<Arr
     track("Bass", ev.bass, program(0, 38)), // Synth Bass 1
     track("Lead", ev.lead, program(1, 81)), // Lead 2 (sawtooth)
     track("Chords", ev.chords, program(2, 89)), // Pad 2 (warm)
+    track("Lead 2", ev.lead2, program(3, 84)), // Lead 5 (charang): un timbro diverso dal primo lead
     track("Drums", ev.drums),
   ];
   const head = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, tracks.length, (PPQ >> 8) & 0xff, PPQ & 0xff];

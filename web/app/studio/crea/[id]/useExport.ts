@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { projectToMidi } from "@/lib/daw/midifile";
 import type { ChannelId, Project, Slot } from "@/lib/daw/project";
+import { isLeadInst } from "@/lib/daw/project";
 import { encodeWav, renderAudio, renderPlan } from "@/lib/daw/render";
 import { storeZip } from "@/lib/daw/zip";
 import { CHANNELS } from "./ui";
@@ -70,7 +71,7 @@ export function useExport({ projectRef, titleRef, songMode, editing, setExportin
       const plays = (c: ChannelId) =>
         !p.mixer[c].muted &&
         pats.some((pt) =>
-          c === "bass" ? pt.bass.some((n) => n !== null) : c === "lead" ? pt.lead.some((n) => n.length) : c === "chords" ? pt.chords.some((x) => x.length) : pt.drums[c].some(Boolean),
+          c === "bass" ? pt.bass.some((n) => n !== null) : isLeadInst(c) ? pt[c].some((n) => n.length) : c === "chords" ? pt.chords.some((x) => x.length) : pt.drums[c].some(Boolean),
         );
       const list = CHANNELS.filter((c) => plays(c.id));
       const files: { name: string; data: Uint8Array }[] = [];

@@ -42,7 +42,7 @@ test("MIDI, stem e mix si scaricano e sono file validi", async ({ page }) => {
   expect(midi.nome).toBe("Prova export - pattern A.mid");
   expect(midi.dati.toString("ascii", 0, 4)).toBe("MThd");
   expect(midi.dati.readUInt16BE(8)).toBe(1); // tipo 1
-  expect(midi.dati.readUInt16BE(10)).toBe(5); // conductor + Bass, Lead, Chords, Drums
+  expect(midi.dati.readUInt16BE(10)).toBe(6); // conductor + Bass, Lead, Chords, Lead 2, Drums
   expect(midi.dati.readUInt16BE(12)).toBe(96);
 
   const stem = await scarica(page, "Stem");
@@ -59,7 +59,7 @@ test("MIDI, stem e mix si scaricano e sono file validi", async ({ page }) => {
     expect(w.peak, `${nomi.at(-1)} non è muto`).toBeGreaterThan(0.005);
     i += 30 + len + size;
   }
-  expect(nomi).toEqual(["01 Kick.wav", "02 Clap.wav", "03 Hi-hat.wav", "04 Tom.wav", "05 Shaker.wav", "06 Bass.wav", "07 Chords.wav", "08 Lead.wav"]);
+  expect(nomi).toEqual(["01 Kick.wav", "02 Clap.wav", "03 Hi-hat.wav", "04 Tom.wav", "05 Shaker.wav", "06 Bass.wav", "07 Chords.wav", "08 Lead.wav", "09 Lead 2.wav"]);
 
   const mix = await scarica(page, "Mix WAV");
   expect(mix.nome).toBe("Prova export - pattern A.wav");

@@ -184,6 +184,7 @@ export function SidePanel({ studio }: { studio: Studio }) {
               type="button"
               className="hw-pad"
               data-color={p.color}
+              data-pad={p.id}
               data-hit={hitNow(p.id)}
               onPointerDown={(e) => {
                 e.preventDefault();

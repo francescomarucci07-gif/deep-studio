@@ -54,7 +54,7 @@ test("automazioni del volume: bersagli, valori da 0 a 1, ritorno al filtro", asy
   await pannello.locator(".hw-btn", { hasText: "Volume" }).click();
   await expect(pannello.locator(".hw-title")).toHaveText(/volume/i);
   expect(await page.locator("#auto-target option").allInnerTexts()).toEqual(
-    ["Master", "Kick", "Clap", "Hi-hat", "Open hat", "Perc", "Tom", "Shaker", "Bass", "Chords", "Lead", "Bus Drums"],
+    ["Master", "Kick", "Clap", "Hi-hat", "Open hat", "Perc", "Tom", "Shaker", "Bass", "Chords", "Lead", "Lead 2", "Bus Drums"],
   );
   await page.locator("#auto-target").selectOption("lead");
   const f = (b: number) => page.locator(".hw-auto-fader").nth(b);

@@ -16,12 +16,14 @@ export const KEY_NOTES: Record<string, number> = {
   Digit7: 22, KeyU: 23, KeyI: 24, Digit9: 25, KeyO: 26, Digit0: 27, KeyP: 28,
 };
 
-export type KeyInstrument = "bass" | "lead" | "chords";
+export type KeyInstrument = "bass" | "lead" | "lead2" | "chords";
+export type NoteKeys = Exclude<KeyInstrument, "chords">;
 
 // l'ottava di partenza (Do della fila bassa) e quelle che si possono scegliere, per strumento
-export const OCTAVES: Record<"bass" | "lead", { start: number; min: number; max: number; low: number; high: number }> = {
+export const OCTAVES: Record<NoteKeys, { start: number; min: number; max: number; low: number; high: number }> = {
   bass: { start: 2, min: 1, max: 2, low: BASS_LOW, high: BASS_HIGH },
   lead: { start: 4, min: 4, max: 5, low: LEAD_LOW, high: LEAD_HIGH },
+  lead2: { start: 5, min: 4, max: 5, low: LEAD_LOW, high: LEAD_HIGH }, // un'ottava sopra: contromelodie e arpeggi
 };
 
 // una nota fuori dalla gamma dello strumento si sposta di ottava finché ci rientra:
@@ -34,7 +36,7 @@ export function fold(note: number, low: number, high: number) {
 }
 
 // La nota MIDI per un tasto (null se il tasto non è una nota). Do4 = 60, quindi ottava 4 → 60.
-export function keyNote(code: string, inst: "bass" | "lead", octave: number): number | null {
+export function keyNote(code: string, inst: NoteKeys, octave: number): number | null {
   const offset = KEY_NOTES[code];
   if (offset === undefined) return null;
   const r = OCTAVES[inst];

@@ -27,6 +27,10 @@ import {
   type BassSound,
   type ChordSound,
   type LeadSound,
+  type LeadInst,
+  LEADS,
+  NOTE_PREFIX,
+  isLeadInst,
   type Slot,
   type ChannelId,
   type Chord,
@@ -41,7 +45,7 @@ import { INSERT_SLOTS, PLUGINS, type PluginInstance } from "./plugins";
 const mtof = (m: number) => 440 * 2 ** ((m - 69) / 12);
 
 // Posizione nello stereo di ogni canale
-const PAN: Record<ChannelId, number> = { kick: 0, clap: 0, hat: 0.18, openhat: -0.15, perc: -0.28, tom: 0.22, shaker: 0.3, bass: 0, chords: 0, lead: 0.05 };
+const PAN: Record<ChannelId, number> = { kick: 0, clap: 0, hat: 0.18, openhat: -0.15, perc: -0.28, tom: 0.22, shaker: 0.3, bass: 0, chords: 0, lead: 0.05, lead2: -0.12 };
 const DELAY_MAX = 0.6; // send del delay al massimo della manopola: oltre, l'eco copre il canale
 
 // Il filtro DJ: un passa-basso e un passa-alto in fila, mossi insieme da un solo valore -1…1
@@ -73,7 +77,7 @@ export class Graph {
   private chokes: { kick: GainNode | null; hat: GainNode | null } = { kick: null, hat: null };
   // Basso (sempre) e lead con Legato: una nota nuova chiude quelle di prima, come un synth mono.
   // Le note che partono insieme (un accordo del lead) non si chiudono tra loro.
-  private voices: Record<"bass" | "lead", { g: GainNode; t: number }[]> = { bass: [], lead: [] };
+  private voices: Record<"bass" | LeadInst, { g: GainNode; t: number }[]> = { bass: [], lead: [], lead2: [] };
   private out: GainNode;
   private limiter: AudioNode;
   limiterDb = 0; // quanto sta abbassando il limiter adesso (dB, 0 = niente)
@@ -181,6 +185,7 @@ export class Graph {
       bass: make("bass", true),
       chords: make("chords", true),
       lead: make("lead"),
+      lead2: make("lead2"),
     };
     this.filters = filters as Record<AutoTarget, DjFilter>;
     this.chains = chains as Record<MixTarget, { from: AudioNode; to: AudioNode }>;
@@ -383,7 +388,7 @@ export class Graph {
     for (const { id } of DRUMS) if (pat.drums[id][s]) this.drum(id, t, velGain(velOf(pat, `${id}${s}`)));
     if (pat.drums.kick[s] && p.sidechain) this.sidechain(t, stepDur);
     // ogni pattern suona con il suo suono, se ce l'ha, altrimenti con quello del progetto
-    const bs = soundOf(p, pat, "bass"), ls = soundOf(p, pat, "lead"), cs = soundOf(p, pat, "chords");
+    const bs = soundOf(p, pat, "bass"), cs = soundOf(p, pat, "chords");
     const n = pat.bass[s];
     if (n !== null) {
       // una nota lunga (disegnata nel Roll) dura i suoi step; le altre: corta, o fino alla nota dopo (808 long)
@@ -391,15 +396,17 @@ export class Graph {
       const len = L > 1 ? L - 0.05 : bs.length === "lunga" ? this.stepsToNext(pat.bass, s) - 0.05 : 0.9;
       this.bassNote(t, n, stepDur * len, bs, velGain(velOf(pat, `b${s}`)));
     }
-    const chord = pat.lead[s];
-    if (chord.length) {
-      const line = pat.lead.map((n) => (n.length ? n[0] : null));
+    for (const r of LEADS) {
+      const notes = pat[r][s];
+      if (!notes.length) continue;
+      const ls = soundOf(p, pat, r);
+      const line = pat[r].map((n) => (n.length ? n[0] : null));
       const len = ls.length === "lunga" ? this.stepsToNext(line, s) - 0.05 : 0.8;
       // più voci insieme: ognuna un po' più piano, così un accordo non è 4 volte più forte di una nota
-      const level = velGain(velOf(pat, `l${s}`)) / Math.sqrt(chord.length);
-      for (const m of chord) {
-        const L = noteLen(pat, "lead", s, m);
-        this.leadNote(t, m, stepDur * (L > 1 ? L - 0.05 : len), ls, level, ls.length === "lunga");
+      const level = velGain(velOf(pat, `${NOTE_PREFIX[r]}${s}`)) / Math.sqrt(notes.length);
+      for (const m of notes) {
+        const L = noteLen(pat, r, s, m);
+        this.leadNote(t, m, stepDur * (L > 1 ? L - 0.05 : len), ls, level, ls.length === "lunga", r);
       }
     }
     if (s % 4 === 0) {
@@ -438,7 +445,7 @@ export class Graph {
     const stepDur = 60 / p.bpm / 4;
     const lv = opts.level ?? 1;
     if (id === "bass") this.bassNote(t, opts.note ?? 33, stepDur * 2, soundOf(p, pat, "bass"), lv);
-    else if (id === "lead") this.leadNote(t, opts.note ?? 69, stepDur * 2, soundOf(p, pat, "lead"), lv);
+    else if (isLeadInst(id)) this.leadNote(t, opts.note ?? 69, stepDur * 2, soundOf(p, pat, id), lv, false, id);
     else if (id === "chords") this.chord(t, opts.chord ?? { root: 9, type: "min7" }, stepDur * 8, soundOf(p, pat, "chords"), lv);
     else this.drum(id, t, lv);
   }
@@ -507,7 +514,7 @@ export class Graph {
   }
 
   // un gain per la nota: se choke, chiude le note dello strumento partite prima di t
-  private voiceGain(inst: "bass" | "lead", t: number, choke: boolean, level = 1) {
+  private voiceGain(inst: "bass" | LeadInst, t: number, choke: boolean, level = 1) {
     const list = this.voices[inst].filter((v) => this.ctx.currentTime < v.t + 8); // le note vecchie sono già finite
     if (choke) for (const v of list) if (v.t < t - 0.0005) v.g.gain.setTargetAtTime(0, t, 0.006);
     const g = this.ctx.createGain();
@@ -755,7 +762,7 @@ export class Graph {
 
   // Lead: polifonico, una voce per nota, un suono a scelta (LEAD_SOUNDS). Il filtro si apre all'attacco;
   // vibrato leggero sulle note lunghe.
-  private leadNote(t: number, midi: number, dur: number, snd: LeadSound, level = 1, legato = false) {
+  private leadNote(t: number, midi: number, dur: number, snd: LeadSound, level = 1, legato = false, inst: LeadInst = "lead") {
     const { wave, cutoff } = snd;
     const ctx = this.ctx;
     const freq = mtof(midi);
@@ -783,7 +790,7 @@ export class Graph {
       g.gain.setValueAtTime(peak, end - 0.015);
       g.gain.linearRampToValueAtTime(0, end + tail);
     }
-    f.connect(g).connect(this.voiceGain("lead", t, legato)).connect(this.channels.lead);
+    f.connect(g).connect(this.voiceGain(inst, t, legato)).connect(this.channels[inst]);
 
     const vibrato = ctx.createOscillator();
     vibrato.frequency.value = 5.5;

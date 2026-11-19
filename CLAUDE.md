@@ -85,6 +85,7 @@ cd web && npm run dev
 # test dello studio (dalla cartella web)
 npm test                     # Vitest: la logica di lib/daw (tests/unit), meno di un secondo
 npx playwright install chromium   # solo la prima volta sul tuo PC: il browser dei test
+                             # (oppure PW_CHROMIUM=<percorso di un Chromium già installato>)
 npm run test:e2e             # Playwright: build + studio vero nel browser (tests/e2e), ~1-2 minuti
 ```
 
@@ -101,7 +102,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   (versionate), contesto = analisi compatta + versione precedente. Messaggi e costi in `coach_messages`.
   Serve `ANTHROPIC_API_KEY` tra le variabili di Vercel. Voce in/out con la Web Speech API del browser.
 - **Studio nel browser** (`/studio/crea/[id]`): `web/lib/daw/project.ts` (formato del progetto v2: pattern
-  A–P + canzone da 16 a 256 battute; lead polifonico, fino a 6 note per step; fino a 3 accordi per battito; `normalize()` converte i progetti v1; `describe()` per il coach), `web/lib/daw/graph.ts` (suoni sintetizzati, kit di batteria in `kits.ts`, mixer, sidechain: usato
+  A–P + canzone da 16 a 256 battute; due lead polifonici (Lead e Lead 2), fino a 6 note per step; fino a 3 accordi per battito; `normalize()` converte i progetti v1; `describe()` per il coach), `web/lib/daw/graph.ts` (suoni sintetizzati, kit di batteria in `kits.ts`, mixer, sidechain: usato
   in tempo reale e per l'export), `web/lib/daw/engine.ts` (l'orologio del sequencer, swing, pattern/song). L'interfaccia sta in
   `app/studio/crea/[id]/`: `useStudio.tsx` (la logica: stato, motore, tastiera, MIDI, Annulla, export, salvataggio
   automatico in `projects`), `Daw.tsx` (mette insieme le viste), una vista per file (`TopBar`, `SidePanel`, `BeatView`,
@@ -120,20 +121,25 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   parte da un pattern vuoto. "Chiedi al coach" manda il passo nella chat. Lezioni finite in `ds-lezioni` (browser).
   Al primo login (`auth/callback`), se l'account non ha progetti e non ha visto il tour, si crea un progetto
   (`lib/daw/new-project.ts`) e si apre subito: il tour parte senza passare dalla pagina "Il tuo studio".
-- **Lunghezza delle note** (basso e lead): `pattern.len` (chiavi `lenKey`: `b5`, `l5:72`; solo note da 2 step in su,
+- **Strumenti** (19 nov): batteria con 7 righe (`DRUMS`: kick, clap, hat, open hat, perc, **tom**, **shaker**; timbri per kit
+  in `kits.ts`; pad `.` e `-`; nei progetti di prima tom e shaker escono dove esce il kick). **Lead 2** (`pattern.lead2`,
+  `lead2Sound`, canale `lead2`; `LEADS`, `isLeadInst`, `NOTE_PREFIX` in `project.ts`): stesso synth del Lead, di base un
+  pluck; chiavi `m5`/`m5:72`; scheda nel Roll, riga nel Beat, pad `'`, traccia MIDI "Lead 2" sul canale 4. Il Pad è uno
+  dei suoni degli accordi (Chord synth). Coach: `tom`, `shaker`, `melodia_2`, `onda_lead2`… (`crea-v26`).
+- **Lunghezza delle note** (basso e lead): `pattern.len` (chiavi `lenKey`: `b5`, `l5:72`, Lead 2 `m5:72`; solo note da 2 step in su,
   `setNoteLen`/`maxLen`/`noteLen` in `project.ts`: dentro la battuta, senza coprire la nota dopo). Nel Roll: premi e
   trascini = disegni o allunghi, clic su una nota = la togli, pennello = lunghezza dell'ultima; in registrazione la
   nota dura quanto tieni il tasto. Coach: campo `lunghezza` in `scrivi_pattern` (`crea-v20`).
 - **Velocity**: `pattern.vel` (chiavi `hat3`, `b5`, `l5` = tutte le note del lead dello step, `c2` = accordi del
   battito; 0.1–1, `VEL_DEFAULT` 0.8 = come prima e non si salva; `velGain` = v/0.8). Nel Beat il pulsante Vel: trascini
-  su e giù sulle barre (il clic non accende step). Coach: campo `velocity` in `scrivi_pattern` (`crea-v21`).
+  su e giù sulle barre (il clic non accende step). Coach: campo `velocity` in `scrivi_pattern` (`crea-v21`). Lead 2: chiavi `m5`.
 - **Pattern lunghi**: `pattern.bars` 1, 2 o 4 (`patBars`, `patSteps`, `setPatternBars` in `project.ts`; ADR); step e
   battiti contati dall'inizio del pattern. Nella canzone caselle di fila = battute del pattern (`barOf`, usato da motore,
   export, MIDI). Beat e Roll mostrano una battuta alla volta (schede 1–4, seguono il Play); selettore "bat." accanto a
   Svuota e nel Roll. Coach: `lunghezza_battute` in `scrivi_pattern` (`crea-v22`).
 - **Tastiera MIDI** (`lib/daw/midi.ts`, Web MIDI: Chrome/Edge, non Safari): pulsante MIDI accanto al titolo dei pad;
   nel Roll suona lo strumento della scheda (`playKey` con `midi`, nota portata nell'estensione con `fold`), altrove i
-  tasti 35–51 suonano la batteria (mappa General MIDI, `gmDrum`). Con REC scrive nota, lunghezza (quanto tieni il
+  tasti 35–51 suonano la batteria (mappa General MIDI, `gmDrum`: tom 41–50, shaker 44, piatti 49/51 sulla perc). Con REC scrive nota, lunghezza (quanto tieni il
   tasto, `releaseKey`) e velocity (`midiVel`: 1–127 → 0.1–1). Si ricollega da solo se il permesso è già dato.
 - **Segnala un problema** (`Segnala.tsx`): pulsante Segnala nella barra delle viste (sul telefono sotto il coach);
   salva messaggio, vista, progetto e dati tecnici (browser, schermo) in `segnalazioni` (RLS: ognuno le sue; 30 al
@@ -145,7 +151,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
 - **Export** (pulsante ⤓ Export, menu): Mix WAV come prima; **Stem** = un WAV 24 bit per strumento che suona
   (`renderAudio(p, what, stem)`: gli altri canali muti, `Graph` con `dry` = senza plugin del master, colla e limiter;
   in uno zip STORE scritto a mano, `lib/daw/zip.ts`); **MIDI** = file .mid tipo 1 (`lib/daw/midifile.ts`: 96 tick
-  per quarto, tracce Bass/Lead/Chords/Drums, batteria sul canale 10 General MIDI, lunghezze e velocity; lo swing no).
+  per quarto, tracce Bass/Lead/Chords/Lead 2/Drums, batteria sul canale 10 General MIDI, lunghezze e velocity; lo swing no).
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
   Python); `Daw.tsx` le manda a `/api/coach/crea` nel campo `misure` (solo per Claude, non salvate).
 - **Cronologia**: `project_versions` (ultime 60 per progetto, trigger di pulizia); il browser salva una versione
@@ -212,7 +218,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
 - Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
-  degli stem~~ **fatto il 18 nov**; più strumenti (secondo lead, pad, perc); sample propri (spazio file, licenze); ~~Roll più
+  degli stem~~ **fatto il 18 nov**; ~~più strumenti~~ **fatti il 19 nov** (tom, shaker, Lead 2; il pad c'era già negli accordi); sample propri (spazio file, licenze); ~~Roll più
   comodo~~ **fatto il 18 nov** (Ctrl/Shift + trascina seleziona; frecce sposta, Shift = ottava o battito; Ctrl+C/X/V/D/A,
   Canc; `rollKey` e `placeNotes` in `Daw.tsx`; ogni comando è un passo di Annulla; restano quantize e velocity per nota); ~~automazioni del volume~~ **fatte il 18 nov** (`volAuto`: master,
   canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); send verso i bus e bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con

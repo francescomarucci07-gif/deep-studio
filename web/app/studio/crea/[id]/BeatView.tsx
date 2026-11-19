@@ -1,7 +1,7 @@
 "use client";
 
-// La pagina Beat: lo step sequencer con batteria, Bass, Lead e Chord, pattern, lunghezza e velocity.
-import { DRUMS, STEPS, chordName, noteName } from "@/lib/daw/project";
+// La pagina Beat: lo step sequencer con batteria, Bass, Lead, Lead 2 e Chord, pattern, lunghezza e velocity.
+import { DRUMS, LEADS, LEAD_LABEL, NOTE_PREFIX, STEPS, chordName, noteName } from "@/lib/daw/project";
 import type { Studio } from "./useStudio";
 
 export function BeatView({ studio }: { studio: Studio }) {
@@ -110,38 +110,40 @@ export function BeatView({ studio }: { studio: Studio }) {
             </span>
           ))}
         </div>
-        <div className="hw-seq-row" data-row="lead">
-          <div className="hw-seq-label">
-            <button
-              type="button"
-              className="hw-seq-name"
-              onClick={() => {
-                setRoll("lead");
-                chooseView("roll");
-              }}
-            >
-              Lead
-            </button>
-            {soloButton("lead", "Lead")}
+        {LEADS.map((r) => (
+          <div className="hw-seq-row" data-row={r} key={r}>
+            <div className="hw-seq-label">
+              <button
+                type="button"
+                className="hw-seq-name"
+                onClick={() => {
+                  setRoll(r);
+                  chooseView("roll");
+                }}
+              >
+                {LEAD_LABEL[r]}
+              </button>
+              {soloButton(r, LEAD_LABEL[r])}
+            </div>
+            {cols.map((i) => [pat[r][i], i] as const).map(([n, i]) => (
+              <span
+                key={i}
+                className="hw-key hw-key--note hw-key--lead"
+                data-group={Math.floor((i % STEPS) / 4)}
+                data-on={n.length > 0}
+                data-hold={n.length === 0 && holds[r].has(i)}
+                data-now={i === step && playingSlot === editing}
+                title={`${n.length ? `${n.map(noteName).join(" + ")} · ` : ""}la melodia si scrive nel Roll: clic per aprirlo`}
+                onClick={() => !velMode && openRoll(r)}
+                {...velProps(`${NOTE_PREFIX[r]}${i}`, n.length > 0)}
+              >
+                {velBar(`${NOTE_PREFIX[r]}${i}`, n.length > 0)}
+                {/* più note insieme: la più bassa e quante ce ne sono in tutto */}
+                {n.length ? `${noteName(n[0]).replace(/\d$/, "")}${n.length > 1 ? `+${n.length - 1}` : ""}` : ""}
+              </span>
+            ))}
           </div>
-          {cols.map((i) => [pat.lead[i], i] as const).map(([n, i]) => (
-            <span
-              key={i}
-              className="hw-key hw-key--note hw-key--lead"
-              data-group={Math.floor((i % STEPS) / 4)}
-              data-on={n.length > 0}
-              data-hold={n.length === 0 && holds.lead.has(i)}
-              data-now={i === step && playingSlot === editing}
-              title={`${n.length ? `${n.map(noteName).join(" + ")} · ` : ""}la melodia si scrive nel Roll: clic per aprirlo`}
-              onClick={() => !velMode && openRoll("lead")}
-              {...velProps(`l${i}`, n.length > 0)}
-            >
-              {velBar(`l${i}`, n.length > 0)}
-              {/* più note insieme: la più bassa e quante ce ne sono in tutto */}
-              {n.length ? `${noteName(n[0]).replace(/\d$/, "")}${n.length > 1 ? `+${n.length - 1}` : ""}` : ""}
-            </span>
-          ))}
-        </div>
+        ))}
         {/* gli accordi: uno per battito (4 step); si scrivono nella scheda Chord del Roll */}
         <div className="hw-seq-row" data-row="chords">
           <div className="hw-seq-label">

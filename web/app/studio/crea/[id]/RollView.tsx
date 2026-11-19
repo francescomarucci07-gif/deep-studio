@@ -1,6 +1,6 @@
 "use client";
 
-// La pagina Roll: il piano roll di Bass, Lead e Chord, con i synth e i suoni.
+// La pagina Roll: il piano roll di Bass, Lead, Lead 2 e Chord, con i synth e i suoni.
 import { Knob } from "@/components/hw/Knob";
 import {
   BASS_WAVES,
@@ -9,8 +9,10 @@ import {
   CHORD_TYPES,
   type ChordStyle,
   type ChordType,
+  LEAD_LABEL,
   LEAD_SOUNDS,
   LEAD_WAVES,
+  type LeadInst,
   NOTE_NAMES,
   type Wave,
   chordName,
@@ -34,6 +36,7 @@ export function RollView({ studio }: { studio: Studio }) {
     keyChord,
     keyHit,
     leadS,
+    lead2S,
     lightKey,
     noteAt,
     pat,
@@ -53,6 +56,9 @@ export function RollView({ studio }: { studio: Studio }) {
     tryOut,
     update,
   } = studio;
+  // il synth del Lead o del Lead 2: stesso pannello, suono e canale diversi
+  const lr: LeadInst = roll === "lead2" ? "lead2" : "lead";
+  const ls = lr === "lead2" ? lead2S : leadS;
   return (
     <section
       className="hw-panel hw-roll-panel"
@@ -326,16 +332,16 @@ export function RollView({ studio }: { studio: Studio }) {
             <div className="hw-strip hw-strip--synth hw-strip--chords hw-strip--lead">
               <div className="hw-synth-head">
                 <div className="hw-synth-title">
-                  <span className="hw-label">Lead synth</span>
-                  {fxJump("lead")}
+                  <span className="hw-label">{LEAD_LABEL[lr]} synth</span>
+                  {fxJump(lr)}
                 </div>
-                {soundScope("lead")}
+                {soundScope(lr)}
                 <button
                   type="button"
                   className="hw-btn hw-btn--small"
-                  aria-pressed={leadS.length === "lunga"}
+                  aria-pressed={ls.length === "lunga"}
                   onClick={() =>
-                    setSound("lead", (x) => {
+                    setSound(lr, (x) => {
                       x.length = x.length === "lunga" ? "corta" : "lunga";
                     })
                   }
@@ -350,13 +356,13 @@ export function RollView({ studio }: { studio: Studio }) {
                     key={w}
                     type="button"
                     className="hw-btn hw-btn--small"
-                    aria-pressed={leadS.wave === w}
+                    aria-pressed={ls.wave === w}
                     title={LEAD_SOUNDS[w].hint}
                     onClick={() => {
-                      setSound("lead", (x) => {
+                      setSound(lr, (x) => {
                         x.wave = w;
                       });
-                      tryOut("lead");
+                      tryOut(lr);
                     }}
                   >
                     <span className="hw-btn-led" />
@@ -366,14 +372,14 @@ export function RollView({ studio }: { studio: Studio }) {
               </div>
               <Knob
                   label="Cutoff"
-                  value={leadS.cutoff}
+                  value={ls.cutoff}
                   min={300}
                   max={9000}
                   step={10}
-                  defaultValue={2600}
-                  display={`${Math.round(leadS.cutoff)} Hz`}
+                  defaultValue={lr === "lead" ? 2600 : 3200}
+                  display={`${Math.round(ls.cutoff)} Hz`}
                   onChange={(v) =>
-                    setSound("lead", (x) => {
+                    setSound(lr, (x) => {
                       x.cutoff = v;
                     })
                   }

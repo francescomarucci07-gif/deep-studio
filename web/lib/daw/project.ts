@@ -123,7 +123,9 @@ export const emptyLead = () => Array.from({ length: STEPS }, () => [] as number[
 export type LeadWave = (typeof LEAD_WAVES)[number];
 
 // out: dove esce il canale, come il routing del mixer di FL: dritto al master o in un bus (gruppo)
-export type Channel = { volume: number; muted: boolean; out: Out };
+// sends: come in FL, il canale manda anche una parte del suono a uno o più bus (per esempio un bus "Rev" condiviso),
+// oltre alla sua uscita normale. 0–1 per bus; il segnale parte dopo fader e filtro. Manca = nessun send.
+export type Channel = { volume: number; muted: boolean; out: Out; sends?: Partial<Record<BusId, number>> };
 
 // I bus: tracce di gruppo del mixer. Più canali entrano in un bus (per esempio tutta la batteria in "Drums"),
 // il bus ha il suo fader e i suoi plugin, poi va al master. shown = si vede nel mixer.
@@ -491,6 +493,25 @@ export function starterProject(): Project {
 }
 
 const outOf = (v: unknown): Out => (isBus(v) ? v : "master");
+// i send di un canale: solo bus veri, quantità tra 0 e 1; quelli a zero spariscono
+function cleanSends(raw: unknown): { sends?: Partial<Record<BusId, number>> } {
+  if (!raw || typeof raw !== "object") return {};
+  const out: Partial<Record<BusId, number>> = {};
+  for (const b of BUS_IDS) {
+    const v = (raw as Record<string, unknown>)[b];
+    if (typeof v === "number" && Number.isFinite(v) && v > 0.005) out[b] = Math.round(Math.min(1, v) * 100) / 100;
+  }
+  return Object.keys(out).length ? { sends: out } : {};
+}
+// scrive un send (0 = lo toglie)
+export function setSend(ch: Channel, b: BusId, v: number) {
+  const x = Math.round(Math.max(0, Math.min(1, v)) * 100) / 100;
+  const next = { ...ch.sends };
+  if (x > 0.005) next[b] = x;
+  else delete next[b];
+  if (Object.keys(next).length) ch.sends = next;
+  else delete ch.sends;
+}
 const clamp = (v: unknown, lo: number, hi: number, d: number) =>
   typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
 
@@ -653,6 +674,7 @@ export function normalize(raw: unknown): Project {
           // i progetti di prima non hanno il routing: tutto al master, come suonavano. Tom e shaker, che prima non
           // c'erano, escono dove esce il kick (di solito il bus Drums)
           out: outOf(r.mixer?.[id]?.out ?? (NEW_DRUMS.includes(id as DrumId) && !r.mixer?.[id] ? r.mixer?.kick?.out : undefined)),
+          ...cleanSends(r.mixer?.[id]?.sends),
         },
       ]),
     ) as Project["mixer"],
@@ -662,7 +684,7 @@ export function normalize(raw: unknown): Project {
         const def = emptyBuses()[b];
         const name = typeof raw?.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 16) : def.name;
         // un bus in cui entra qualche canale si vede sempre
-        const used = CHANNEL_IDS.some((id) => r.mixer?.[id]?.out === b);
+        const used = CHANNEL_IDS.some((id) => r.mixer?.[id]?.out === b || Number(r.mixer?.[id]?.sends?.[b]) > 0.005);
         return [b, { name, volume: clamp(raw?.volume, 0, 1, def.volume), muted: raw?.muted === true, shown: raw?.shown === true || used }];
       }),
     ) as Project["buses"],
@@ -676,10 +698,12 @@ function routingLine(p: Project) {
   if (!shown.length) return "Routing: tutti i canali vanno dritti al master (nessun bus).";
   const into = (b: BusId) => CHANNEL_IDS.filter((id) => p.mixer[id].out === b).map(label);
   const toMaster = CHANNEL_IDS.filter((id) => p.mixer[id].out === "master").map(label);
+  const sendsTo = (b: BusId) =>
+    CHANNEL_IDS.filter((id) => p.mixer[id].sends?.[b]).map((id) => `${label(id)} ${Math.round((p.mixer[id].sends?.[b] ?? 0) * 100)}%`);
   return `Routing (bus = gruppo del mixer, come in FL; il bus va al master, fader ${BUS_UNITY} = volume invariato): ${shown
     .map(
       (b) =>
-        `${b} "${p.buses[b].name}" vol ${p.buses[b].volume.toFixed(2)}${p.buses[b].muted ? " MUTO" : ""} ← ${into(b).join(", ") || "nessun canale"}`,
+        `${b} "${p.buses[b].name}" vol ${p.buses[b].volume.toFixed(2)}${p.buses[b].muted ? " MUTO" : ""} ← ${into(b).join(", ") || "nessun canale"}${sendsTo(b).length ? `; send: ${sendsTo(b).join(", ")}` : ""}`,
     )
     .join("; ")}; dritti al master: ${toMaster.join(", ") || "nessuno"}.`;
 }

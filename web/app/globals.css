@@ -1400,6 +1400,18 @@ ol.ds-led-row {
   align-items: center;
   gap: 2px;
 }
+.hw-strip-send {
+  display: flex;
+  justify-content: center;
+  min-height: 52px;
+  padding-top: 2px;
+  border-top: 1px dashed var(--hw-panel-edge);
+}
+.hw-strip-send .hw-label {
+  align-self: center;
+  font-size: 10px;
+  text-align: center;
+}
 .hw-strip-fx .hw-knob {
   gap: 1px;
 }
@@ -1617,6 +1629,8 @@ ol.ds-led-row {
 /* mute e FX sulla stessa riga nelle strisce del mixer */
 .hw-strip-btns {
   display: flex;
+  flex-wrap: wrap; /* sui bus M, FX e Send vanno su due righe se la striscia è stretta */
+  justify-content: center;
   gap: 4px;
 }
 .hw-strip-btns .hw-btn {
@@ -2265,8 +2279,17 @@ ol.ds-led-row {
   .console-stage .hw-strips {
     display: grid;
     grid-auto-flow: column; /* canali, bus e master su una riga: le colonne si adattano a quante sono */
-    grid-auto-columns: minmax(0, 1fr);
+    /* almeno 64 px a striscia, perché M, S e FX ci stiano; se non c'è spazio il mixer scorre di lato, come in FL */
+    grid-auto-columns: minmax(64px, 1fr);
     gap: 6px;
+    overflow-x: auto;
+  }
+  /* il master resta sempre visibile a destra mentre i canali scorrono */
+  .console-stage .hw-strip--master {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    box-shadow: -10px 0 14px -8px rgb(0 0 0 / 0.6);
   }
   .console-stage .hw-strip {
     min-width: 0;

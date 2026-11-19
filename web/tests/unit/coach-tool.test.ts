@@ -50,3 +50,36 @@ describe("scrivi_effetti", () => {
     expect(p.volAuto?.lead?.slice(0, 4)).toEqual([0, null, null, 0.6]);
   });
 });
+
+describe("tom, shaker, Lead 2 e send", () => {
+  it("il coach scrive tom, shaker e melodia_2 con il suo suono", () => {
+    const w = createStudioWriter(starterProject(), "A");
+    w.run("scrivi_pattern", {
+      ...base,
+      tom: [13, 15],
+      shaker: [2, 4],
+      melodia_2: [{ step: 3, nota: 79, lunghezza: 2 }],
+      onda_lead2: "bell",
+      velocity: [{ riga: "melodia_2", step: 3, valore: 1 }],
+    });
+    const p = w.result().project;
+    const A = p.patterns.A;
+    expect(A.drums.tom[12] && A.drums.shaker[1]).toBe(true);
+    expect(A.lead2[2]).toEqual([79]);
+    expect(A.len).toEqual({ "m2:79": 2 });
+    expect(A.vel).toEqual({ m2: 1 });
+    expect(p.lead2Sound.wave).toBe("bell");
+    expect(p.leadSound.wave).toBe("sawtooth"); // il primo lead non cambia
+  });
+
+  it("send verso un bus Rev", () => {
+    const w = createStudioWriter(starterProject(), "A");
+    w.run("scrivi_effetti", { bus: [{ bus: "bus2", nome: "Rev", send: [{ canale: "clap", quantita: 0.3 }, { canale: "lead", quantita: 0.25 }] }] });
+    const p = w.result().project;
+    expect(p.mixer.clap.sends).toEqual({ bus2: 0.3 });
+    expect(p.mixer.lead.sends).toEqual({ bus2: 0.25 });
+    expect(p.mixer.clap.out).toBe("bus1"); // l'uscita normale resta dov'era
+    expect(p.buses.bus2).toMatchObject({ name: "Rev", shown: true });
+    expect(describeProject(p, "t", "A")).toContain("send: Clap 30%, Lead 25%");
+  });
+});

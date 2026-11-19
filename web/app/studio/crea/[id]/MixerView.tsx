@@ -28,6 +28,9 @@ export function MixerView({ studio }: { studio: Studio }) {
     project,
     removeBus,
     routeTo,
+    sendBus,
+    setChannelSend,
+    setSendBus,
     selSlot,
     setBus,
     setChannel,
@@ -116,6 +119,27 @@ export function MixerView({ studio }: { studio: Studio }) {
                 onChange={(v) => setFx(c, { delay: v })}
               />
             </div>
+            {/* il send verso il bus scelto con il suo pulsante Send (un canale che esce già lì non ne ha bisogno) */}
+            {sendBus && (
+              <div className="hw-strip-send">
+                {project.mixer[c].out === sendBus ? (
+                  <span className="hw-label" title={`${label} esce già in ${project.buses[sendBus].name}`}>
+                    in {project.buses[sendBus].name}
+                  </span>
+                ) : (
+                  <Knob
+                    size={30}
+                    label={`→ ${project.buses[sendBus].name}`}
+                    value={project.mixer[c].sends?.[sendBus] ?? 0}
+                    min={0}
+                    max={1}
+                    defaultValue={0}
+                    display={pct(project.mixer[c].sends?.[sendBus] ?? 0)}
+                    onChange={(v) => setChannelSend(c, sendBus, v)}
+                  />
+                )}
+              </div>
+            )}
             <label className="hw-visually-hidden" htmlFor={`out-${c}`}>
               Uscita di {label}
             </label>
@@ -141,12 +165,13 @@ export function MixerView({ studio }: { studio: Studio }) {
         {BUS_IDS.filter((b) => project.buses[b].shown).map((b) => {
           const bus = project.buses[b];
           const inside = CHANNELS.filter((c) => project.mixer[c.id].out === b);
+          const senders = CHANNELS.filter((c) => (project.mixer[c.id].sends?.[b] ?? 0) > 0);
           const db = 20 * Math.log10(Math.max(1e-4, bus.volume / BUS_UNITY));
           return (
             <div key={b} className="hw-strip hw-strip--bus">
               <span
                 className="hw-meter"
-                data-hit={!bus.muted && inside.some((c) => hitNow(c.id) && !project.mixer[c.id].muted)}
+                data-hit={!bus.muted && [...inside, ...senders].some((c) => hitNow(c.id) && !project.mixer[c.id].muted)}
                 aria-hidden="true"
               />
               <input
@@ -181,9 +206,22 @@ export function MixerView({ studio }: { studio: Studio }) {
                 >
                   FX{project.inserts[b].some(Boolean) ? ` ${project.inserts[b].filter(Boolean).length}` : ""}
                 </button>
+                <button
+                  type="button"
+                  className="hw-btn hw-btn--small"
+                  aria-pressed={sendBus === b}
+                  aria-label={`Send verso il bus ${bus.name}`}
+                  title="Mostra sotto ogni canale quanto manda a questo bus (send), oltre alla sua uscita normale"
+                  onClick={() => setSendBus(sendBus === b ? null : b)}
+                >
+                  <span className="hw-btn-led" />
+                  Send{senders.length ? ` ${senders.length}` : ""}
+                </button>
               </div>
               <span className="hw-bus-in" title={inside.length ? `Entrano: ${inside.map((c) => c.label).join(", ")}` : undefined}>
-                {inside.length ? inside.map((c) => c.label).join(" · ") : "nessun canale: scegli il bus nell'uscita di un canale"}
+                {inside.length || senders.length
+                  ? [...inside.map((c) => c.label), ...senders.map((c) => `${c.label} (send ${pct(project.mixer[c.id].sends?.[b] ?? 0)})`)].join(" · ")
+                  : "nessun canale: scegli il bus nell'uscita di un canale, o premi Send"}
               </span>
               <label className="hw-visually-hidden" htmlFor={`bus-${b}`}>
                 Nome del bus

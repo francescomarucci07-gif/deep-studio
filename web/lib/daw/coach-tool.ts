@@ -19,6 +19,7 @@ import {
   CHORD_TYPES,
   DRUMS,
   type DrumId,
+  setSend,
   SLOTS,
   MAX_SONG_BARS,
   MIN_SONG_BARS,
@@ -268,7 +269,7 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
       },
       bus: {
         type: "array",
-        description: `Routing nei bus, come il mixer di FL: un bus è una traccia di gruppo (per esempio tutta la batteria in "Drums") con fader e plugin suoi, che poi va al master. Ci sono ${BUS_IDS.length} bus (${BUS_IDS.join(", ")}). Per ogni bus: il nome, il volume (fader 0–1, ${BUS_UNITY} = volume invariato) e i canali che ci entrano; un canale non elencato non cambia uscita. Per rimandare un canale al master usa il bus "master" con quel canale.`,
+        description: `Routing nei bus, come il mixer di FL: un bus è una traccia di gruppo (per esempio tutta la batteria in "Drums") con fader e plugin suoi, che poi va al master. Ci sono ${BUS_IDS.length} bus (${BUS_IDS.join(", ")}). Per ogni bus: il nome, il volume (fader 0–1, ${BUS_UNITY} = volume invariato) e i canali che ci entrano; un canale non elencato non cambia uscita. Per rimandare un canale al master usa il bus "master" con quel canale. send: come in FL, canali che mandano anche solo una parte del suono a questo bus, oltre alla loro uscita normale (quantità 0–1, 0 = toglie il send): per esempio un bus "Rev" con un plugin Riverbero al 100% di mix, dove mandi clap 0.3, accordi 0.4 e lead 0.25, così tutti stanno nella stessa stanza; oppure un bus di compressione parallela per la batteria.`,
         items: {
           type: "object",
           properties: {
@@ -276,6 +277,17 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
             nome: { type: "string", description: "Nome del bus nel mixer, es. 'Drums' o 'Synth' (max 16 caratteri)." },
             volume: { type: "number", minimum: 0, maximum: 1 },
             canali: { type: "array", items: { type: "string", enum: [...CHANNEL_IDS] } },
+            send: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  canale: { type: "string", enum: [...CHANNEL_IDS] },
+                  quantita: { type: "number", minimum: 0, maximum: 1 },
+                },
+                required: ["canale", "quantita"],
+              },
+            },
           },
           required: ["bus"],
         },
@@ -526,7 +538,7 @@ export function createStudioWriter(current: Project, editing: Slot) {
       const buses = structuredClone(project.buses);
       let routed = 0;
       if (Array.isArray((raw as { bus?: unknown }).bus)) {
-        for (const b of (raw as { bus: { bus?: unknown; nome?: unknown; volume?: unknown; canali?: unknown }[] }).bus) {
+        for (const b of (raw as { bus: { bus?: unknown; nome?: unknown; volume?: unknown; canali?: unknown; send?: unknown }[] }).bus) {
           const dest = b?.bus;
           if (dest !== "master" && !isBus(dest)) continue;
           if (isBus(dest)) {
@@ -538,6 +550,13 @@ export function createStudioWriter(current: Project, editing: Slot) {
             for (const c of b.canali) {
               if (!CHANNEL_IDS.includes(c as (typeof CHANNEL_IDS)[number])) continue;
               mixer[c as (typeof CHANNEL_IDS)[number]].out = dest as Out;
+              routed++;
+            }
+          }
+          if (isBus(dest) && Array.isArray(b.send)) {
+            for (const x of b.send as { canale?: unknown; quantita?: unknown }[]) {
+              if (!CHANNEL_IDS.includes(x?.canale as (typeof CHANNEL_IDS)[number]) || typeof x.quantita !== "number") continue;
+              setSend(mixer[x.canale as (typeof CHANNEL_IDS)[number]], dest, x.quantita);
               routed++;
             }
           }

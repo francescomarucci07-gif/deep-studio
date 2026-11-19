@@ -24,6 +24,7 @@ import {
   DRUMS,
   type DrumId,
   LEAD_VOICES,
+  setSend,
   LEADS,
   NOTE_PREFIX,
   isLeadInst,
@@ -1035,13 +1036,20 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
       p.buses[b] = { ...p.buses[b], ...patch };
     });
   const nextBus = BUS_IDS.find((b) => !project.buses[b].shown);
+  // Send come in FL: scegli un bus con il suo pulsante Send, e sotto ogni canale compare la manopola di quanto ci mandi
+  const [sendBus, setSendBus] = useState<BusId | null>(null);
+  const setChannelSend = (c: ChannelId, b: BusId, v: number) => update((p) => setSend(p.mixer[c], b, v));
   // togli un bus: sparisce dal mixer e i suoi canali tornano dritti al master (i plugin restano, se lo riapri)
   const removeBus = (b: BusId) => {
     update((p) => {
       p.buses[b].shown = false;
-      for (const id of CHANNEL_IDS) if (p.mixer[id].out === b) p.mixer[id].out = "master";
+      for (const id of CHANNEL_IDS) {
+        if (p.mixer[id].out === b) p.mixer[id].out = "master";
+        if (p.mixer[id].sends?.[b]) setSend(p.mixer[id], b, 0); // e i send verso quel bus si tolgono
+      }
     });
     if (fxTarget === b) setFxOpen(false);
+    if (sendBus === b) setSendBus(null);
   };
 
   // il coach ha scritto pattern e/o canzone: li applico e tengo il progetto di prima per "Annulla"
@@ -1163,6 +1171,9 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
 
   return {
     ascolto,
+    sendBus,
+    setSendBus,
+    setChannelSend,
     addBars,
     applyFromCoach,
     ask,

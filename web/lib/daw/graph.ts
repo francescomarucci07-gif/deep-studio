@@ -64,6 +64,8 @@ export class Graph {
   // routing: l'ultimo nodo di ogni canale, e dove è collegato adesso (master o un bus)
   private outs = {} as Record<ChannelId, AudioNode>;
   private routes: Partial<Record<ChannelId, Out>> = {};
+  // i send verso i bus: un gain per canale e bus, creato al primo uso (dopo fader e filtro, come riverbero e delay)
+  private busSends: Partial<Record<ChannelId, Partial<Record<BusId, GainNode>>>> = {};
   // i bus: ingresso (dove entrano i canali) → plugin → fader → master
   private buses = {} as Record<BusId, { input: GainNode; fader: GainNode }>;
   private reverb: ConvolverNode;
@@ -291,6 +293,21 @@ export class Graph {
       fader(this.channels[id].gain, c.volume, !!p.volAuto?.[id], silenced);
       set(this.sends[id].reverb.gain, p.fx[id].reverb);
       set(this.sends[id].delay.gain, p.fx[id].delay * DELAY_MAX);
+    }
+    for (const id of CHANNEL_IDS) {
+      const want = p.mixer[id].sends ?? {};
+      const have = (this.busSends[id] ??= {});
+      for (const b of BUS_IDS) {
+        const v = want[b] ?? 0;
+        if (!have[b] && v <= 0) continue;
+        if (!have[b]) {
+          const g = this.ctx.createGain();
+          g.gain.value = 0;
+          this.filters[id].hp.connect(g).connect(this.buses[b].input);
+          have[b] = g;
+        }
+        set(have[b].gain, v);
+      }
     }
     set(this.delay.delayTime, (60 / p.bpm / 4) * 3);
     // i bus: fader (0.8 = volume invariato) e mute; il solo dei canali non li tocca (sono di passaggio)

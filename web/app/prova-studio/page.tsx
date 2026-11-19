@@ -40,7 +40,19 @@ export default async function ProvaStudio({ searchParams }: { searchParams: Prom
                 },
                 mixer: Object.fromEntries(Object.entries(starter.mixer).map(([k, c]) => [k, { ...c, volume: 1 }])),
               })
-            : starter;
+            : p === "send"
+              ? // solo il lead suona, ma la sua uscita è un bus muto: si sente solo se il send verso bus3 funziona
+                normalize({
+                  ...starter,
+                  bpm: 120,
+                  patterns: { ...starter.patterns, A: { ...starter.patterns.A, lead } },
+                  fx: { ...starter.fx, lead: { filter: 0, reverb: 0, delay: 0 } }, // niente riverbero e delay: vanno dritti al master
+                  mixer: Object.fromEntries(
+                    Object.entries(starter.mixer).map(([k, c]) => [k, k === "lead" ? { ...c, out: "bus2", sends: { bus3: 1 } } : { ...c, muted: true }]),
+                  ),
+                  buses: { ...starter.buses, bus2: { ...starter.buses.bus2, name: "Muto", muted: true, shown: true }, bus3: { ...starter.buses.bus3, name: "Rev", shown: true } },
+                })
+              : starter;
   return (
     <Daw
       id={p === "segnala" ? "00000000-0000-0000-0000-000000000001" : "prova"}

@@ -149,6 +149,10 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   si aggiunge solo dall'SQL editor di Supabase (vedi il commento nella 0008). (La tabella `feedback` è un'altra cosa: M4.)
 - **Mixer e bus**: ogni canale esce sul master o in un bus (`mixer.X.out`); i bus (`buses`, `BUS_IDS`) hanno fader
   (`BUS_UNITY` = 0 dB), mute e 8 insert, poi vanno al master. In `graph.ts` il routing si ricollega in `applyMixer`.
+  **Send** (19 nov): `mixer.X.sends` = { bus: 0–1 } (`setSend`), dopo fader e filtro come rev/dly; nel Mixer il pulsante
+  Send sul bus mostra la manopola sotto ogni canale (`sendBus`); togliendo il bus spariscono anche i suoi send. Coach:
+  `send` dentro `bus` di `scrivi_effetti` (`crea-v28`). Il mixer sul computer ha strisce da almeno 64 px e scorre di lato;
+  il master resta fisso a destra.
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
   (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
 - **Export** (pulsante ⤓ Export, menu): Mix WAV come prima; **Stem** = un WAV 24 bit per strumento che suona
@@ -168,7 +172,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
 - **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen; `vitest.config.mts`);
   `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
-  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto` (pesto = mix sbagliato apposta);
+  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send` (pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
   la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
@@ -229,7 +233,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   degli stem~~ **fatto il 18 nov**; ~~più strumenti~~ **fatti il 19 nov** (tom, shaker, Lead 2; il pad c'era già negli accordi); sample propri (spazio file, licenze); ~~Roll più
   comodo~~ **fatto il 18 nov** (Ctrl/Shift + trascina seleziona; frecce sposta, Shift = ottava o battito; Ctrl+C/X/V/D/A,
   Canc; `rollKey` e `placeNotes` in `Daw.tsx`; ogni comando è un passo di Annulla; restano quantize e velocity per nota); ~~automazioni del volume~~ **fatte il 18 nov** (`volAuto`: master,
-  canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); send verso i bus e bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
+  canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); ~~send verso i bus~~ **fatto il 19 nov**; bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
   `graph.click`, non entra nell'export).
 - Coach: ~~lezioni guidate~~ **fatte il 18 nov**; ~~parere in tempo reale~~ **fatto il 19 nov** (vedi "Cose da sapere").
 - Prodotto: ~~pagina delle segnalazioni nel sito~~ **fatta il 19 nov** (/studio/segnalazioni); link di ascolto pubblico; email di accesso con

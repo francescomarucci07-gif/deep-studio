@@ -1,38 +1,8 @@
 // Export: il file MIDI, lo zip degli stem e il Mix WAV, letti byte per byte come farebbe FL Studio.
-import { readFile } from "node:fs/promises";
-import { expect, test, type Page } from "@playwright/test";
-import { apri, errori } from "./aiuto";
+import { expect, test } from "@playwright/test";
+import { apri, errori, scarica, wav } from "./aiuto";
 
 test.setTimeout(180_000);
-
-async function scarica(page: Page, voce: string) {
-  await page.locator(".hw-export > .hw-btn").click();
-  const arriva = page.waitForEvent("download", { timeout: 120_000 });
-  await page.locator(".hw-export-menu button", { hasText: voce }).click();
-  const d = await arriva;
-  return { nome: d.suggestedFilename(), dati: await readFile((await d.path())!) };
-}
-
-// l'intestazione di un WAV: canali, bit, frequenza, durata
-function wav(b: Buffer) {
-  expect(b.toString("ascii", 0, 4)).toBe("RIFF");
-  expect(b.toString("ascii", 8, 12)).toBe("WAVE");
-  let i = 12;
-  let fmt = { ch: 0, rate: 0, bits: 0 };
-  while (i < b.length - 8) {
-    const id = b.toString("ascii", i, i + 4);
-    const size = b.readUInt32LE(i + 4);
-    if (id === "fmt ") fmt = { ch: b.readUInt16LE(i + 10), rate: b.readUInt32LE(i + 12), bits: b.readUInt16LE(i + 22) };
-    if (id === "data") {
-      // il picco: il campione a 24 bit più forte, da 0 a 1
-      let peak = 0;
-      for (let k = i + 8; k + 2 < i + 8 + size; k += 3) peak = Math.max(peak, Math.abs(b.readIntLE(k, 3)));
-      return { ...fmt, sec: size / (fmt.rate * fmt.ch * (fmt.bits / 8)), peak: peak / 2 ** 23 };
-    }
-    i += 8 + size;
-  }
-  throw new Error("WAV senza dati");
-}
 
 test("MIDI, stem e mix si scaricano e sono file validi", async ({ page }) => {
   const err = errori(page);

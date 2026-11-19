@@ -11,6 +11,7 @@ import {
   resizeSong,
   setNoteLen,
   setPatternBars,
+  setSend,
   setVel,
   starterProject,
   STEPS,
@@ -162,5 +163,21 @@ describe("Lead 2", () => {
     expect(isEmptyPattern(p.patterns.B)).toBe(false);
     setPatternBars(p.patterns.B, 2);
     expect(p.patterns.B.lead2[17]).toEqual([76]);
+  });
+});
+
+describe("send verso i bus", () => {
+  it("normalize tiene solo bus veri e valori tra 0 e 1; il bus che riceve un send si vede", () => {
+    const p = normalize({ version: 2, mixer: { clap: { volume: 0.6, out: "bus1", sends: { bus3: 0.4, bus9: 1, bus2: 0, bus4: 7 } } } });
+    expect(p.mixer.clap.sends).toEqual({ bus3: 0.4, bus4: 1 });
+    expect(p.buses.bus3.shown).toBe(true);
+    expect(p.mixer.kick.sends).toBeUndefined();
+  });
+  it("setSend scrive e toglie", () => {
+    const c = { volume: 1, muted: false, out: "master" as const };
+    setSend(c, "bus2", 0.333);
+    expect(c).toMatchObject({ sends: { bus2: 0.33 } });
+    setSend(c, "bus2", 0);
+    expect(c).not.toHaveProperty("sends");
   });
 });

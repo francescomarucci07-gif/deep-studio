@@ -127,6 +127,11 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   `lead2Sound`, canale `lead2`; `LEADS`, `isLeadInst`, `NOTE_PREFIX` in `project.ts`): stesso synth del Lead, di base un
   pluck; chiavi `m5`/`m5:72`; scheda nel Roll, riga nel Beat, pad `'`, traccia MIDI "Lead 2" sul canale 4. Il Pad è uno
   dei suoni degli accordi (Chord synth). Coach: `tom`, `shaker`, `melodia_2`, `onda_lead2`… (`crea-v26`).
+- **Scala** (20 nov): `project.key` = { root 0–11, mode `minore|maggiore|dorico|frigio` } (`lib/daw/scale.ts`: `MODES`,
+  `inScale`, `diatonicChord`, `guessKey`, `normKey`). Nel Roll: Scala (nota + modo), **Trova** (indovina dalle note di basso,
+  lead e accordi), **Piega** (solo le note della scala, `ds-roll-piega`), righe con `data-scale` root/in/out; nella scheda
+  Chord **Accordi della scala** (`ds-roll-accordi-scala`): il clic mette l'accordo della tonalità. Coach: campo `tonalita` di
+  `scrivi_pattern`, riga Tonalità in `describe()` (`crea-v30`).
 - **Lunghezza delle note** (basso e lead): `pattern.len` (chiavi `lenKey`: `b5`, `l5:72`, Lead 2 `m5:72`; solo note da 2 step in su,
   `setNoteLen`/`maxLen`/`noteLen` in `project.ts`: dentro la battuta, senza coprire la nota dopo). Nel Roll: premi e
   trascini = disegni o allunghi, clic su una nota = la togli, pennello = lunghezza dell'ultima; in registrazione la
@@ -178,7 +183,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   alla prima modifica, prima di ogni modifica del coach, ogni 10 minuti e a mano (`lib/daw/versions.ts`).
 - **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
-- **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen; `vitest.config.mts`);
+- **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen, scale; `vitest.config.mts`);
   `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
   che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send|ascolta` (ascolta = il lettore del link; pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
   la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.
@@ -237,7 +242,8 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 "Cose da sapere").
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
-- Studio: ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
+- Studio: ~~scala nel Roll~~ **fatta il 20 nov**; progetti modello per genere; quantize e velocity per nota nel Roll;
+  duplica/rinomina/cancella progetti; ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
   degli stem~~ **fatto il 18 nov**; ~~più strumenti~~ **fatti il 19 nov** (tom, shaker, Lead 2; il pad c'era già negli accordi); sample propri (proposta in `docs/ADR-0002-sample-propri.md`, 20 nov: da decidere con Francesco e Spencer); ~~Roll più
   comodo~~ **fatto il 18 nov** (Ctrl/Shift + trascina seleziona; frecce sposta, Shift = ottava o battito; Ctrl+C/X/V/D/A,
   Canc; `rollKey` e `placeNotes` in `Daw.tsx`; ogni comando è un passo di Annulla; restano quantize e velocity per nota); ~~automazioni del volume~~ **fatte il 18 nov** (`volAuto`: master,

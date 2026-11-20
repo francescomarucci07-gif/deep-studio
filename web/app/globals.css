@@ -467,6 +467,36 @@ ol.ds-led-row {
 .daw-roll-row[data-sharp="true"] .daw-cell {
   background: var(--ds-surface-inset);
 }
+/* la scala del progetto (scale.ts): le righe della scala con una tinta d'accento, la tonica più marcata, le altre più
+   scure; i tasti mostrano lo stesso */
+.daw-roll-row[data-scale="in"] .daw-cell,
+.daw-roll-row[data-scale="root"] .daw-cell {
+  background: color-mix(in srgb, var(--ds-accent) 12%, var(--ds-surface));
+}
+.daw-roll-row[data-scale="root"] .daw-cell {
+  background: color-mix(in srgb, var(--ds-accent) 22%, var(--ds-surface));
+}
+.daw-roll-row[data-scale="out"] .daw-cell {
+  background: var(--ds-surface-inset);
+  opacity: 0.7;
+}
+.daw-roll-row[data-scale="root"] .daw-key {
+  box-shadow: inset 3px 0 0 var(--ds-accent);
+}
+.daw-roll-row[data-scale="out"] .daw-key {
+  opacity: 0.55;
+}
+.daw-key-chord {
+  margin-left: 4px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.hw-scale .hw-label {
+  align-self: center;
+}
+.hw-scale-msg {
+  text-transform: none;
+}
 .daw-cell[data-beat="true"] {
   box-shadow: -2px 0 0 var(--ds-border-strong);
 }

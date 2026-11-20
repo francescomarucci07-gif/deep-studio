@@ -1,6 +1,7 @@
 // Gli strumenti che il coach usa per scrivere nello studio: un pattern (A–P), la canzone, effetti e automazioni.
 // Claude manda step da 1 a 16 e note MIDI; qui diventa un Project valido (normalize scarta il resto).
 // Il coach può chiamarli più volte nella stessa risposta: ogni chiamata parte dal risultato della precedente.
+import { MODES, MODE_IDS } from "./scale";
 import type Anthropic from "@anthropic-ai/sdk";
 import { KIT_IDS, KITS } from "./kits";
 import { defaultSlot, INSERT_SLOTS, isPluginType, normalizeSlot, pluginParams, PLUGIN_TYPES, PLUGINS } from "./plugins";
@@ -72,6 +73,15 @@ const PATTERN_TOOL: Anthropic.Beta.BetaTool = {
       bpm: { type: "number", minimum: 60, maximum: 200 },
       swing: { type: "number", minimum: 0, maximum: 0.5, description: "0 = dritto, 0.1–0.2 = groove house." },
       sidechain: { type: "boolean", description: "Il kick abbassa il basso." },
+      tonalita: {
+        type: "object",
+        description: `La tonalità del progetto (vale per tutta la traccia): radice 0 = Do … 9 = La … 11 = Si, modo ${MODE_IDS.join(", ")} (${MODE_IDS.map((m) => `${m}: ${MODES[m].hint}`).join("; ")}). Nel Roll illumina le note della scala. Sceglila quando crei da zero e scrivi note dentro la scala; non cambiarla se il producer ne ha già scelta una, a meno che non lo chieda.`,
+        properties: {
+          radice: { type: "integer", minimum: 0, maximum: 11 },
+          modo: { type: "string", enum: [...MODE_IDS] },
+        },
+        required: ["radice", "modo"],
+      },
       kick: stepList("il kick"),
       clap: stepList("il clap (o snare)"),
       hat: stepList("l'hi-hat chiuso"),
@@ -341,6 +351,7 @@ type PatternInput = Partial<Record<DrumId, unknown>> & {
   onda_lead2?: unknown;
   filtro_lead2?: unknown;
   durata_lead2?: unknown;
+  tonalita?: { radice?: unknown; modo?: unknown };
 
   stile_accordi?: unknown;
   filtro_accordi?: unknown;
@@ -463,6 +474,8 @@ export function createStudioWriter(current: Project, editing: Slot) {
         bpm: i.bpm ?? project.bpm,
         swing: i.swing ?? project.swing,
         sidechain: typeof i.sidechain === "boolean" ? i.sidechain : project.sidechain,
+        // normalize scarta una tonalità non valida
+        key: i.tonalita ? { root: i.tonalita.radice, mode: i.tonalita.modo } : project.key,
         kit: i.kit ?? project.kit, // normalize scarta i kit che non esistono
         patterns: { ...project.patterns, [slot]: pattern },
         bassSound: here ? project.bassSound : next.bass,

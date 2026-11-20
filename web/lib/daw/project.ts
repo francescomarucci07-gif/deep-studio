@@ -2,6 +2,7 @@
 // e melodia (lead), una canzone (da 16 a 256 battute) che dice quale pattern suona, suoni dei synth, mixer.
 // È anche il JSON salvato in projects.data, quindi ogni campo ha un default (vedi normalize).
 import { isKit, KITS, type KitId } from "./kits";
+import { keyName, normKey, type Key } from "./scale";
 import { INSERT_SLOTS, normalizeSlot, pluginParams, PLUGINS, type PluginSlot } from "./plugins";
 
 export const STEPS = 16;
@@ -302,6 +303,7 @@ export type Project = {
   inserts: Record<MixTarget, (PluginSlot | null)[]>; // i plugin di master, canali e bus, INSERT_SLOTS slot
   buses: Record<BusId, Bus>;
   sidechain: boolean; // il kick abbassa il basso
+  key?: Key; // la tonalità (scale.ts): illumina le note nel Roll e la usa il coach; manca = nessuna
   mixer: Record<ChannelId, Channel>;
 };
 
@@ -666,6 +668,7 @@ export function normalize(raw: unknown): Project {
       MIX_TARGETS.map((t) => [t, Array.from({ length: INSERT_SLOTS }, (_, i) => normalizeSlot(r.inserts?.[t]?.[i]))]),
     ) as Project["inserts"],
     sidechain: typeof r.sidechain === "boolean" ? r.sidechain : d.sidechain,
+    ...(normKey(r.key) ? { key: normKey(r.key) } : {}),
     mixer: Object.fromEntries(
       (Object.keys(d.mixer) as ChannelId[]).map((id) => [
         id,
@@ -748,6 +751,9 @@ export function describe(p: Project, title: string, editing: Slot) {
     `Progetto "${title}": ${p.bpm} BPM, swing ${pct(p.swing)}, sidechain kick→basso ${p.sidechain ? "acceso" : "spento"}.`,
     `Mixer: ${DRUMS.map(({ id, label }) => `${label} ${ch(id)}`).join("; ")}; Bass ${ch("bass")}; Accordi ${ch("chords")}; Lead ${ch("lead")}; Lead 2 ${ch("lead2")}.`,
     `Kit di batteria: ${KITS[p.kit].label} (${KITS[p.kit].hint}).`,
+    p.key
+      ? `Tonalità: ${keyName(p.key)} (scelta dal producer: nel Roll le note della scala sono illuminate; scrivi melodie, bassline e accordi dentro la scala, a meno che non ti chieda altro).`
+      : "Tonalità: non scelta (se scrivi note, sceglila tu con il campo tonalita e dillo).",
     routingLine(p),
     "Suoni dei synth: quelli qui sotto sono i suoni di base; un pattern con un suono proprio lo dice nella sua scheda.",
     `Accordi: suono ${CHORD_STYLES[p.chordSound.style].label} (${CHORD_STYLES[p.chordSound.style].hint}), filtro ${Math.round(p.chordSound.cutoff)} Hz.`,

@@ -19,7 +19,9 @@ import {
   noteLen,
   noteName,
 } from "@/lib/daw/project";
-import { CHORD_ROOTS, ROLLS, ROLL_TABS, TYPE_LABEL, isSharp } from "./ui";
+import { useEffect, useState } from "react";
+import { MODES, MODE_IDS, type Mode, diatonicChord, guessKey, inScale, keyName } from "@/lib/daw/scale";
+import { CHORD_ROOTS, ROLLS, ROLL_TABS, TYPE_LABEL, isSharp, store, stored } from "./ui";
 import type { Studio } from "./useStudio";
 
 export function RollView({ studio }: { studio: Studio }) {
@@ -41,6 +43,7 @@ export function RollView({ studio }: { studio: Studio }) {
     noteAt,
     pat,
     patternButtons,
+    project,
     playing,
     playingSlot,
     roll,
@@ -57,6 +60,24 @@ export function RollView({ studio }: { studio: Studio }) {
     update,
   } = studio;
   // il synth del Lead o del Lead 2: stesso pannello, suono e canale diversi
+  const key = project.key;
+  // Piega (come il "fold" di FL): nasconde le note fuori scala. Accordi della scala: un clic mette l'accordo della
+  // tonalità per quella fondamentale. Sono scelte di comodo, salvate nel browser.
+  const [fold, setFold] = useState(false);
+  const [scaleChords, setScaleChords] = useState(true);
+  useEffect(() => {
+    setFold(stored("ds-roll-piega") === "1");
+    setScaleChords(stored("ds-roll-accordi-scala") !== "0");
+  }, []);
+  const [guessMsg, setGuessMsg] = useState("");
+  const setKey = (root: number | null, mode?: Mode) =>
+    update((p) => {
+      if (root === null) delete p.key;
+      else p.key = { root, mode: mode ?? p.key?.mode ?? "minore" };
+    });
+  const scaleOf = (midi: number) => (!key ? undefined : (((midi - key.root) % 12) + 12) % 12 === 0 ? "root" : inScale(key, midi) ? "in" : "out");
+  // l'accordo che un clic mette su questa fondamentale
+  const chordFor = (root: number): ChordType => (key && scaleChords ? (diatonicChord(key, root) ?? keyChord) : keyChord);
   const lr: LeadInst = roll === "lead2" ? "lead2" : "lead";
   const ls = lr === "lead2" ? lead2S : leadS;
   return (
@@ -110,26 +131,111 @@ export function RollView({ studio }: { studio: Studio }) {
             </>
           )}
         </div>
+        <div className="hw-patterns hw-scale" role="group" aria-label="Scala">
+          <label className="hw-label" htmlFor="roll-key">
+            Scala
+          </label>
+          <select
+            id="roll-key"
+            className="hw-select"
+            value={key ? String(key.root) : ""}
+            title="La tonalità del progetto: nel Roll le sue note si illuminano"
+            onChange={(e) => setKey(e.target.value === "" ? null : Number(e.target.value))}
+          >
+            <option value="">nessuna</option>
+            {NOTE_NAMES.map((n, i) => (
+              <option key={n} value={i}>
+                {n}
+              </option>
+            ))}
+          </select>
+          {key && (
+            <>
+              <label className="hw-visually-hidden" htmlFor="roll-mode">
+                Modo della scala
+              </label>
+              <select
+                id="roll-mode"
+                className="hw-select"
+                value={key.mode}
+                title={MODES[key.mode].hint}
+                onChange={(e) => setKey(key.root, e.target.value as Mode)}
+              >
+                {MODE_IDS.map((m) => (
+                  <option key={m} value={m} title={MODES[m].hint}>
+                    {MODES[m].label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          <button
+            type="button"
+            className="hw-btn hw-btn--small"
+            title="Guarda le note che hai scritto (basso, lead, accordi) e sceglie la tonalità più probabile"
+            onClick={() => {
+              const g = guessKey(project);
+              if (!g) return setGuessMsg("scrivi prima qualche nota");
+              setKey(g.root, g.mode);
+              setGuessMsg(`→ ${keyName(g)}`);
+            }}
+          >
+            Trova
+          </button>
+          {guessMsg && <span className="hw-label hw-scale-msg">{guessMsg}</span>}
+          {key && (
+            <button
+              type="button"
+              className="hw-btn hw-btn--small"
+              aria-pressed={fold}
+              title="Mostra solo le note della scala"
+              onClick={() => {
+                setFold(!fold);
+                store("ds-roll-piega", fold ? "0" : "1");
+              }}
+            >
+              <span className="hw-btn-led" />
+              Piega
+            </button>
+          )}
+          {key && roll === "chords" && (
+            <button
+              type="button"
+              className="hw-btn hw-btn--small"
+              aria-pressed={scaleChords}
+              title="Un clic mette l'accordo della scala per quella fondamentale (in La minore: Do → Do maj7, Re → Re m7)"
+              onClick={() => {
+                setScaleChords(!scaleChords);
+                store("ds-roll-accordi-scala", scaleChords ? "0" : "1");
+              }}
+            >
+              <span className="hw-btn-led" />
+              Accordi della scala
+            </button>
+          )}
+        </div>
       </div>
       {roll === "chords" ? (
         // accordi: una riga per fondamentale, una casella per battito (4 step)
         <div className="daw-roll" data-roll="chords">
-          {CHORD_ROOTS.map((root) => (
+          {CHORD_ROOTS.filter((root) => !(fold && key && !inScale(key, root))).map((root) => (
             <div
               key={root}
               className="daw-roll-row"
               data-sharp={isSharp(root)}
+              data-scale={scaleOf(root)}
               data-hit={keyHit?.inst === "chords" && keyHit.value === root}
             >
               <button
                 type="button"
                 className="daw-key"
                 onClick={() => {
-                  void engine().preview("chords", { chord: { root, type: keyChord } });
+                  void engine().preview("chords", { chord: { root, type: chordFor(root) } });
                   lightKey("chords", root);
                 }}
               >
                 {NOTE_NAMES[root]}
+                {key && scaleChords && diatonicChord(key, root) && <span className="daw-key-chord">{TYPE_LABEL[diatonicChord(key, root)!]}</span>}
               </button>
               {beatCols.map((b) => {
                 // gli accordi del battito con questa fondamentale (di solito uno)
@@ -144,10 +250,10 @@ export function RollView({ studio }: { studio: Studio }) {
                     aria-pressed={on}
                     disabled={full}
                     title={full ? `Già ${CHORD_LAYERS} accordi su questo battito` : undefined}
-                    aria-label={`Battito ${b + 1}: ${on ? `${here.map(chordName).join(" + ")}, clic per togliere` : `aggiungi ${chordName({ root, type: keyChord })}`}`}
+                    aria-label={`Battito ${b + 1}: ${on ? `${here.map(chordName).join(" + ")}, clic per togliere` : `aggiungi ${chordName({ root, type: chordFor(root) })}`}`}
                     data-now={Math.floor(step / 4) === b && playingSlot === editing}
                     onClick={() => {
-                      const next = { root, type: keyChord };
+                      const next = { root, type: chordFor(root) };
                       update((p) => {
                         const layers = p.patterns[editing].chords[b];
                         // clic su una casella accesa: tolgo quell'accordo, gli altri del battito restano
@@ -165,11 +271,12 @@ export function RollView({ studio }: { studio: Studio }) {
         </div>
       ) : (
         <div className="daw-roll" data-roll={roll}>
-          {ROLLS[roll].rows.map((note) => (
+          {ROLLS[roll].rows.filter((note) => !(fold && key && !inScale(key, note))).map((note) => (
             <div
               key={note}
               className="daw-roll-row"
               data-sharp={isSharp(note)}
+              data-scale={scaleOf(note)}
               data-hit={keyHit?.inst === roll && keyHit.value === note}
             >
               <button

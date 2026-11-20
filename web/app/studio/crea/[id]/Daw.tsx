@@ -1,8 +1,10 @@
 "use client";
+import { useCallback } from "react";
 import { CoachChat } from "@/components/CoachChat";
 import { VersionsPanel } from "@/components/hw/VersionsPanel";
 import { SLOTS, isEmptyPattern } from "@/lib/daw/project";
 import { Ascolto } from "./Ascolto";
+import { Condividi } from "./Condividi";
 import { Lezioni } from "./Lezioni";
 import { Segnala } from "./Segnala";
 import { Tour } from "./Tour";
@@ -59,15 +61,19 @@ export function Daw(props: StudioProps) {
     titleRef,
     toggleCoach,
     ascolto,
+    sharing,
+    setSharing,
     touring,
     undo,
     versionsTick,
     view,
   } = studio;
+  const closeShare = useCallback(() => setSharing(false), [setSharing]);
   return (
     <div className="console" data-coach={coachOpen ? "on" : "off"}>
       {touring && <Tour onView={chooseView} onCoach={openCoach} onClose={endTour} />}
       {reporting && <Segnala projectId={id} view={view} onClose={closeReport} />}
+      {sharing && <Condividi projectId={id} title={titleRef.current} getProject={() => projectRef.current} onClose={closeShare} />}
       <Lezioni
         ctx={{ project, editing, playing, songMode, exported }}
         menu={learnMenu}

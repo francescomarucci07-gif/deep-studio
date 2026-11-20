@@ -51,7 +51,7 @@ analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script 
 db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach,
             0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions),
             0006–0007 segnalazioni dallo studio (tabella segnalazioni, limite di 30 al giorno con un trigger),
-            0008 admins + segnalazioni lette e segnate risolte dagli admin
+            0008 admins + segnalazioni lette e segnate risolte dagli admin, 0009 link di ascolto (ascolti)
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili (palette "Neon morbido"; font Geist, Chakra Petch, Geist Mono
             caricati in app/layout.tsx con next/font). Collegamento a Supabase e Vercel: docs/DEPLOY.md
@@ -164,6 +164,12 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   (`Listener`, soglie in `LISTEN`, provvisorie, tarate sui progetti di prova) decidono gli avvisi: `kick_basso`, `limiter`,
   `fango`, `aspro`. Scheda in basso a destra (`Ascolto.tsx`): "Chiedi al coach" manda la domanda con le misure dal vivo
   (campo `ascolto` a `/api/coach/crea`, non salvato); "Non dirmelo più" in `ds-ascolto-no`. Niente token finché non chiedi.
+- **Link di ascolto** (20 nov): menu ⤓ Export → "Link di ascolto" (`Condividi.tsx`): crea, copia, aggiorna o toglie un link
+  pubblico `/ascolta/<codice>`. Non si salva audio: la tabella `ascolti` (migrazione 0009, RLS: ognuno i suoi; un link per
+  progetto) tiene una fotografia del progetto e la pagina (`app/ascolta/[codice]/`, `Player.tsx`) la fa suonare con `Engine`
+  in modalità Song fino alla fine (canzone vuota = primo pattern in loop). Chi non ha account legge solo con le funzioni
+  `ascolto(codice)` e `ascolto_play(codice)` (contatore): nessuno può elencare i link. Codice casuale di 24 caratteri.
+  Attenzione: in supabase-js una query parte solo con `await` o `.then` (`void query` non la spedisce).
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
   Python); `Daw.tsx` le manda a `/api/coach/crea` nel campo `misure` (solo per Claude, non salvate).
 - **Cronologia**: `project_versions` (ultime 60 per progetto, trigger di pulizia); il browser salva una versione
@@ -172,7 +178,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
 - **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen; `vitest.config.mts`);
   `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
-  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send` (pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
+  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send|ascolta` (ascolta = il lettore del link; pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
   la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
@@ -236,7 +242,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); ~~send verso i bus~~ **fatto il 19 nov**; bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
   `graph.click`, non entra nell'export).
 - Coach: ~~lezioni guidate~~ **fatte il 18 nov**; ~~parere in tempo reale~~ **fatto il 19 nov** (vedi "Cose da sapere").
-- Prodotto: ~~pagina delle segnalazioni nel sito~~ **fatta il 19 nov** (/studio/segnalazioni); link di ascolto pubblico; email di accesso con
+- Prodotto: ~~pagina delle segnalazioni nel sito~~ **fatta il 19 nov** (/studio/segnalazioni); ~~link di ascolto pubblico~~ **fatto il 20 nov**; email di accesso con
   SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).
 - Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).
 

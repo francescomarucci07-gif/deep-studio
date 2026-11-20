@@ -30,6 +30,7 @@ export function TopBar({ studio }: { studio: Studio }) {
     redoEdit,
     save,
     setExportMenu,
+    setSharing,
     setShowVersions,
     setTitle,
     showVersions,
@@ -151,6 +152,17 @@ export function TopBar({ studio }: { studio: Studio }) {
               <button type="button" role="menuitem" onClick={() => void exportMidi()}>
                 <strong>MIDI</strong>
                 <span>le note, da trascinare in FL Studio (.mid)</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setExportMenu(false);
+                  setSharing(true);
+                }}
+              >
+                <strong>Link di ascolto</strong>
+                <span>chi lo apre ascolta la traccia, anche senza account</span>
               </button>
             </span>
           )}

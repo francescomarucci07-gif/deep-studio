@@ -178,6 +178,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
   }, [tourDone]);
   const openCoach = useCallback(() => setCoachOpen(true), []);
   const [reporting, setReporting] = useState(false); // il riquadro "Segnala un problema"
+  const [sharing, setSharing] = useState(false); // il riquadro "Link di ascolto"
   const [learnMenu, setLearnMenu] = useState(false); // il menu "Impara" (tour e lezioni)
   const [exported, setExported] = useState(false); // ha esportato o chiesto un parere (per l'ultima lezione)
   const closeReport = useCallback(() => setReporting(false), []);
@@ -1261,6 +1262,8 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     removeBars,
     removeBus,
     reporting,
+    sharing,
+    setSharing,
     restore,
     roll,
     rollDown,

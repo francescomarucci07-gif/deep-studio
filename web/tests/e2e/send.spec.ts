@@ -44,3 +44,21 @@ test("send dal mixer: manopola, testo del bus, il bus tolto si porta via i send"
   await expect(page.locator(".hw-strip--bus")).toHaveCount(1);
   expect(err).toEqual([]);
 });
+
+test("bus dentro bus: il bus Rev dentro il bus muto non si sente più; i giri chiusi non si offrono", async ({ page }) => {
+  const err = errori(page);
+  await apri(page, "send");
+  await vista(page, "Mixer");
+  const revOut = page.locator("#bus-out-bus3");
+  const mutoOut = page.locator("#bus-out-bus2");
+  await revOut.selectOption({ label: "→ Muto" });
+  // Muto riceve già Rev: nell'uscita di Muto, Rev non c'è (sarebbe un giro chiuso)
+  expect(await mutoOut.locator("option").allInnerTexts()).not.toContain("→ Rev");
+  await expect(page.locator(".hw-strip--bus").filter({ has: page.locator("#bus-bus2") }).locator(".hw-bus-in")).toContainText("bus Rev");
+  const dentro = wav((await scarica(page, "Mix WAV")).dati);
+  expect(dentro.peak, "Rev dentro il bus muto: silenzio").toBeLessThan(0.001);
+  await revOut.selectOption("master");
+  const fuori = wav((await scarica(page, "Mix WAV")).dati);
+  expect(fuori.peak, "Rev di nuovo al master: si sente").toBeGreaterThan(0.01);
+  expect(err).toEqual([]);
+});

@@ -83,3 +83,17 @@ describe("tom, shaker, Lead 2 e send", () => {
     expect(describeProject(p, "t", "A")).toContain("send: Clap 30%, Lead 25%");
   });
 });
+
+describe("bus dentro bus dal coach", () => {
+  it("uscita del bus, e il giro chiuso si corregge da solo", () => {
+    const w = createStudioWriter(starterProject(), "A");
+    w.run("scrivi_effetti", { bus: [{ bus: "bus2", nome: "Ritmica" }, { bus: "bus1", uscita: "bus2" }, { bus: "bus2", uscita: "bus1" }] });
+    const p = w.result().project;
+    expect([p.buses.bus1.out, p.buses.bus2.out].filter(Boolean)).toHaveLength(1);
+    w.run("scrivi_effetti", { bus: [{ bus: "bus2", uscita: "master" }, { bus: "bus1", uscita: "bus2" }] });
+    const q = w.result().project;
+    expect(q.buses.bus1.out).toBe("bus2");
+    expect(q.buses.bus2.out).toBeUndefined();
+    expect(describeProject(q, "t", "A")).toContain('(esce in bus2)');
+  });
+});

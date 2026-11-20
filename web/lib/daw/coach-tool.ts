@@ -277,6 +277,12 @@ const FX_TOOL: Anthropic.Beta.BetaTool = {
             nome: { type: "string", description: "Nome del bus nel mixer, es. 'Drums' o 'Synth' (max 16 caratteri)." },
             volume: { type: "number", minimum: 0, maximum: 1 },
             canali: { type: "array", items: { type: "string", enum: [...CHANNEL_IDS] } },
+            uscita: {
+              type: "string",
+              enum: [...BUS_IDS, "master"],
+              description:
+                "Dove esce il bus (default master). Un altro bus = bus dentro bus, per esempio Drums e Perc dentro un bus Ritmica con un compressore comune. Niente giri chiusi: un bus che tornerebbe indietro resta sul master.",
+            },
             send: {
               type: "array",
               items: {
@@ -538,13 +544,18 @@ export function createStudioWriter(current: Project, editing: Slot) {
       const buses = structuredClone(project.buses);
       let routed = 0;
       if (Array.isArray((raw as { bus?: unknown }).bus)) {
-        for (const b of (raw as { bus: { bus?: unknown; nome?: unknown; volume?: unknown; canali?: unknown; send?: unknown }[] }).bus) {
+        for (const b of (raw as { bus: { bus?: unknown; nome?: unknown; volume?: unknown; canali?: unknown; send?: unknown; uscita?: unknown }[] }).bus) {
           const dest = b?.bus;
           if (dest !== "master" && !isBus(dest)) continue;
           if (isBus(dest)) {
             if (typeof b.nome === "string" && b.nome.trim()) buses[dest].name = b.nome.trim().slice(0, 16);
             if (typeof b.volume === "number") buses[dest].volume = b.volume;
             buses[dest].shown = true;
+            if (b.uscita === "master") delete buses[dest].out;
+            else if (isBus(b.uscita) && b.uscita !== dest) {
+              buses[dest].out = b.uscita; // normalize toglie i giri chiusi e mostra il bus di arrivo
+              routed++;
+            }
           }
           if (Array.isArray(b.canali)) {
             for (const c of b.canali) {

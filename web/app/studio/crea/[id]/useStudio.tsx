@@ -1037,6 +1037,12 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
       p.buses[b] = { ...p.buses[b], ...patch };
     });
   const nextBus = BUS_IDS.find((b) => !project.buses[b].shown);
+  // bus dentro bus: dove esce il bus (master o un altro bus; normalize toglie i giri chiusi)
+  const routeBus = (b: BusId, out: Out) =>
+    update((p) => {
+      if (out === "master") delete p.buses[b].out;
+      else p.buses[b].out = out;
+    });
   // Send come in FL: scegli un bus con il suo pulsante Send, e sotto ogni canale compare la manopola di quanto ci mandi
   const [sendBus, setSendBus] = useState<BusId | null>(null);
   const setChannelSend = (c: ChannelId, b: BusId, v: number) => update((p) => setSend(p.mixer[c], b, v));
@@ -1048,6 +1054,9 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
         if (p.mixer[id].out === b) p.mixer[id].out = "master";
         if (p.mixer[id].sends?.[b]) setSend(p.mixer[id], b, 0); // e i send verso quel bus si tolgono
       }
+      // i bus che uscivano lì tornano al master, e lui stesso riparte dal master se lo riapri
+      for (const x of BUS_IDS) if (p.buses[x].out === b) delete p.buses[x].out;
+      delete p.buses[b].out;
     });
     if (fxTarget === b) setFxOpen(false);
     if (sendBus === b) setSendBus(null);
@@ -1174,6 +1183,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     ascolto,
     sendBus,
     setSendBus,
+    routeBus,
     setChannelSend,
     addBars,
     applyFromCoach,

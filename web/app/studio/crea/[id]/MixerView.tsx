@@ -11,7 +11,7 @@ import {
   isPluginType,
   pluginParams,
 } from "@/lib/daw/plugins";
-import { BUS_IDS, BUS_UNITY, type Out, filterLabel } from "@/lib/daw/project";
+import { BUS_IDS, BUS_UNITY, type Out, busTargets, filterLabel } from "@/lib/daw/project";
 import { CHANNELS, pct } from "./ui";
 import type { Studio } from "./useStudio";
 
@@ -28,6 +28,7 @@ export function MixerView({ studio }: { studio: Studio }) {
     project,
     removeBus,
     routeTo,
+    routeBus,
     sendBus,
     setChannelSend,
     setSendBus,
@@ -166,6 +167,7 @@ export function MixerView({ studio }: { studio: Studio }) {
           const bus = project.buses[b];
           const inside = CHANNELS.filter((c) => project.mixer[c.id].out === b);
           const senders = CHANNELS.filter((c) => (project.mixer[c.id].sends?.[b] ?? 0) > 0);
+          const subBuses = BUS_IDS.filter((x) => project.buses[x].shown && project.buses[x].out === b);
           const db = 20 * Math.log10(Math.max(1e-4, bus.volume / BUS_UNITY));
           return (
             <div key={b} className="hw-strip hw-strip--bus">
@@ -219,8 +221,12 @@ export function MixerView({ studio }: { studio: Studio }) {
                 </button>
               </div>
               <span className="hw-bus-in" title={inside.length ? `Entrano: ${inside.map((c) => c.label).join(", ")}` : undefined}>
-                {inside.length || senders.length
-                  ? [...inside.map((c) => c.label), ...senders.map((c) => `${c.label} (send ${pct(project.mixer[c.id].sends?.[b] ?? 0)})`)].join(" · ")
+                {inside.length || senders.length || subBuses.length
+                  ? [
+                      ...inside.map((c) => c.label),
+                      ...subBuses.map((x) => `bus ${project.buses[x].name}`),
+                      ...senders.map((c) => `${c.label} (send ${pct(project.mixer[c.id].sends?.[b] ?? 0)})`),
+                    ].join(" · ")
                   : "nessun canale: scegli il bus nell'uscita di un canale, o premi Send"}
               </span>
               <label className="hw-visually-hidden" htmlFor={`bus-${b}`}>
@@ -234,6 +240,23 @@ export function MixerView({ studio }: { studio: Studio }) {
                 onChange={(e) => setBus(b, { name: e.target.value })}
                 onBlur={(e) => !e.target.value.trim() && setBus(b, { name: `Bus ${BUS_IDS.indexOf(b) + 1}` })}
               />
+              <label className="hw-visually-hidden" htmlFor={`bus-out-${b}`}>
+                Uscita del bus {bus.name}
+              </label>
+              <select
+                id={`bus-out-${b}`}
+                className="hw-select hw-out"
+                value={bus.out ?? "master"}
+                title="Dove esce il bus: al master o dentro un altro bus (bus dentro bus, come in FL)"
+                onChange={(e) => routeBus(b, e.target.value as Out)}
+              >
+                <option value="master">→ Master</option>
+                {busTargets(project, b).map((x) => (
+                  <option key={x} value={x}>
+                    → {project.buses[x].name}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 className="hw-bus-x"

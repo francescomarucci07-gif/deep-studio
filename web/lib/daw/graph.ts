@@ -64,6 +64,7 @@ export class Graph {
   // routing: l'ultimo nodo di ogni canale, e dove è collegato adesso (master o un bus)
   private outs = {} as Record<ChannelId, AudioNode>;
   private routes: Partial<Record<ChannelId, Out>> = {};
+  private busRoutes: Partial<Record<BusId, Out>> = {};
   // i send verso i bus: un gain per canale e bus, creato al primo uso (dopo fader e filtro, come riverbero e delay)
   private busSends: Partial<Record<ChannelId, Partial<Record<BusId, GainNode>>>> = {};
   // i bus: ingresso (dove entrano i canali) → plugin → fader → master
@@ -150,7 +151,7 @@ export class Graph {
     for (const b of BUS_IDS) {
       const input = ctx.createGain();
       const fader = ctx.createGain();
-      fader.connect(master);
+      fader.connect(master); // un bus dentro un altro bus si ricollega in applyMixer
       chains[b] = { from: input, to: fader };
       this.buses[b] = { input, fader };
     }
@@ -323,6 +324,15 @@ export class Graph {
       if (this.routes[id] !== undefined) node.disconnect();
       node.connect(out === "master" ? this.master : this.buses[out].input);
       this.routes[id] = out;
+    }
+    // bus dentro bus: ricollego l'uscita di un bus solo se è cambiata
+    for (const b of BUS_IDS) {
+      const out: Out = p.buses[b].out ?? "master";
+      if ((this.busRoutes[b] ?? "master") === out) continue;
+      const f = this.buses[b].fader;
+      f.disconnect();
+      f.connect(out === "master" ? this.master : this.buses[out].input);
+      this.busRoutes[b] = out;
     }
     fader(this.masterVol.gain, 1, !!p.volAuto?.master, false);
     this.applyInserts(immediate);

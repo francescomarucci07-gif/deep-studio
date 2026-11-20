@@ -131,7 +131,8 @@ export type Channel = { volume: number; muted: boolean; out: Out; sends?: Partia
 // il bus ha il suo fader e i suoi plugin, poi va al master. shown = si vede nel mixer.
 export const BUS_IDS = ["bus1", "bus2", "bus3", "bus4"] as const;
 export type BusId = (typeof BUS_IDS)[number];
-export type Bus = { name: string; volume: number; muted: boolean; shown: boolean };
+// out: dove esce il bus. Manca = master; un altro bus = bus dentro bus (20 nov), come il routing di FL.
+export type Bus = { name: string; volume: number; muted: boolean; shown: boolean; out?: BusId };
 export type Out = "master" | BusId;
 export const isBus = (v: unknown): v is BusId => BUS_IDS.includes(v as BusId);
 export const BUS_UNITY = 0.8; // il fader del bus a 0.8 = volume invariato (si può alzare fino a +1,9 dB)
@@ -631,7 +632,7 @@ export function normalize(raw: unknown): Project {
     : Array.from({ length: songSize(Array.isArray(r.song) ? r.song.length : 0) }, (_, i) =>
         Array.isArray(r.song) && isSlot(r.song[i]) ? r.song[i] : null,
       );
-  return {
+  return fixBusRouting({
     version: 2,
     bpm: clamp(r.bpm, 60, 200, d.bpm),
     swing: clamp(r.swing, 0, 0.5, d.swing),
@@ -685,10 +686,38 @@ export function normalize(raw: unknown): Project {
         const name = typeof raw?.name === "string" && raw.name.trim() ? raw.name.trim().slice(0, 16) : def.name;
         // un bus in cui entra qualche canale si vede sempre
         const used = CHANNEL_IDS.some((id) => r.mixer?.[id]?.out === b || Number(r.mixer?.[id]?.sends?.[b]) > 0.005);
-        return [b, { name, volume: clamp(raw?.volume, 0, 1, def.volume), muted: raw?.muted === true, shown: raw?.shown === true || used }];
+        const out = isBus(raw?.out) && raw.out !== b ? { out: raw.out } : {};
+        return [b, { name, volume: clamp(raw?.volume, 0, 1, def.volume), muted: raw?.muted === true, shown: raw?.shown === true || used, ...out }];
       }),
     ) as Project["buses"],
-  };
+  });
+}
+
+// il bus finale in cui finisce b seguendo le uscite (null = c'è un giro chiuso)
+function busChain(buses: Project["buses"], b: BusId): BusId[] | null {
+  const seen: BusId[] = [b];
+  for (let x = buses[b].out; x; x = buses[x].out) {
+    if (seen.includes(x)) return null;
+    seen.push(x);
+  }
+  return seen;
+}
+// Bus dentro bus senza giri chiusi (A → B → A farebbe girare il suono all'infinito): un bus che chiude un giro torna al
+// master; un bus che riceve un bus visibile si vede anche lui.
+function fixBusRouting(p: Project): Project {
+  for (const b of BUS_IDS) {
+    if (p.buses[b].out && !busChain(p.buses, b)) delete p.buses[b].out;
+  }
+  for (const b of BUS_IDS) {
+    const o = p.buses[b].out;
+    if (!p.buses[b].shown) delete p.buses[b].out;
+    else if (o) p.buses[o].shown = true;
+  }
+  return p;
+}
+// dove può uscire il bus b: il master o un bus visibile che non lo riporta indietro
+export function busTargets(p: Project, b: BusId): BusId[] {
+  return BUS_IDS.filter((x) => x !== b && p.buses[x].shown && !(busChain(p.buses, x) ?? [x]).includes(b));
 }
 
 // il routing del mixer in una riga: dove esce ogni canale e quali bus ci sono
@@ -696,14 +725,17 @@ function routingLine(p: Project) {
   const label = (id: ChannelId) => DRUMS.find((d) => d.id === id)?.label ?? { bass: "Bass", chords: "Accordi", lead: "Lead", lead2: "Lead 2" }[id as "bass"];
   const shown = BUS_IDS.filter((b) => p.buses[b].shown);
   if (!shown.length) return "Routing: tutti i canali vanno dritti al master (nessun bus).";
-  const into = (b: BusId) => CHANNEL_IDS.filter((id) => p.mixer[id].out === b).map(label);
+  const into = (b: BusId) => [
+    ...CHANNEL_IDS.filter((id) => p.mixer[id].out === b).map(label),
+    ...BUS_IDS.filter((x) => p.buses[x].shown && p.buses[x].out === b).map((x) => `bus ${x} "${p.buses[x].name}"`),
+  ];
   const toMaster = CHANNEL_IDS.filter((id) => p.mixer[id].out === "master").map(label);
   const sendsTo = (b: BusId) =>
     CHANNEL_IDS.filter((id) => p.mixer[id].sends?.[b]).map((id) => `${label(id)} ${Math.round((p.mixer[id].sends?.[b] ?? 0) * 100)}%`);
   return `Routing (bus = gruppo del mixer, come in FL; il bus va al master, fader ${BUS_UNITY} = volume invariato): ${shown
     .map(
       (b) =>
-        `${b} "${p.buses[b].name}" vol ${p.buses[b].volume.toFixed(2)}${p.buses[b].muted ? " MUTO" : ""} ← ${into(b).join(", ") || "nessun canale"}${sendsTo(b).length ? `; send: ${sendsTo(b).join(", ")}` : ""}`,
+        `${b} "${p.buses[b].name}" vol ${p.buses[b].volume.toFixed(2)}${p.buses[b].muted ? " MUTO" : ""}${p.buses[b].out ? ` (esce in ${p.buses[b].out})` : ""} ← ${into(b).join(", ") || "nessun canale"}${sendsTo(b).length ? `; send: ${sendsTo(b).join(", ")}` : ""}`,
     )
     .join("; ")}; dritti al master: ${toMaster.join(", ") || "nessuno"}.`;
 }

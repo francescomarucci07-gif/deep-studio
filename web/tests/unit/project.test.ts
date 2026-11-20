@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   barOf,
+  busTargets,
   isEmptyPattern,
   BUS_UNITY,
   maxLen,
@@ -179,5 +180,29 @@ describe("send verso i bus", () => {
     expect(c).toMatchObject({ sends: { bus2: 0.33 } });
     setSend(c, "bus2", 0);
     expect(c).not.toHaveProperty("sends");
+  });
+});
+
+describe("bus dentro bus", () => {
+  it("un giro chiuso torna al master; il bus di arrivo si vede", () => {
+    const shown = { shown: true };
+    const p = normalize({
+      version: 2,
+      buses: { bus1: { ...shown, out: "bus2" }, bus2: { ...shown, out: "bus1" }, bus3: { ...shown, out: "bus4" }, bus4: { shown: false } },
+    });
+    // bus1 → bus2 → bus1: il primo che chiude il giro torna al master
+    expect([p.buses.bus1.out, p.buses.bus2.out].filter(Boolean)).toHaveLength(1);
+    expect(p.buses.bus3.out).toBe("bus4");
+    expect(p.buses.bus4.shown).toBe(true);
+  });
+  it("busTargets non offre i bus che riportano indietro", () => {
+    const p = normalize({ version: 2, buses: { bus1: { shown: true, out: "bus2" }, bus2: { shown: true }, bus3: { shown: true } } });
+    expect(busTargets(p, "bus2")).toEqual(["bus3"]); // non bus1: bus1 esce già in bus2
+    expect(busTargets(p, "bus1")).toEqual(["bus2", "bus3"]);
+    expect(busTargets(p, "bus3")).toEqual(["bus1", "bus2"]);
+  });
+  it("un bus nascosto non esce in un altro bus", () => {
+    const p = normalize({ version: 2, buses: { bus2: { shown: false, out: "bus3" }, bus3: { shown: true } } });
+    expect(p.buses.bus2.out).toBeUndefined();
   });
 });

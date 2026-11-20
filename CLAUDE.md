@@ -152,7 +152,9 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   **Send** (19 nov): `mixer.X.sends` = { bus: 0–1 } (`setSend`), dopo fader e filtro come rev/dly; nel Mixer il pulsante
   Send sul bus mostra la manopola sotto ogni canale (`sendBus`); togliendo il bus spariscono anche i suoi send. Coach:
   `send` dentro `bus` di `scrivi_effetti` (`crea-v28`). Il mixer sul computer ha strisce da almeno 64 px e scorre di lato;
-  il master resta fisso a destra.
+  il master resta fisso a destra. **Bus dentro bus** (20 nov): `buses.X.out` (manca = master), selettore sotto ogni bus
+  (`busTargets` offre solo bus che non chiudono un giro; `fixBusRouting` in `normalize` riporta al master un giro chiuso);
+  in `graph.ts` il fader del bus si ricollega in `applyMixer` (`busRoutes`). Coach: `uscita` del bus (`crea-v29`).
 - **Export WAV**: `web/lib/daw/render.ts` suona la stessa catena di `graph.ts` in un OfflineAudioContext
   (Song = la canzone, Pattern = 4 giri) e scrive un WAV 24 bit / 44,1 kHz: si può caricare nell'analisi.
 - **Export** (pulsante ⤓ Export, menu): Mix WAV come prima; **Stem** = un WAV 24 bit per strumento che suona
@@ -239,7 +241,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   degli stem~~ **fatto il 18 nov**; ~~più strumenti~~ **fatti il 19 nov** (tom, shaker, Lead 2; il pad c'era già negli accordi); sample propri (spazio file, licenze); ~~Roll più
   comodo~~ **fatto il 18 nov** (Ctrl/Shift + trascina seleziona; frecce sposta, Shift = ottava o battito; Ctrl+C/X/V/D/A,
   Canc; `rollKey` e `placeNotes` in `Daw.tsx`; ogni comando è un passo di Annulla; restano quantize e velocity per nota); ~~automazioni del volume~~ **fatte il 18 nov** (`volAuto`: master,
-  canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); ~~send verso i bus~~ **fatto il 19 nov**; bus dentro bus; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
+  canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); ~~send verso i bus~~ **fatto il 19 nov**; ~~bus dentro bus~~ **fatto il 20 nov**; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
   `graph.click`, non entra nell'export).
 - Coach: ~~lezioni guidate~~ **fatte il 18 nov**; ~~parere in tempo reale~~ **fatto il 19 nov** (vedi "Cose da sapere").
 - Prodotto: ~~pagina delle segnalazioni nel sito~~ **fatta il 19 nov** (/studio/segnalazioni); ~~link di ascolto pubblico~~ **fatto il 20 nov**; email di accesso con

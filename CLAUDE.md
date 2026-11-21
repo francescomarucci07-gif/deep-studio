@@ -145,6 +145,9 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
 - **Velocity**: `pattern.vel` (chiavi `hat3`, `b5`, `l5` = tutte le note del lead dello step, `c2` = accordi del
   battito; 0.1–1, `VEL_DEFAULT` 0.8 = come prima e non si salva; `velGain` = v/0.8). Nel Beat il pulsante Vel: trascini
   su e giù sulle barre (il clic non accende step). Coach: campo `velocity` in `scrivi_pattern` (`crea-v21`). Lead 2: chiavi `m5`.
+  Nel Roll (21 nov) la corsia **Vel** sotto la griglia (e sotto gli accordi) usa le stesse chiavi (`velProps`/`velBar` con
+  `always`). La velocity resta per step: tutte le note dello stesso step hanno la stessa forza.
+  **Quantize** nel Roll (21 nov): 1/8 o 1/4, sulle note selezionate o su tutte (`quantize` in `useStudio.tsx`, un passo di Annulla).
 - **Pattern lunghi**: `pattern.bars` 1, 2 o 4 (`patBars`, `patSteps`, `setPatternBars` in `project.ts`; ADR); step e
   battiti contati dall'inizio del pattern. Nella canzone caselle di fila = battute del pattern (`barOf`, usato da motore,
   export, MIDI). Beat e Roll mostrano una battuta alla volta (schede 1–4, seguono il Play); selettore "bat." accanto a
@@ -248,7 +251,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 "Cose da sapere").
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
-- Studio: ~~scala nel Roll~~ **fatta il 20 nov**; ~~progetti modello per genere~~ **fatti il 21 nov**; quantize e velocity per nota nel Roll;
+- Studio: ~~scala nel Roll~~ **fatta il 20 nov**; ~~progetti modello per genere~~ **fatti il 21 nov**; ~~quantize e velocity nel Roll~~ **fatti il 21 nov** (corsia Vel per step);
   ~~duplica/rinomina/cancella progetti~~ **fatto il 21 nov**; ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
   degli stem~~ **fatto il 18 nov**; ~~più strumenti~~ **fatti il 19 nov** (tom, shaker, Lead 2; il pad c'era già negli accordi); sample propri (proposta in `docs/ADR-0002-sample-propri.md`, 20 nov: da decidere con Francesco e Spencer); ~~Roll più
   comodo~~ **fatto il 18 nov** (Ctrl/Shift + trascina seleziona; frecce sposta, Shift = ottava o battito; Ctrl+C/X/V/D/A,

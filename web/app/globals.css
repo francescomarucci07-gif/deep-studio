@@ -2860,3 +2860,43 @@ ol.ds-led-row {
   color: var(--ds-text);
   font: inherit;
 }
+
+/* la corsia della velocity sotto il Roll: una barra per step con note, si trascina su e giù */
+.daw-vel-lane {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--ds-border);
+}
+.daw-vel-key {
+  display: grid;
+  place-items: center;
+  height: 40px;
+  background: var(--ds-surface-inset);
+  color: var(--ds-text-muted);
+}
+.daw-vel-cell {
+  position: relative;
+  height: 40px;
+  border-radius: 3px;
+  background: var(--ds-surface-inset);
+}
+.daw-vel-cell[data-on="true"] {
+  background: var(--ds-surface);
+  cursor: ns-resize;
+  touch-action: none;
+}
+.daw-vel-cell[data-on="true"] .hw-vel {
+  background: var(--hw-pad-green);
+}
+.daw-roll[data-roll="lead"] .daw-vel-cell .hw-vel,
+.daw-roll[data-roll="lead2"] .daw-vel-cell .hw-vel {
+  background: var(--hw-pad-blue);
+}
+.daw-roll[data-roll="chords"] .daw-vel-cell .hw-vel {
+  background: var(--hw-pad-purple);
+}
+.hw-quantize {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

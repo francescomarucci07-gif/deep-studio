@@ -593,10 +593,11 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
     setVelShown(Math.round(v * 100));
     update((p) => setVel(p.patterns[playbackRef.current.editing], key, v));
   };
-  const velBar = (key: string, on: boolean) =>
-    velMode && on ? <span className="hw-vel" style={{ height: `${Math.round(velOf(pat, key) * 100)}%` }} aria-hidden="true" /> : null;
-  const velProps = (key: string, on: boolean) =>
-    velMode && on
+  // always: la corsia della velocity sotto il Roll, che non dipende dal pulsante Vel del Beat
+  const velBar = (key: string, on: boolean, always = false) =>
+    (velMode || always) && on ? <span className="hw-vel" style={{ height: `${Math.round(velOf(pat, key) * 100)}%` }} aria-hidden="true" /> : null;
+  const velProps = (key: string, on: boolean, always = false) =>
+    (velMode || always) && on
       ? {
           "data-velkey": key,
           title: `Velocity ${Math.round(velOf(pat, key) * 100)}% (trascina su e giù)`,
@@ -832,6 +833,24 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
       for (const x of ok) setNoteLen(pp, r, x.s, x.n, x.len);
     });
     setSel(new Set(ok.map((x) => `${x.s}:${x.n}`)));
+  };
+  // Quantize (come in FL): sposta l'inizio delle note sulla griglia più larga (2 = 1/8, 4 = 1/4), le selezionate o, se
+  // non c'è selezione, tutte quelle dello strumento. Due note che finiscono sullo stesso posto diventano una.
+  const quantize = (r: RollId, grid: 2 | 4) => {
+    const cur = projectRef.current.patterns[playbackRef.current.editing];
+    const all: { s: number; n: number }[] = [];
+    for (let st = 0; st < cur.bass.length; st++) {
+      const list = isLeadInst(r) ? cur[r][st] : cur.bass[st] === null ? [] : [cur.bass[st] as number];
+      for (const n of list) all.push({ s: st, n });
+    }
+    const chosen = sel.size ? all.filter((x) => sel.has(`${x.s}:${x.n}`)) : all;
+    if (!chosen.length) return;
+    const items = chosen.map((x) => {
+      const v = cur.vel?.[`${NOTE_PREFIX[r]}${x.s}`];
+      const to = Math.min(cur.bass.length - grid, Math.round(x.s / grid) * grid);
+      return { s: to, n: x.n, len: noteLen(cur, r, x.s, x.n), ...(v !== undefined ? { vel: v } : {}) };
+    });
+    placeNotes(r, items, chosen);
   };
   // i tasti del Roll (solo con il Roll aperto sul computer): true = tasto usato
   const rollKey = (e: KeyboardEvent) => {
@@ -1181,6 +1200,7 @@ export function useStudio({ id, initialTitle, initialProject, coachMessages, tou
 
   return {
     ascolto,
+    quantize,
     sendBus,
     setSendBus,
     routeBus,

@@ -10,6 +10,7 @@ import {
   type ChordStyle,
   type ChordType,
   LEAD_LABEL,
+  NOTE_PREFIX,
   LEAD_SOUNDS,
   LEAD_WAVES,
   type LeadInst,
@@ -44,6 +45,9 @@ export function RollView({ studio }: { studio: Studio }) {
     pat,
     patternButtons,
     project,
+    quantize,
+    velBar,
+    velProps,
     playing,
     playingSlot,
     roll,
@@ -198,6 +202,19 @@ export function RollView({ studio }: { studio: Studio }) {
               Piega
             </button>
           )}
+          {roll !== "chords" && (
+            <span className="hw-quantize" role="group" aria-label="Quantize">
+              <span className="hw-label" title="Sposta l'inizio delle note sulla griglia: le selezionate o, senza selezione, tutte">
+                Quantizza
+              </span>
+              <button type="button" className="hw-btn hw-btn--small" onClick={() => quantize(roll, 2)} title="Sugli ottavi (1/8)">
+                1/8
+              </button>
+              <button type="button" className="hw-btn hw-btn--small" onClick={() => quantize(roll, 4)} title="Sui quarti (1/4)">
+                1/4
+              </button>
+            </span>
+          )}
           {key && roll === "chords" && (
             <button
               type="button"
@@ -268,6 +285,18 @@ export function RollView({ studio }: { studio: Studio }) {
               })}
             </div>
           ))}
+          {/* la corsia della velocity: una barra per battito con accordi, trascina su e giù */}
+          <div className="daw-roll-row daw-vel-lane" aria-label="Velocity degli accordi">
+            <span className="daw-key daw-vel-key">Vel</span>
+            {beatCols.map((b) => {
+              const on = pat.chords[b].length > 0;
+              return (
+                <span key={b} className="daw-vel-cell daw-cell--beat" data-on={on} {...velProps(`c${b}`, on, true)}>
+                  {velBar(`c${b}`, on, true)}
+                </span>
+              );
+            })}
+          </div>
         </div>
       ) : (
         <div className="daw-roll" data-roll={roll}>
@@ -320,6 +349,19 @@ export function RollView({ studio }: { studio: Studio }) {
               })}
             </div>
           ))}
+          {/* la corsia della velocity, come in FL: una barra per ogni step con note (tutte le note dello step) */}
+          <div className="daw-roll-row daw-vel-lane" aria-label="Velocity delle note">
+            <span className="daw-key daw-vel-key">Vel</span>
+            {cols.map((i) => {
+              const on = roll === "bass" ? pat.bass[i] !== null : roll === "lead" || roll === "lead2" ? pat[roll][i].length > 0 : false;
+              const k = `${NOTE_PREFIX[roll as keyof typeof NOTE_PREFIX]}${i}`;
+              return (
+                <span key={i} className="daw-vel-cell" data-on={on} data-beat={i % 4 === 0} {...velProps(k, on, true)}>
+                  {velBar(k, on, true)}
+                </span>
+              );
+            })}
+          </div>
         </div>
       )}
       {roll === "chords" && (

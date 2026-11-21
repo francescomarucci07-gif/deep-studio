@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { SupabaseMissing } from "@/components/SupabaseMissing";
 import { TEMPLATES, TEMPLATE_IDS } from "@/lib/daw/templates";
+import { ProjectActions } from "./ProjectActions";
 import { JOB_STEPS } from "@/lib/jobs";
 import { STAGES, SUBGENRES, labelOf } from "@/lib/options";
 import { hasSupabase } from "@/lib/supabase/env";
@@ -94,9 +95,12 @@ export default async function Studio() {
                     {Number(p.bpm)} BPM · {new Date(p.updated_at).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
                   </div>
                 </div>
-                <Link href={`/studio/crea/${p.id}`} className="ds-pad">
-                  Apri
-                </Link>
+                <div className="ds-row">
+                  <ProjectActions id={p.id} title={p.title} />
+                  <Link href={`/studio/crea/${p.id}`} className="ds-pad">
+                    Apri
+                  </Link>
+                </div>
               </li>
             ))}
           </ul>

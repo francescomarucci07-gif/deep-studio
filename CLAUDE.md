@@ -136,6 +136,8 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   Afro house; ognuno con BPM, swing, kit, scala, suoni, un groove A e un break B in una canzone di 16 battute). Nella pagina
   Il tuo studio la sezione "Nuovo progetto" ha un pulsante per modello (`name="modello"` → `/studio/crea/nuovo`,
   `createStarterProject(supabase, modello)`); il primo login usa House. Un test controlla che ogni nota stia nella scala.
+  Accanto a ogni progetto: Rinomina, Duplica ("(copia)"), Elimina con conferma (`app/studio/ProjectActions.tsx`, dal browser con
+  la RLS di projects; cronologia, chat e link di ascolto se ne vanno con il progetto).
 - **Lunghezza delle note** (basso e lead): `pattern.len` (chiavi `lenKey`: `b5`, `l5:72`, Lead 2 `m5:72`; solo note da 2 step in su,
   `setNoteLen`/`maxLen`/`noteLen` in `project.ts`: dentro la battuta, senza coprire la nota dopo). Nel Roll: premi e
   trascini = disegni o allunghi, clic su una nota = la togli, pennello = lunghezza dell'ultima; in registrazione la
@@ -189,7 +191,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
 - **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen, scale, templates; `vitest.config.mts`);
   `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
-  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send|ascolta|modello-<id>` (modello-deep… = un progetto modello; ascolta = il lettore del link; pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
+  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send|ascolta|progetti|modello-<id>` (modello-deep… = un progetto modello; ascolta = il lettore del link; pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
   la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
@@ -247,7 +249,7 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
 - Studio: ~~scala nel Roll~~ **fatta il 20 nov**; ~~progetti modello per genere~~ **fatti il 21 nov**; quantize e velocity per nota nel Roll;
-  duplica/rinomina/cancella progetti; ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
+  ~~duplica/rinomina/cancella progetti~~ **fatto il 21 nov**; ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e
   degli stem~~ **fatto il 18 nov**; ~~più strumenti~~ **fatti il 19 nov** (tom, shaker, Lead 2; il pad c'era già negli accordi); sample propri (proposta in `docs/ADR-0002-sample-propri.md`, 20 nov: da decidere con Francesco e Spencer); ~~Roll più
   comodo~~ **fatto il 18 nov** (Ctrl/Shift + trascina seleziona; frecce sposta, Shift = ottava o battito; Ctrl+C/X/V/D/A,
   Canc; `rollKey` e `placeNotes` in `Daw.tsx`; ogni comando è un passo di Annulla; restano quantize e velocity per nota); ~~automazioni del volume~~ **fatte il 18 nov** (`volAuto`: master,

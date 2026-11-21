@@ -2838,3 +2838,25 @@ ol.ds-led-row {
   font-size: 13px;
   line-height: 1.4;
 }
+
+/* Il tuo studio: le azioni su un progetto (Rinomina, Duplica, Elimina) */
+.ds-project-actions,
+.ds-project-rename {
+  flex-wrap: wrap;
+  gap: var(--ds-space-2);
+}
+.ds-pad--danger:hover,
+.ds-pad--danger:focus-visible {
+  border-color: var(--hw-led-red, #e2647f);
+  color: var(--hw-led-red, #e2647f);
+}
+.ds-rename-input {
+  min-height: 36px;
+  min-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+  color: var(--ds-text);
+  font: inherit;
+}

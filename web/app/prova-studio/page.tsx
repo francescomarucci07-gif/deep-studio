@@ -3,6 +3,7 @@ import { normalize, starterProject } from "@/lib/daw/project";
 import user from "@/tests/e2e/progetto-utente.json";
 import { TEMPLATES, isTemplate } from "@/lib/daw/templates";
 import { Player } from "../ascolta/[codice]/Player";
+import { ProjectActions } from "../studio/ProjectActions";
 import { Daw } from "../studio/crea/[id]/Daw";
 
 // La pagina dei test nel browser (Playwright, tests/e2e): lo studio senza login né database, con un progetto scelto
@@ -55,6 +56,8 @@ export default async function ProvaStudio({ searchParams }: { searchParams: Prom
                   buses: { ...starter.buses, bus2: { ...starter.buses.bus2, name: "Muto", muted: true, shown: true }, bus3: { ...starter.buses.bus3, name: "Rev", shown: true } },
                 })
               : starter;
+  // le azioni sui progetti della pagina Il tuo studio
+  if (p === "progetti") return <ProjectActions id="00000000-0000-0000-0000-000000000002" title="Groove di prova" />;
   // un progetto modello (?p=modello-deep, modello-tech…)
   const modello = p.startsWith("modello-") ? p.slice(8) : null;
   if (modello && isTemplate(modello))

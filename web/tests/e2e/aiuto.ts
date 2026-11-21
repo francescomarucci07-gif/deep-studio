@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, type Page } from "@playwright/test";
 
-export type Progetto = "starter" | "empty" | "user" | "export" | "tour" | "segnala" | "pesto" | "send" | "ascolta" | `modello-${string}`;
+export type Progetto = "starter" | "empty" | "user" | "export" | "tour" | "segnala" | "pesto" | "send" | "ascolta" | "progetti" | `modello-${string}`;
 
 // apre lo studio con un progetto; il database e il coach rispondono finti, il tour è già visto (tranne con "tour")
 export async function apri(page: Page, p: Progetto = "starter") {

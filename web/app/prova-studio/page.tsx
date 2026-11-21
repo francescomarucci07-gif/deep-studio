@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { normalize, starterProject } from "@/lib/daw/project";
 import user from "@/tests/e2e/progetto-utente.json";
+import { TEMPLATES, isTemplate } from "@/lib/daw/templates";
 import { Player } from "../ascolta/[codice]/Player";
 import { Daw } from "../studio/crea/[id]/Daw";
 
@@ -54,6 +55,10 @@ export default async function ProvaStudio({ searchParams }: { searchParams: Prom
                   buses: { ...starter.buses, bus2: { ...starter.buses.bus2, name: "Muto", muted: true, shown: true }, bus3: { ...starter.buses.bus3, name: "Rev", shown: true } },
                 })
               : starter;
+  // un progetto modello (?p=modello-deep, modello-tech…)
+  const modello = p.startsWith("modello-") ? p.slice(8) : null;
+  if (modello && isTemplate(modello))
+    return <Daw id="prova" initialTitle={TEMPLATES[modello].label} initialProject={TEMPLATES[modello].make()} coachMessages={[]} tourDone />;
   // il lettore del link di ascolto (/ascolta/<codice>) con la traccia di prova, senza database
   if (p === "ascolta")
     return <Player codice="codicediprova12345678" title="Prova ascolto" project={normalize({ ...starter, bpm: 140 })} updatedAt="2026-11-20T10:00:00Z" />;

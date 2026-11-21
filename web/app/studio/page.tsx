@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SupabaseMissing } from "@/components/SupabaseMissing";
+import { TEMPLATES, TEMPLATE_IDS } from "@/lib/daw/templates";
 import { JOB_STEPS } from "@/lib/jobs";
 import { STAGES, SUBGENRES, labelOf } from "@/lib/options";
 import { hasSupabase } from "@/lib/supabase/env";
@@ -48,11 +49,9 @@ export default async function Studio() {
           <p className="ds-lead">{user?.email}</p>
         </div>
         <div className="ds-row">
-          <form action="/studio/crea/nuovo" method="post">
-            <button type="submit" className="ds-pad ds-pad--primary">
-              Nuovo progetto
-            </button>
-          </form>
+          <a href="#nuovo" className="ds-pad ds-pad--primary">
+            Nuovo progetto
+          </a>
           {admin && (
             <Link href="/studio/segnalazioni" className="ds-pad">
               Segnalazioni
@@ -66,11 +65,24 @@ export default async function Studio() {
         </div>
       </div>
 
+      <section className="ds-module" id="nuovo">
+        <h2 className="ds-module-title">Nuovo progetto</h2>
+        <p className="ds-lead">Scegli da dove partire: ogni modello è già pronto da ascoltare, con groove, break e una piccola canzone.</p>
+        <form action="/studio/crea/nuovo" method="post" className="ds-templates">
+          {TEMPLATE_IDS.map((t) => (
+            <button key={t} type="submit" name="modello" value={t} className="ds-template">
+              <strong>{TEMPLATES[t].label}</strong>
+              <span>{TEMPLATES[t].hint}</span>
+            </button>
+          ))}
+        </form>
+      </section>
+
       <section className="ds-module">
         <h2 className="ds-module-title">Progetti</h2>
         {projects.length === 0 ? (
           <p className="ds-lead">
-            Crea il primo groove: batteria, bassline e un coach che ti segue mentre produci. Premi “Nuovo progetto”.
+            Crea il primo groove: batteria, bassline e un coach che ti segue mentre produci. Scegli un modello qui sopra.
           </p>
         ) : (
           <ul className="ds-list">

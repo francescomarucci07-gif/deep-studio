@@ -2368,7 +2368,7 @@ ol.ds-led-row {
     min-width: 26px;
     padding: 0 4px;
   }
-  /* Versioni: solo l'icona ↺ (la scritta è nel tooltip) */
+  /* Versioni, Export e Parere: solo l'icona (la scritta è nel tooltip), così ci sta anche il selettore Pat/Song */
   .console .hw-top .hw-transport .hw-btn-text {
     display: none;
   }
@@ -2936,4 +2936,43 @@ ol.ds-led-row {
 .hw-strip--newbus .hw-label {
   font-size: 10px;
   text-transform: none;
+}
+
+/* Pattern / Song in alto, accanto a Play (come in FL): un pulsante con due scritte, si accende quella attiva */
+.hw-pat-song {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  padding: 2px 8px;
+  line-height: 1.1;
+}
+.hw-pat-song-led {
+  color: var(--hw-print);
+  font-size: 10px;
+  opacity: 0.45;
+}
+.hw-pat-song-led[data-on="true"] {
+  color: var(--ds-accent);
+  opacity: 1;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--ds-accent) 60%, transparent);
+}
+/* con il selettore Pat/Song la barra in alto è più lunga: fino a 1500 px Versioni resta solo icona e i pulsanti si
+   stringono un poco, così il trasporto sta su una riga anche sui portatili da 1366 */
+@media (min-width: 1251px) and (max-width: 1500px) {
+  .console .hw-top .hw-transport {
+    gap: 5px;
+  }
+  .console .hw-top .hw-transport .hw-btn {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .console .hw-top .hw-transport .hw-btn--icon {
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+  .console .hw-top .hw-transport .hw-btn-text {
+    display: none;
+  }
 }

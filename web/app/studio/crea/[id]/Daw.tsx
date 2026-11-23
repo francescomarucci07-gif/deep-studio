@@ -249,20 +249,22 @@ export function Daw(props: StudioProps) {
             </div>
           )}
 
+          {/* sul telefono le viste stanno una sotto l'altra: stesso ordine delle schede del computer
+              (Beat, Roll, Song, Mixer, Auto; chiesto da Francesco il 23 nov: il Roll prima del Mixer) */}
           {/* ---- step sequencer: ogni riga ha il colore del suo strumento ---- */}
           <BeatView studio={studio} />
+
+          {/* ---- piano roll: una schermata con la sua tastiera per Bass, Lead, Lead 2 e Chord ---- */}
+          <RollView studio={studio} />
 
           {/* ---- arrangiamento: quale pattern suona in ogni battuta ---- */}
           <SongView studio={studio} />
 
-          {/* ---- automazioni dei filtri, battuta per battuta ---- */}
-          <AutoView studio={studio} />
-
           {/* ---- mixer ---- */}
           <MixerView studio={studio} />
 
-          {/* ---- piano roll: una schermata con la sua tastiera per Bass, Lead e Chord ---- */}
-          <RollView studio={studio} />
+          {/* ---- automazioni dei filtri e del volume, battuta per battuta ---- */}
+          <AutoView studio={studio} />
         </div>
 
         {/* ---- colonna destra: il coach (sul computer si può chiudere) ---- */}

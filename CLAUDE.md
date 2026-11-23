@@ -112,6 +112,10 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   (Mix WAV, stem, MIDI). Coach dello studio:
   `/api/coach/crea` + `lib/coach/prompt-crea.ts`; il coach scrive nello studio con gli strumenti di
   `lib/daw/coach-tool.ts` (scrivi_pattern, scrivi_canzone, scrivi_effetti con i plugin); plugin degli insert in `lib/daw/plugins.ts`; streaming condiviso in `lib/coach/stream.ts`.
+- **Barra in alto** (23 nov): selettore **Pat/Song** accanto a Play (`.hw-pat-song`, come in FL), cambia modalità da ogni
+  vista e va d'accordo con quello della Song; tra 1000 e 1500 px Versioni, Export e Parere sono solo icona (scritta nel
+  tooltip) perché il trasporto stia su una riga. Sul telefono le viste sono in fila nell'ordine delle schede:
+  Beat, Roll, Song, Mixer, Auto (`Daw.tsx`).
 - **Tour guidato** (`web/app/studio/crea/[id]/Tour.tsx`): 14 tappe scritte a mano (`TOUR`), evidenzia la parte
   dello studio e apre la vista giusta; parte da solo la prima volta (`user_metadata.tour_done` nell'account,
   più `ds-tour-visto` nel browser), pulsante Tutorial per rivederlo; voce del coach se accesa. Su telefono salta

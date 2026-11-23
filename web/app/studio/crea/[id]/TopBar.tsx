@@ -1,6 +1,6 @@
 "use client";
 
-// La barra in alto: marchio, display, trasporto (Play, Rec, Versioni, Annulla, Export, Parere), Tempo e Swing.
+// La barra in alto: marchio, display, trasporto (Pattern/Song, Play, Rec, Versioni, Annulla, Export, Parere), Tempo e Swing.
 import { Knob } from "@/components/hw/Knob";
 import { STEPS, patBars, songLength } from "@/lib/daw/project";
 import { pct, two } from "./ui";
@@ -31,6 +31,7 @@ export function TopBar({ studio }: { studio: Studio }) {
     save,
     setExportMenu,
     setSharing,
+    setSongMode,
     setShowVersions,
     setTitle,
     showVersions,
@@ -81,6 +82,22 @@ export function TopBar({ studio }: { studio: Studio }) {
       </div>
 
       <div className="hw-transport">
+        {/* Pattern / Song come in FL: un selettore sempre qui in alto, da qualunque vista (anche mentre suona) */}
+        <button
+          type="button"
+          className="hw-btn hw-pat-song"
+          data-mode={songMode ? "song" : "pat"}
+          aria-label={songMode ? "Modalità Song: passa a Pattern" : "Modalità Pattern: passa a Song"}
+          title={
+            songMode
+              ? "Song: suona la canzone come la playlist di FL. Clic: torna a Pattern"
+              : `Pattern: suona in loop il pattern ${editing}. Clic: passa a Song (la canzone)`
+          }
+          onClick={() => setSongMode(!songMode)}
+        >
+          <span className="hw-pat-song-led" data-on={!songMode}>Pat</span>
+          <span className="hw-pat-song-led" data-on={songMode}>Song</span>
+        </button>
         <button type="button" className="hw-btn hw-btn--play" aria-pressed={playing} onClick={() => void play(0)}>
           <span className="hw-btn-led" />▶ Play
         </button>
@@ -133,11 +150,16 @@ export function TopBar({ studio }: { studio: Studio }) {
             aria-pressed={exporting === "sì" || exportMenu}
             aria-expanded={exportMenu}
             disabled={exporting === "sì"}
-            title={songMode ? "Esporta tutta la canzone" : `Esporta 4 giri del pattern ${editing}`}
+            aria-label={exporting === "sì" ? undefined : "Export"}
+            title={songMode ? "Export: esporta tutta la canzone" : `Export: esporta 4 giri del pattern ${editing}`}
             onClick={() => setExportMenu(!exportMenu)}
           >
             <span className="hw-btn-led" />
-            {exporting === "sì" ? exportMsg || "Esporto…" : exporting === "errore" ? "Riprova" : "⤓ Export"}
+            {exporting === "sì" ? exportMsg || "Esporto…" : exporting === "errore" ? "Riprova" : (
+              <>
+                ⤓<span className="hw-btn-text"> Export</span>
+              </>
+            )}
           </button>
           {exportMenu && (
             <span className="hw-export-menu" role="menu">
@@ -172,11 +194,18 @@ export function TopBar({ studio }: { studio: Studio }) {
           className="hw-btn hw-btn--listen"
           aria-pressed={listening}
           disabled={listening}
-          title={songMode ? "Il coach ascolta tutta la canzone" : `Il coach ascolta il pattern ${editing}`}
+          aria-label={listening ? undefined : "Parere"}
+          title={songMode ? "Parere: il coach ascolta tutta la canzone" : `Parere: il coach ascolta il pattern ${editing}`}
           onClick={() => void listen()}
         >
           <span className="hw-btn-led" />
-          {listening ? "Ascolto…" : "◉ Parere"}
+          {listening ? (
+            "Ascolto…"
+          ) : (
+            <>
+              ◉<span className="hw-btn-text"> Parere</span>
+            </>
+          )}
         </button>
       </div>
 

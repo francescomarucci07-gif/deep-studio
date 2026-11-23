@@ -47,7 +47,13 @@ export function MixerView({ studio }: { studio: Studio }) {
   } = studio;
   return (
     <section className="hw-panel hw-mixer" data-panel="mixer" data-rack={fxOpen} aria-label="Mixer">
-      <h2 className="hw-title">Mixer</h2>
+      <div className="hw-mixer-head">
+        <h2 className="hw-title">Mixer</h2>
+        <p className="hw-mixer-hint">
+          Un <strong>bus</strong> è un gruppo di canali, come in FL: ci mandi più canali (dall&apos;uscita sotto ognuno, o con
+          Send) e li regoli insieme con un fader e i suoi plugin. Esempio: tutta la batteria nel bus Drums.
+        </p>
+      </div>
       <div className="hw-strips">
         {CHANNELS.map(({ id: c, label }) => (
           <div key={c} className="hw-strip">
@@ -269,6 +275,21 @@ export function MixerView({ studio }: { studio: Studio }) {
             </div>
           );
         })}
+        {/* un bus nuovo con un clic: la striscia tratteggiata prima del Master */}
+        {nextBus && (
+          <button
+            type="button"
+            className="hw-strip hw-strip--newbus"
+            title="Crea un bus: poi scegli quali canali ci entrano dall'uscita sotto ogni canale"
+            onClick={() => setBus(nextBus, { shown: true })}
+          >
+            <span className="hw-newbus-plus" aria-hidden="true">
+              +
+            </span>
+            <span className="hw-strip-name">Nuovo bus</span>
+            <span className="hw-label">un gruppo per più canali</span>
+          </button>
+        )}
         <div className="hw-strip hw-strip--master">
           <span className="hw-label">Master</span>
           <button

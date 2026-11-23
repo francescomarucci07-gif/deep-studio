@@ -2900,3 +2900,40 @@ ol.ds-led-row {
   align-items: center;
   gap: 4px;
 }
+
+/* Mixer: due righe che spiegano il bus, e la striscia tratteggiata per crearne uno (si vedeva poco "+ Bus" sul Master) */
+.hw-mixer-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin-bottom: var(--ds-space-2);
+}
+.hw-mixer-hint {
+  flex: 1 1 320px;
+  margin: 0;
+  color: var(--hw-print);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.hw-strip--newbus {
+  justify-content: center;
+  gap: 6px;
+  border-style: dashed;
+  background: transparent;
+  color: var(--hw-print);
+  cursor: pointer;
+  text-align: center;
+}
+.hw-strip--newbus:hover,
+.hw-strip--newbus:focus-visible {
+  border-color: var(--ds-accent);
+  color: var(--ds-text);
+}
+.hw-newbus-plus {
+  font: 300 28px/1 var(--ds-font-mono);
+}
+.hw-strip--newbus .hw-label {
+  font-size: 10px;
+  text-transform: none;
+}

@@ -41,6 +41,10 @@ export class Engine {
     private getPlayback: () => Playback,
     private onStep: (step: number, bar: number, slot: Slot | null) => void,
   ) {
+    // iPhone: senza questo, con l'interruttore del silenzioso l'audio del web non si sente (è musica, non un suono di
+    // sistema). Safari 16.4+; gli altri browser non hanno audioSession e lo ignorano.
+    const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = "playback";
     this.ctx = new AudioContext();
     this.graph = new Graph(this.ctx, getProject);
     // il limiter vero si carica in sottofondo; play e anteprime lo aspettano (pochi millisecondi)
@@ -68,8 +72,11 @@ export class Engine {
   // fromBar: in modalità song la battuta da cui partire (il marker); a fine canzone si torna lì.
   // countIn: quanti click di metronomo (uno per battito) prima della prima battuta; 0 = parte subito.
   async start(fromBar = 0, countIn = 0) {
+    // prima sblocco l'audio, poi aspetto il limiter: su iPhone e Safari l'audio parte solo se resume() arriva nello
+    // stesso istante del tocco (prima di qualsiasi await), altrimenti resta muto
+    const unlocked = this.ctx.resume();
     await this.ready;
-    await this.ctx.resume();
+    await unlocked;
     this.step = 0;
     this.recent = [];
     this.bar = fromBar;
@@ -145,8 +152,11 @@ export class Engine {
 
   // senza slot suona con il suono del pattern che stai modificando
   async preview(id: ChannelId, opts: { note?: number; chord?: Chord; slot?: Slot; level?: number } = {}) {
+    // prima sblocco l'audio, poi aspetto il limiter: su iPhone e Safari l'audio parte solo se resume() arriva nello
+    // stesso istante del tocco (prima di qualsiasi await), altrimenti resta muto
+    const unlocked = this.ctx.resume();
     await this.ready;
-    await this.ctx.resume();
+    await unlocked;
     this.graph.preview(id, this.ctx.currentTime + 0.01, { ...opts, slot: opts.slot ?? this.getPlayback().editing });
   }
 

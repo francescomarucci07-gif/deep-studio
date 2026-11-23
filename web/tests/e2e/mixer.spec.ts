@@ -71,3 +71,17 @@ test("automazioni del volume: bersagli, valori da 0 a 1, ritorno al filtro", asy
   expect(await scorre(page, ".console-stage")).toBe(0);
   expect(err).toEqual([]);
 });
+
+test("la striscia + Nuovo bus crea un bus e sparisce quando i bus sono finiti", async ({ page }) => {
+  const err = errori(page);
+  await apri(page);
+  await vista(page, "Mixer");
+  await expect(page.locator(".hw-mixer-hint")).toContainText("un gruppo di canali");
+  const nuovo = page.locator(".hw-strip--newbus");
+  for (const n of [2, 3, 4]) {
+    await nuovo.click();
+    await expect(page.locator(".hw-strip--bus")).toHaveCount(n);
+  }
+  await expect(nuovo).toHaveCount(0); // 4 bus: non ce ne sono altri
+  expect(err).toEqual([]);
+});

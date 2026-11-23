@@ -83,7 +83,7 @@ export const TEMPLATES = {
             bass: { 3: 38, 7: 38, 10: 41, 14: 36 },
             len: { b7: 2 },
             chords: { 0: ch(2, "min9"), 2: ch(7, "dom7") },
-            lead2: { 0: [74], 6: [77], 11: [76] },
+            lead2: { 0: [74], 6: [77], 10: [71] },
             vel: { ...velAll("shaker", every(1, 2), 0.45), hat2: 0.6, hat10: 0.6, perc13: 0.5 },
           }),
           B: pat({

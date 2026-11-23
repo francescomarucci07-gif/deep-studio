@@ -6,7 +6,12 @@ import { Graph } from "./graph";
 import { loadLimiter } from "./limiter";
 import { STEPS, barOf, patBars, songLength, type ChannelId, type Chord, type Project, type Slot } from "./project";
 
-const LOOKAHEAD_S = 0.1;
+// quanto avanti programma l'orologio: più margine = regge meglio i momenti in cui il browser è occupato
+// (apertura del progetto, ridisegno della pagina), ma il Play e i cambi arrivano un attimo dopo
+const LOOKAHEAD_S = 0.15;
+// Se il browser resta bloccato più del margine, gli step il cui momento è già passato da più di LATE_S non si suonano:
+// meglio perdere un colpo che sentire tutti i colpi rimasti indietro ammucchiati, fuori tempo (come i sequencer veri).
+const LATE_S = 0.03;
 const TICK_MS = 25;
 
 // Cosa suona: in modalità pattern il pattern che stai modificando, in modalità song la canzone
@@ -151,6 +156,7 @@ export class Engine {
     const stepDur = 60 / p.bpm / 4;
     this.graph.setAutomating(song);
     while (this.nextTime < this.ctx.currentTime + LOOKAHEAD_S) {
+      const late = this.nextTime < this.ctx.currentTime - LATE_S;
       const s = this.step;
       const len = songLength(p);
       const back = this.loopFrom < len ? this.loopFrom : 0; // il marker, se è dentro la canzone
@@ -159,11 +165,11 @@ export class Engine {
       // la battuta del pattern che suona adesso (pattern lunghi): in song dalle caselle di fila, in pattern dal giro
       const k = slot ? (song ? barOf(p, p.song, bar) : this.loop % patBars(p.patterns[slot])) : 0;
       const ps = k * STEPS + s; // lo step contato dall'inizio del pattern
-      if (this.metronome && s % 4 === 0) this.graph.click(this.nextTime, s === 0);
+      if (this.metronome && s % 4 === 0 && !late) this.graph.click(this.nextTime, s === 0);
       // swing: gli step in levare (2, 4, 6… contando da 1) arrivano un po' dopo
       const t = this.nextTime + (s % 2 === 1 ? p.swing * stepDur : 0);
       if (song && s === 0) this.graph.automateBar(bar, this.nextTime, STEPS * stepDur, songLength(p) - 1);
-      if (slot) this.graph.playStep(p.patterns[slot], ps, t, stepDur);
+      if (slot && !late) this.graph.playStep(p.patterns[slot], ps, t, stepDur);
       this.recent.push({ t, step: ps, slot });
       if (this.recent.length > 32) this.recent.shift();
       const delay = Math.max(0, (t - this.ctx.currentTime) * 1000);

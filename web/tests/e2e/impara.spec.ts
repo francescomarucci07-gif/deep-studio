@@ -42,6 +42,7 @@ test("lezione 1: parte da un pattern vuoto e va avanti da sola a ogni passo", as
     "3. Accordi e melodia",
     "4. Costruisci la canzone",
     "5. Build, drop e mix",
+    "6. Il mixer e i bus",
   ]);
   await page.locator(".ds-learn-list button", { hasText: "Il primo groove" }).click();
   const card = page.locator(".ds-lesson");
@@ -76,5 +77,25 @@ test("lezione 1: parte da un pattern vuoto e va avanti da sola a ogni passo", as
   await expect(page.locator(".console-coach")).toContainText('Sono alla lezione "La bassline"');
   await titolo.click();
   await expect(card).toHaveAttribute("data-small", "true");
+  expect(err).toEqual([]);
+});
+
+test("lezione 6, il mixer e i bus: apre il Mixer e va avanti con il mute del bus Drums durante il Play", async ({ page }) => {
+  const err = errori(page);
+  await apri(page);
+  await page.getByRole("button", { name: "Impara", exact: true }).first().click();
+  await page.locator(".ds-learn-list button", { hasText: "Il mixer e i bus" }).click();
+  const titolo = page.locator(".ds-lesson .ds-lesson-title");
+  await expect(titolo).toHaveText(/1\/6/);
+  await expect(page.locator(".console-stage")).toHaveAttribute("data-view", "mixer");
+  await page.keyboard.press("Space");
+  await page.getByRole("button", { name: "Mute del bus Drums" }).click();
+  await expect(titolo).toHaveText(/2\/6/);
+  await page.getByRole("button", { name: "Mute del bus Drums" }).click();
+  await page.getByLabel("Volume del bus Drums").fill("0.5");
+  await expect(titolo).toHaveText(/3\/6/);
+  await page.keyboard.press("Space");
+  await page.locator(".hw-strip--newbus").click();
+  await expect(titolo).toHaveText(/4\/6/);
   expect(err).toEqual([]);
 });

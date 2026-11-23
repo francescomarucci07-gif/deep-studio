@@ -117,7 +117,9 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   più `ds-tour-visto` nel browser), pulsante Tutorial per rivederlo; voce del coach se accesa. Su telefono salta
   le tappe `wide`. Il pulsante si chiama **Impara** (ex Tutorial): apre il tour e le lezioni.
 - **Lezioni guidate** (`lib/daw/lessons.ts` = testi e controlli, `Lezioni.tsx` = menu Impara e scheda in basso):
-  5 lezioni (Il primo groove, La bassline, Accordi e melodia, Costruisci la canzone, Build drop e mix); ogni passo ha
+  6 lezioni (Il primo groove, La bassline, Accordi e melodia, Costruisci la canzone, Build drop e mix, Il mixer e i bus;
+  la sesta del 23 nov, dopo la segnalazione "non trovo il bus": mute e fader del bus Drums, + Nuovo bus, Chords e Lead dentro,
+  un plugin sul bus, il Send del clap); ogni passo ha
   istruzione, suggerimento e `done(ctx)` che guarda il progetto: quando è vero la lezione va avanti da sola. La prima
   parte da un pattern vuoto. "Chiedi al coach" manda il passo nella chat. Lezioni finite in `ds-lezioni` (browser).
   Al primo login (`auth/callback`), se l'account non ha progetti e non ha visto il tour, si crea un progetto

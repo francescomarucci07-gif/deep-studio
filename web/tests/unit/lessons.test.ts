@@ -43,4 +43,32 @@ describe("lezioni", () => {
     p.mixer.lead.out = "bus2";
     expect(step.done({ ...ctx(p), project: p })).toBe(true);
   });
+
+  it("il mixer e i bus: mute e fader del bus Drums, bus nuovo, Chords e Lead dentro, plugin, Send del clap", () => {
+    const steps = LESSONS[5].steps;
+    const p = starterProject(); // la batteria nel bus Drums (bus1)
+    const c = (extra: Partial<LessonCtx> = {}): LessonCtx => ({ project: p, editing: "A", playing: true, songMode: false, exported: false, ...extra });
+    expect(steps[0].done(c())).toBe(false);
+    p.buses.bus1.muted = true;
+    expect(steps[0].done(c({ playing: false }))).toBe(false); // serve il Play, per sentirlo
+    expect(steps[0].done(c())).toBe(true);
+    expect(steps[1].done(c())).toBe(false); // ancora in mute
+    p.buses.bus1.muted = false;
+    expect(steps[1].done(c())).toBe(false); // fader a 0 dB
+    p.buses.bus1.volume = 0.6;
+    expect(steps[1].done(c())).toBe(true);
+    expect(steps[2].done(c())).toBe(false);
+    p.buses.bus2.shown = true;
+    expect(steps[2].done(c())).toBe(true);
+    p.mixer.chords.out = "bus2";
+    expect(steps[3].done(c())).toBe(false); // manca il Lead
+    p.mixer.lead.out = "bus2";
+    expect(steps[3].done(c())).toBe(true);
+    expect(steps[4].done(c())).toBe(false);
+    p.inserts.bus2[0] = { type: "reverb", on: true, params: {} } as never;
+    expect(steps[4].done(c())).toBe(true);
+    expect(steps[5].done(c())).toBe(false);
+    p.mixer.clap.sends = { bus2: 0.3 };
+    expect(steps[5].done(c())).toBe(true);
+  });
 });

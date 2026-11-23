@@ -1,7 +1,7 @@
 // Le lezioni guidate: piccole "missioni" del coach, divise in passi. Ogni passo ha un'istruzione, un suggerimento e
 // un controllo che guarda il progetto mentre lavori: quando il passo è fatto, la lezione va avanti da sola, come un
 // insegnante che ti guarda le mani. I testi sono scritti qui (uguali per tutti, si controllano, non costano token).
-import { DRUMS, MIX_TARGETS, songLength, type Pattern, type Project, type Slot } from "./project";
+import { BUS_IDS, BUS_UNITY, DRUMS, isBus, MIX_TARGETS, songLength, type BusId, type Pattern, type Project, type Slot } from "./project";
 
 // quello che la lezione può vedere: il progetto e qualche cosa dello studio
 export type LessonCtx = {
@@ -27,6 +27,15 @@ export type Lesson = { id: string; title: string; intro: string; outro: string; 
 const pat = (c: LessonCtx): Pattern => c.project.patterns[c.editing];
 const on = (c: LessonCtx, d: (typeof DRUMS)[number]["id"], steps: number[]) => steps.every((s) => pat(c).drums[d][s]);
 const notesIn = (a: (number | null)[]) => a.filter((n) => n !== null).length;
+// il bus in cui entra la batteria (di solito Drums) e quello in cui entrano gli accordi, se ci sono
+const drumBus = (c: LessonCtx): BusId | null => {
+  const o = c.project.mixer.kick.out;
+  return isBus(o) ? o : null;
+};
+const synthBus = (c: LessonCtx): BusId | null => {
+  const o = c.project.mixer.chords.out;
+  return isBus(o) && o !== drumBus(c) ? o : null;
+};
 
 export const LESSONS: Lesson[] = [
   {
@@ -200,6 +209,61 @@ export const LESSONS: Lesson[] = [
         text: "Esporta la traccia (Export → Mix WAV) oppure chiedimi un Parere.",
         hint: "Export e Parere sono in alto. Con Parere ascolto l'export e ti dico cosa sistemare nel mix.",
         done: (c) => c.exported,
+      },
+    ],
+  },
+  {
+    id: "bus",
+    title: "Il mixer e i bus",
+    intro:
+      "Un bus è un gruppo di canali, come in FL: ci mandi più canali e li regoli insieme con un fader e i suoi plugin. È come un'unica manopola per tutto il kit di un batterista, invece di sette.",
+    outro:
+      "Ora sai raggruppare i canali: un fader e un effetto per tutto il gruppo, e con il Send un po' di suono in più dove serve. È così che si tiene in ordine un mix grande.",
+    steps: [
+      {
+        text: "Nel Mixer premi Play e poi M (mute) sulla striscia del bus Drums: sparisce tutta la batteria insieme.",
+        hint: "Sotto kick, clap e hat c'è scritto → Drums: entrano tutti lì. Se la batteria esce sul Master, sceglilo tu nel menu in fondo alla striscia del Kick (→ Drums o + Nuovo bus).",
+        view: "mixer",
+        done: (c) => c.playing && (drumBus(c) ? c.project.buses[drumBus(c) as BusId].muted : false),
+      },
+      {
+        text: "Togli il mute e abbassa un po' il fader del bus Drums: tutta la batteria scende insieme, anche se i fader dei singoli canali restano dove sono.",
+        hint: "Il fader è la levetta in alto nella striscia Drums; il numero sotto dice di quanti dB stai abbassando (0 dB = come prima).",
+        view: "mixer",
+        done: (c) => {
+          const b = drumBus(c);
+          return !!b && !c.project.buses[b].muted && c.project.buses[b].volume < BUS_UNITY - 0.04;
+        },
+      },
+      {
+        text: "Crea un bus nuovo con la striscia tratteggiata + Nuovo bus, prima del Master. Se vuoi rinominalo Synth (clic sul nome).",
+        hint: "Compare una striscia nuova, \"Bus 2\": per ora è vuota, nessun canale ci entra.",
+        view: "mixer",
+        done: (c) => BUS_IDS.some((b) => c.project.buses[b].shown && b !== drumBus(c)),
+      },
+      {
+        text: "Manda Chords e Lead nel bus nuovo: sotto ciascuno dei due canali, nel menu in fondo, scegli il bus.",
+        hint: "Quando ci sono entrati, sotto il nome del bus leggi \"Chords · Lead\".",
+        view: "mixer",
+        done: (c) => !!synthBus(c) && c.project.mixer.lead.out === synthBus(c),
+      },
+      {
+        text: "Metti un plugin sul bus (FX sulla sua striscia), per esempio un Riverbero: lo senti su accordi e lead insieme.",
+        hint: "Premi FX sul bus e scegli il plugin nel primo slot. Prova ad accenderlo e spegnerlo mentre suona.",
+        view: "mixer",
+        done: (c) => {
+          const b = synthBus(c);
+          return !!b && c.project.inserts[b].some(Boolean);
+        },
+      },
+      {
+        text: "Ora il Send: premi Send sul bus e alza la manopola sotto il Clap. Il clap resta nel bus Drums, ma un po' del suo suono va anche nel tuo bus.",
+        hint: "Il Send è una seconda uscita, più piccola: utile per mettere un po' di riverbero comune su strumenti di gruppi diversi.",
+        view: "mixer",
+        done: (c) => {
+          const b = synthBus(c);
+          return !!b && (c.project.mixer.clap.sends?.[b] ?? 0) > 0.01;
+        },
       },
     ],
   },

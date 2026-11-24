@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { apri, errori } from "./aiuto";
 
-for (const [w, h, tappe] of [[1366, 650, 14], [390, 844, 13]] as const) {
+for (const [w, h, tappe] of [[1366, 650, 16], [390, 844, 15]] as const) {
   test(`tour a ${w}x${h}: parte da solo, ${tappe} tappe dentro lo schermo, poi non riparte`, async ({ page }) => {
     const err = errori(page);
     await page.setViewportSize({ width: w, height: h });

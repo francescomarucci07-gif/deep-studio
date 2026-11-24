@@ -21,11 +21,11 @@ type Step = {
 export const TOUR: Step[] = [
   {
     title: "Benvenuto in Deep Studio",
-    text: "Ciao! Sono il tuo coach. In un paio di minuti ti faccio vedere dove stanno le cose e come si costruisce una traccia house, un pezzo alla volta. Puoi saltare quando vuoi e rivedere il tour dal pulsante Impara, dove trovi anche le lezioni guidate.",
+    text: "Ciao! Sono il tuo coach. In un paio di minuti ti faccio vedere dove stanno le cose e come si costruisce una traccia house, un pezzo alla volta. Puoi saltare quando vuoi e rivedere il tour dal pulsante Impara, dove trovi anche 6 lezioni guidate. Per un progetto nuovo, nella pagina Il tuo studio scegli un modello: Deep house, Tech house, Progressive, Afro house o vuoto.",
   },
   {
-    title: "Play, Stop, Rec",
-    text: "Questo è il trasporto. Play fa partire la musica, Stop la ferma; anche la barra spaziatrice fa Play e Stop. Nel display vedi i BPM, il pattern che suona e lo step. Le manopole Tempo e Swing sono a destra.",
+    title: "Play, Stop, Rec e Pat/Song",
+    text: "Questo è il trasporto. Play fa partire la musica, Stop la ferma; anche la barra spaziatrice fa Play e Stop. Il primo pulsante, Pat/Song, è come in FL: in Pat suona in loop il pattern che stai modificando, in Song tutta la canzone. Lo cambi da qualunque pagina, anche mentre suona. Nel display vedi i BPM, il pattern e lo step; Tempo e Swing sono a destra.",
     target: ".hw-transport",
     view: "beat",
   },
@@ -38,7 +38,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Il beat",
-    text: "Questo è lo step sequencer: una battuta divisa in 16 step. Clicca una casella per accendere un colpo. Il kick sugli step 1, 5, 9 e 13 è il battito della house. Ogni riga è uno strumento, e il pulsante S lo fa suonare da solo. Le ultime righe, Bass, Lead e Chord, mostrano le note: un clic ti porta al Roll, dove si scrivono. Il pulsante Vel cambia la forza di ogni colpo: trascina su e giù.",
+    text: "Lo step sequencer: una battuta in 16 step, una riga per strumento (anche tom per i fill e shaker per il movimento). Clicca una casella per accendere un colpo: il kick su 1, 5, 9 e 13 è il battito della house. S fa suonare la riga da sola, Vel cambia la forza dei colpi. Le righe Bass, Lead, Lead 2 e Chord mostrano le note: un clic ti porta al Roll.",
     target: '[data-panel="beat"] .hw-seq-grid',
     view: "beat",
   },
@@ -56,8 +56,14 @@ export const TOUR: Step[] = [
   },
   {
     title: "Le note: basso, lead, accordi",
-    text: "Nel Roll scrivi le note. Bass è il basso, Lead la melodia, Chord gli accordi. Clicca nella griglia per mettere una nota e trascina verso destra per allungarla, come nel piano roll di FL; un clic su una nota la toglie. Con Ctrl e trascina selezioni più note: poi le frecce le spostano, Ctrl+C e Ctrl+V le copiano, Ctrl+D le duplica. Oppure suona con la tastiera: Z X C V B N M sono Do Re Mi Fa Sol La Si. In alto scegli su quale pattern stai lavorando.",
+    text: "Nel Roll scrivi le note. Bass è il basso, Lead la melodia, Lead 2 una seconda melodia con un suono suo, Chord gli accordi. Clicca nella griglia per mettere una nota e trascina verso destra per allungarla, come nel piano roll di FL; un clic su una nota la toglie. Con Ctrl e trascina selezioni più note: poi le frecce le spostano, Ctrl+C e Ctrl+V le copiano, Ctrl+D le duplica. Oppure suona con la tastiera: Z X C V B N M sono Do Re Mi Fa Sol La Si. Sotto la griglia, la corsia Vel cambia la forza delle note.",
     target: '[data-panel="roll"]',
+    view: "roll",
+  },
+  {
+    title: "La scala",
+    text: "Non serve sapere la teoria: scegli una scala, per esempio La minore, e le note giuste si illuminano. Trova la indovina dalle note che hai già scritto. Piega nasconde le altre, così ogni nota che scrivi sta bene con le altre. Nella scheda Chord, con Accordi della scala, un clic mette l'accordo giusto per quella nota.",
+    target: '[data-panel="roll"] .hw-scale',
     view: "roll",
   },
   {
@@ -74,7 +80,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Il mixer",
-    text: "Il Mixer ha un canale per ogni strumento: il volume, M per il mute, S per il solo e FX per gli effetti, come EQ, compressore, riverbero e delay. Sotto ogni canale scegli l'uscita: il Master o un bus, come Drums, dove la batteria passa insieme con fader ed effetti suoi, come nel mixer di FL. Il sidechain abbassa il basso a ogni kick: è il classico respiro della house.",
+    text: "Il Mixer ha un canale per ogni strumento: il volume, M per il mute, S per il solo e FX per gli effetti, come EQ, compressore, riverbero e delay. Sotto ogni canale scegli l'uscita: il Master o un bus, un gruppo di canali con fader ed effetti suoi, come Drums per tutta la batteria. Un bus nuovo lo crei con la striscia + Nuovo bus, e con Send ci mandi solo un po' di suono. Se è la prima volta, fai la lezione Il mixer e i bus. Il sidechain abbassa il basso a ogni kick: è il classico respiro della house.",
     target: '[data-panel="mixer"]',
     view: "mixer",
   },
@@ -86,9 +92,13 @@ export const TOUR: Step[] = [
   },
   {
     title: "Esporta e chiedi un parere",
-    text: "Quando sei pronto, Export ti dà la traccia in WAV, gli stem (un WAV per strumento) o le note in MIDI, da portare in FL Studio. Parere mi fa ascoltare l'export e ti dico cosa sistemare nel mix. Se sbagli qualcosa, le frecce accanto a Versioni annullano e ripetono l'ultima modifica, come Ctrl+Z e Ctrl+Y; Versioni ti riporta a una versione salvata.",
+    text: "Quando sei pronto, Export ti dà la traccia in WAV, gli stem (un WAV per strumento) o le note in MIDI, da portare in FL Studio. Link di ascolto crea un link da mandare agli amici: ascoltano la traccia dal telefono, anche senza account. Parere mi fa ascoltare l'export e ti dico cosa sistemare nel mix. Se sbagli qualcosa, le frecce accanto a Versioni annullano e ripetono l'ultima modifica, come Ctrl+Z e Ctrl+Y; Versioni ti riporta a una versione salvata.",
     target: ".hw-transport",
     view: "beat",
+  },
+  {
+    title: "Ti ascolto mentre suoni",
+    text: "Mentre suona, io ascolto il mix. Se trovo un problema chiaro, per esempio kick e basso che si pestano o il master troppo forte, compare un avviso qui in basso a destra con il perché. Con Chiedi al coach ti spiego come sistemarlo in questo progetto; con Non dirmelo più non te lo ripeto.",
   },
   {
     title: "Il tuo coach",
@@ -99,7 +109,7 @@ export const TOUR: Step[] = [
   },
   {
     title: "Tocca a te",
-    text: "Per cominciare, apri Impara e fai la prima lezione, Il primo groove: ti guido passo per passo. Oppure chiedimi: fammi un groove deep house a 122 BPM. Buona musica!",
+    text: "Per cominciare, apri Impara e fai la prima lezione, Il primo groove: ti guido passo per passo. Oppure chiedimi: fammi un groove deep house a 122 BPM. Se qualcosa non va, premi Segnala e scrivimelo: lo leggiamo e lo sistemiamo. Buona musica!",
   },
 ];
 

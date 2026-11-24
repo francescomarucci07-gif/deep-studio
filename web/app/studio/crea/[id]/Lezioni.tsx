@@ -4,6 +4,7 @@
 // fare, controlla da sola quando l'hai fatto (lessons.ts) e passa al passo dopo. Si può ridurre a una pillola.
 import { useEffect, useRef, useState } from "react";
 import { LESSONS, type LessonCtx, type LessonView } from "@/lib/daw/lessons";
+import { TOUR } from "./Tour";
 import { speak } from "@/lib/voice-client";
 import { DEFAULT_VOICE, isVoice } from "@/lib/voices";
 
@@ -137,7 +138,7 @@ export function Lezioni({
               <li>
                 <button type="button" onClick={() => (onMenu(false), onTour())}>
                   <strong>Tour dello studio</strong>
-                  <span>dove stanno le cose, in 14 tappe</span>
+                  <span>dove stanno le cose, in {TOUR.length} tappe</span>
                 </button>
               </li>
               {LESSONS.map((l, i) => (

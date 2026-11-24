@@ -51,7 +51,8 @@ analysis/   deep_studio_analyze.py (v0.3, JSON 1.0), schema 1.0, tests/, script 
 db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor, 0003 strumenti + coach,
             0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions),
             0006–0007 segnalazioni dallo studio (tabella segnalazioni, limite di 30 al giorno con un trigger),
-            0008 admins + segnalazioni lette e segnate risolte dagli admin, 0009 link di ascolto (ascolti)
+            0008 admins + segnalazioni lette e segnate risolte dagli admin, 0009 link di ascolto (ascolti),
+            0010 consumi del coach per gli admin (funzione consumi_coach: solo totali)
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili (palette "Neon morbido"; font Geist, Chakra Petch, Geist Mono
             caricati in app/layout.tsx con next/font). Collegamento a Supabase e Vercel: docs/DEPLOY.md
@@ -193,6 +194,10 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   in modalità Song fino alla fine (canzone vuota = primo pattern in loop). Chi non ha account legge solo con le funzioni
   `ascolto(codice)` e `ascolto_play(codice)` (contatore): nessuno può elencare i link. Codice casuale di 24 caratteri.
   Attenzione: in supabase-js una query parte solo con `await` o `.then` (`void query` non la spedisce).
+- **Consumi del coach** (24 nov): pagina **/studio/consumi** (solo admin, link "Consumi" in Il tuo studio): costo, risposte,
+  token per periodo (7/30/90 giorni), per persona (numero, niente email) e per giorno, stima al mese per persona e per 20
+  amici. Legge la funzione `consumi_coach(giorni)` (migrazione 0010, security definer: solo totali, mai il testo; errore
+  se non sei admin). Non conta ElevenLabs né i costi fissi.
 - **Parere del coach**: `web/lib/daw/measure.ts` misura il render nel browser (stesse misure dell'analisi
   Python); `Daw.tsx` le manda a `/api/coach/crea` nel campo `misure` (solo per Claude, non salvate).
 - **Cronologia**: `project_versions` (ultime 60 per progetto, trigger di pulizia); il browser salva una versione

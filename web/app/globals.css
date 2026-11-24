@@ -2976,3 +2976,31 @@ ol.ds-led-row {
     display: none;
   }
 }
+
+/* la pagina dei consumi del coach: i numeri principali in una griglia */
+.ds-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--ds-space-3);
+  margin-bottom: var(--ds-space-3);
+}
+.ds-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--ds-space-3);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  background: var(--ds-surface-inset);
+}
+.ds-stats strong {
+  font: 600 22px var(--ds-font-mono);
+}
+.ds-stats span {
+  color: var(--ds-text-muted, var(--ds-text));
+  font-size: 13px;
+}
+.ds-pad[aria-current="page"] {
+  border-color: var(--ds-accent);
+  color: var(--ds-accent);
+}

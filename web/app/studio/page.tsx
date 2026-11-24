@@ -58,6 +58,11 @@ export default async function Studio() {
               Segnalazioni
             </Link>
           )}
+          {admin && (
+            <Link href="/studio/consumi" className="ds-pad">
+              Consumi
+            </Link>
+          )}
           <form action="/auth/esci" method="post">
             <button type="submit" className="ds-pad">
               Esci

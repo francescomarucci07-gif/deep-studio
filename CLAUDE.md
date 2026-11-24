@@ -265,6 +265,8 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   canali e bus, 0–1 come il fader; pagina Auto con Filtro/Volume; mute e solo vincono; restano send e plugin); ~~send verso i bus~~ **fatto il 19 nov**; ~~bus dentro bus~~ **fatto il 20 nov**; ~~metronomo~~ **fatto il 18 nov** (pulsante Metro accanto a 1234; `engine.metronome`, click su ogni battito con
   `graph.click`, non entra nell'export).
 - Coach: ~~lezioni guidate~~ **fatte il 18 nov**; ~~parere in tempo reale~~ **fatto il 19 nov** (vedi "Cose da sapere").
+- Controllo generale (23–24 nov): fatti i punti 1–6, 8 e il link di ascolto del 7; il resto del 7 (Mix WAV, Stem e MIDI in
+  FL Studio) lo prova un amico di Francesco con il messaggio in `docs/MESSAGGIO-AMICO-EXPORT.md` (da inviare).
 - Prodotto: ~~pagina delle segnalazioni nel sito~~ **fatta il 19 nov** (/studio/segnalazioni); ~~link di ascolto pubblico~~ **fatto il 20 nov**; email di accesso con
   SMTP (oltre 3–4 amici); controllo generale dello studio (dal 14 nov).
 - Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).

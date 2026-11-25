@@ -6,7 +6,7 @@ Da copiare su WhatsApp. Serve a finire il punto 7 del controllo generale (Mix WA
 
 **Ciao! Mi aiuti a provare l'export di Deep Studio in FL Studio? Ci vogliono 10 minuti.**
 
-1. Vai su **https://deep-studio-azure.vercel.app** e accedi: arriva un'email con il link (guarda anche nello spam).
+1. Vai su **https://deep-studio-azure.vercel.app** e accedi: arriva un'email con il link (guarda anche nello spam, e se c'è premi "Non è spam").
 2. In "Il tuo studio" premi **Nuovo progetto → Deep house**. Si apre lo studio: premi Play per sentirlo.
 3. In alto premi **Pat/Song** finché si illumina **Song**: così l'export prende tutta la canzone di 16 battute.
 4. Apri il menu **⤓** (Export) e scarica tutti e tre i file:

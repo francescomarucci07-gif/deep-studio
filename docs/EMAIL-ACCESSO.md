@@ -66,4 +66,9 @@ smettono di arrivare. Con l'SMTP di Gmail le email partono dal tuo indirizzo, co
    "Non è spam": dopo le prime volte Gmail impara.
 3. Se non arriva: Supabase → **Logs → Auth** dice l'errore (di solito una password per le app copiata male).
 
+**Com'è andata (25 nov):** funziona con il Gmail dedicato `deepstudio.app`. L'errore `535 BadCredentials` nei log
+voleva dire password per le app copiata male: rifatta da capo, svuotando il campo e senza spazi, è passata. Le prime
+email arrivano nello **spam** (account nuovo, niente dominio nostro): chi le riceve preme "Non è spam" e aggiunge
+l'indirizzo ai contatti. La soluzione vera arriva con un dominio nostro e un servizio come Resend (SPF e DKIM).
+
 Fatto questo, nel CLAUDE.md la voce "email di accesso con SMTP" si può segnare come fatta.

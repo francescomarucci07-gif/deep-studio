@@ -272,6 +272,16 @@ Ctrl+Y / Ctrl+Shift+Z e i pulsanti ↶ ↷ accanto a Versioni; pila di 100 passi
 ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~Velocity e accenti~~ **fatti** (vedi
 "Cose da sapere").
 
+**Per il 27 nov (chiesto da Francesco il 26 nov, dopo la prova della voce):**
+- **Voce che parte subito**: oggi tra il cambio di step e la voce passa circa un secondo. Piste: il browser aspetta tutto
+  l'audio (`res.blob()` in `voice-client.ts`) invece di suonarlo mentre arriva (`/api/voce` è già in streaming); i testi del
+  tour e delle lezioni sono fissi, quindi si possono preparare prima (cache) invece di generarli a ogni clic.
+- **Sempre la stessa voce**: ogni messaggio sembra letto da una voce diversa. Piste: quando ElevenLabs non risponde in tempo
+  si ripiega sulla voce del browser (un'altra voce); controllare i log di `/api/voce` (502?) e scegliere una sola voce per
+  tutto lo studio (oggi c'è la scelta nella chat, `ds-coach-voce-id`).
+- **Design delle pagine d'ingresso**: la pagina di entrata (home e Accedi) e quella del link (ascolto ed esercizio) sono uno
+  schermo di un colore solo: da ripensare.
+
 **Idee per i prossimi giorni (lista del 17 nov; ✱ = consigliate per prime):**
 - Studio: ~~scala nel Roll~~ **fatta il 20 nov**; ~~progetti modello per genere~~ **fatti il 21 nov**; ~~quantize e velocity nel Roll~~ **fatti il 21 nov** (corsia Vel per step);
   ~~duplica/rinomina/cancella progetti~~ **fatto il 21 nov**; ~~tastiera MIDI vera~~ **fatta il 18 nov**; ~~pattern da 2 o 4 battute~~ **fatti il 18 nov**; ~~export MIDI e

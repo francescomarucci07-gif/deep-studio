@@ -212,7 +212,9 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   alla prima modifica, prima di ogni modifica del coach, ogni 10 minuti e a mano (`lib/daw/versions.ts`).
 - **Voce**: `/api/voce` → ElevenLabs (variabili `ELEVENLABS_API_KEY`, opzionali `ELEVENLABS_VOICE_ID`,
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
-- **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen, scale, templates; `vitest.config.mts`);
+  Una voce alla volta (`lib/voice-client.ts`, 26 nov): ogni `speak` ha un numero; una frase nuova o `stopSpeaking` interrompono
+  il download da ElevenLabs e l'audio arrivato tardi non suona (prima tour, lezioni e chat potevano parlare in due).
+- **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen, scale, templates, voice; `vitest.config.mts`);
   `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
   che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send|ascolta|progetti|esercizio|esercizio-loggato|studente|modello-<id>` (modello-deep… = un progetto modello; ascolta = il lettore del link; pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
   la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.

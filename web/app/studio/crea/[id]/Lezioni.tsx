@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LESSONS, type LessonCtx, type LessonView } from "@/lib/daw/lessons";
 import { TOUR } from "./Tour";
-import { speak } from "@/lib/voice-client";
+import { speak, stopSpeaking } from "@/lib/voice-client";
 import { DEFAULT_VOICE, isVoice } from "@/lib/voices";
 
 const KEY = "ds-lezioni"; // le lezioni finite, nel browser
@@ -68,7 +68,12 @@ export function Lezioni({
   // a ogni passo: apro la pagina giusta e, se la voce è accesa, lo leggo
   const lastSpoken = useRef("");
   useEffect(() => {
-    if (!lesson || !active) return;
+    if (!lesson || !active) {
+      // chiusa la lezione: se il coach stava leggendo un passo, si ferma
+      if (lastSpoken.current) stopSpeaking();
+      lastSpoken.current = "";
+      return;
+    }
     const text = finished ? lesson.outro : step?.text;
     if (step?.view) onView(step.view);
     if (step?.roll) onRoll(step.roll);

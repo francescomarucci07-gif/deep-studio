@@ -290,6 +290,8 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   forma d'onda, audio → MIDI; fase 2 canto con ElevenLabs Music solo dopo il loro sì scritto; fase 3 cambio voce dopo le
   prove). ~~Modalità lezione~~ **fatta il 26 nov** (vedi "Cose da sapere"; prossimo: l'insegnante vede le copie degli
   studenti, con il loro consenso). Da fare: leggere i termini di ElevenLabs (la rete della sessione non li apriva).
+  Idea per più avanti (26 nov, solo teoria, in secondo piano): se la piattaforma diventa pubblica, **gruppi** creati da
+  insegnanti/capigruppo che seguono i loro studenti nell'app (vedere i lavori, consegne, consenso; minori di 14 anni = genitori).
 - Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,

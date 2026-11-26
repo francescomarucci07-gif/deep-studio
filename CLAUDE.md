@@ -52,7 +52,7 @@ db/         migrations/ 0001 init (tabelle, RLS, bucket, realtime), 0002 advisor
             0004 progetti dello studio (projects) + coach_messages.project_id, 0005 cronologia (project_versions),
             0006–0007 segnalazioni dallo studio (tabella segnalazioni, limite di 30 al giorno con un trigger),
             0008 admins + segnalazioni lette e segnate risolte dagli admin, 0009 link di ascolto (ascolti),
-            0010 consumi del coach per gli admin (funzione consumi_coach: solo totali)
+            0010 consumi del coach per gli admin (funzione consumi_coach: solo totali), 0011 esercizi (modalità lezione)
 web/        app Next.js 15 (login, studio, nuova analisi, stato job, privacy); design/tokens.css =
             unica fonte di colori e stili (palette "Neon morbido"; font Geist, Chakra Petch, Geist Mono
             caricati in app/layout.tsx con next/font). Collegamento a Supabase e Vercel: docs/DEPLOY.md
@@ -194,6 +194,14 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   in modalità Song fino alla fine (canzone vuota = primo pattern in loop). Chi non ha account legge solo con le funzioni
   `ascolto(codice)` e `ascolto_play(codice)` (contatore): nessuno può elencare i link. Codice casuale di 24 caratteri.
   Attenzione: in supabase-js una query parte solo con `await` o `.then` (`void query` non la spedisce).
+- **Modalità lezione** (26 nov): menu ⤓ Export → **Esercizio** (`Esercizio.tsx`): l'insegnante scrive titolo e consegna e crea
+  il link `/esercizio/<codice>` (tabella `esercizi`, migrazione 0011, RLS: ognuno i suoi; uno per progetto; contatore `copie`).
+  La fotografia porta la consegna dentro il progetto (`project.esercizio` = { titolo, consegna }, `normEsercizio`). La pagina
+  (`app/esercizio/[codice]/`, `EsercizioView.tsx` con il `Player` del link di ascolto) si legge anche senza login con
+  `esercizio(codice)`; "Copia nel mio studio" = POST a `/esercizio/<codice>/copia` → `esercizio_copia(codice)` (solo con login,
+  crea "Esercizio · titolo" tra i progetti dello studente); senza login passa da `/accedi?next=…` (LoginForm porta `next` nel
+  link magico). Nello studio dello studente la scheda `Consegna.tsx` in basso a sinistra, e il coach la legge in `describe()`
+  (dà indizi, non la soluzione: `crea-v32`). L'insegnante non vede ancora le copie degli studenti (serve il loro consenso).
 - **Consumi del coach** (24 nov): pagina **/studio/consumi** (solo admin, link "Consumi" in Il tuo studio): costo, risposte,
   token per periodo (7/30/90 giorni), per persona (numero, niente email) e per giorno, stima al mese per persona e per 20
   amici. Legge la funzione `consumi_coach(giorni)` (migrazione 0010, security definer: solo totali, mai il testo; errore
@@ -206,7 +214,7 @@ npm run test:e2e             # Playwright: build + studio vero nel browser (test
   `ELEVENLABS_MODEL`), voci in `lib/voices.ts`; senza chiave si usa la voce del browser.
 - **Test** (`web/tests`): `unit/` con Vitest (project, midifile, zip, lezioni, coach-tool, midi, listen, scale, templates; `vitest.config.mts`);
   `e2e/` con Playwright (`playwright.config.ts`: fa la build con un Supabase finto e apre `/prova-studio`, una pagina
-  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send|ascolta|progetti|modello-<id>` (modello-deep… = un progetto modello; ascolta = il lettore del link; pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
+  che esiste solo con `DS_PROVA=1`, altrimenti 404; progetti di prova con `?p=starter|empty|user|export|tour|segnala|pesto|send|ascolta|progetti|esercizio|esercizio-loggato|studente|modello-<id>` (modello-deep… = un progetto modello; ascolta = il lettore del link; pesto = mix sbagliato apposta, send = lead che si sente solo dal send);
   la rete verso database e coach è finta, aiuti in `aiuto.ts`). Le prove controllano risultati, non millisecondi.
 - **Stati del job** (enum `job_status`): `in_coda → in_analisi → separazione_stem → coach → pronta`,
   più `errore`. L'utente crea solo job `in_coda` e può rimettere in coda un job in errore con
@@ -278,7 +286,8 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
   `docs/EMAIL-ACCESSO.md`; le prime email finiscono nello spam: "Non è spam"; più avanti dominio nostro + Resend); controllo generale dello studio (dal 14 nov).
 - **Area beat, lezioni e canto** (richiesta del 26 nov): piano in `docs/PIANO-BEAT-CANTO.md` (fase 1 modalità lezione,
   forma d'onda, audio → MIDI; fase 2 canto con ElevenLabs Music solo dopo il loro sì scritto; fase 3 cambio voce dopo le
-  prove). Da decidere: partire dalla modalità lezione; leggere i termini di ElevenLabs (la rete della sessione non li apriva).
+  prove). ~~Modalità lezione~~ **fatta il 26 nov** (vedi "Cose da sapere"; prossimo: l'insegnante vede le copie degli
+  studenti, con il loro consenso). Da fare: leggere i termini di ElevenLabs (la rete della sessione non li apriva).
 - Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type Stato = { tipo: "pronto" } | { tipo: "invio" } | { tipo: "inviato"; email: string } | { tipo: "errore"; testo: string };
 
-export function LoginForm() {
+export function LoginForm({ next = "/studio" }: { next?: string }) {
   const [email, setEmail] = useState("");
   const [stato, setStato] = useState<Stato>({ tipo: "pronto" });
 
@@ -15,7 +15,7 @@ export function LoginForm() {
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/studio` },
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
     });
     setStato(error ? { tipo: "errore", testo: error.message } : { tipo: "inviato", email });
   }

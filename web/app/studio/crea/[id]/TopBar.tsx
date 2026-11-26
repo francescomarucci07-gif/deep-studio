@@ -31,6 +31,7 @@ export function TopBar({ studio }: { studio: Studio }) {
     save,
     setExportMenu,
     setSharing,
+    setExercising,
     setSongMode,
     setShowVersions,
     setTitle,
@@ -185,6 +186,17 @@ export function TopBar({ studio }: { studio: Studio }) {
               >
                 <strong>Link di ascolto</strong>
                 <span>chi lo apre ascolta la traccia, anche senza account</span>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setExportMenu(false);
+                  setExercising(true);
+                }}
+              >
+                <strong>Esercizio</strong>
+                <span>una consegna e un link: gli studenti copiano il progetto e lo modificano</span>
               </button>
             </span>
           )}

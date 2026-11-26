@@ -206,3 +206,21 @@ describe("bus dentro bus", () => {
     expect(p.buses.bus2.out).toBeUndefined();
   });
 });
+
+describe("esercizio (modalità lezione)", () => {
+  it("la consegna resta nel progetto, ripulita e tagliata", async () => {
+    const { describe: descrivi, ESERCIZIO_CONSEGNA_MAX } = await import("@/lib/daw/project");
+    const p = normalize({ ...starterProject(), esercizio: { titolo: "  Bassline  ", consegna: "x".repeat(5000) } });
+    expect(p.esercizio?.titolo).toBe("Bassline");
+    expect(p.esercizio?.consegna).toHaveLength(ESERCIZIO_CONSEGNA_MAX);
+    // il coach la legge
+    expect(descrivi(p, "Prova", "A")).toContain('ESERCIZIO dell\'insegnante: "Bassline"');
+  });
+
+  it("senza esercizio (o vuoto) il campo non c'è e il coach non ne parla", async () => {
+    const { describe: descrivi } = await import("@/lib/daw/project");
+    expect(normalize(starterProject()).esercizio).toBeUndefined();
+    expect(normalize({ ...starterProject(), esercizio: { titolo: " ", consegna: 3 } }).esercizio).toBeUndefined();
+    expect(descrivi(normalize(starterProject()), "Prova", "A")).not.toContain("ESERCIZIO");
+  });
+});

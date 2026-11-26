@@ -10,7 +10,24 @@ import { createClient } from "@/lib/supabase/client";
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 
-export function Player({ codice, title, project, updatedAt }: { codice: string; title: string; project: Project; updatedAt: string }) {
+// Nella pagina di un esercizio: count = false (non conta gli ascolti), label sopra il titolo, children al posto dell'invito
+export function Player({
+  codice,
+  title,
+  project,
+  updatedAt,
+  count = true,
+  label = "Ascolta · fatta con Deep Studio",
+  children,
+}: {
+  codice: string;
+  title: string;
+  project: Project;
+  updatedAt: string;
+  count?: boolean;
+  label?: string;
+  children?: React.ReactNode;
+}) {
   const hasSong = project.song.some(Boolean);
   const loopSlot: Slot = useMemo(() => SLOTS.find((s) => !isEmptyPattern(project.patterns[s])) ?? "A", [project]);
   const bars = hasSong ? songLength(project) : 0;
@@ -47,7 +64,7 @@ export function Player({ codice, title, project, updatedAt }: { codice: string; 
     await engine.current.start(0);
     setPlaying(true);
     // il contatore degli ascolti: una volta per visita
-    if (!counted.current) {
+    if (count && !counted.current) {
       counted.current = true;
       // (la richiesta parte solo con then/await: senza, supabase-js la prepara e basta)
       void createClient()
@@ -61,7 +78,7 @@ export function Player({ codice, title, project, updatedAt }: { codice: string; 
   return (
     <div className="ds-stack ds-listen">
       <section className="ds-module ds-listen-card">
-        <p className="ds-meta">Ascolta · fatta con Deep Studio</p>
+        <p className="ds-meta">{label}</p>
         <h1 className="ds-heading">{title}</h1>
         <p className="ds-lead">
           {project.bpm} BPM · {hasSong ? `${bars} battute · ${clock(total)}` : `pattern ${loopSlot} in loop`} · aggiornata il{" "}
@@ -84,13 +101,15 @@ export function Player({ codice, title, project, updatedAt }: { codice: string; 
         )}
         <p className="ds-meta">I suoni nascono nel tuo browser mentre ascolti: alza il volume e usa le cuffie per il basso.</p>
       </section>
-      <section className="ds-module">
-        <h2 className="ds-module-title">Vuoi farne una tua?</h2>
-        <p className="ds-lead">Deep Studio è uno studio house nel browser, con un coach che ti insegna mentre produci.</p>
-        <Link href="/accedi" className="ds-pad">
-          Prova Deep Studio
-        </Link>
-      </section>
+      {children ?? (
+        <section className="ds-module">
+          <h2 className="ds-module-title">Vuoi farne una tua?</h2>
+          <p className="ds-lead">Deep Studio è uno studio house nel browser, con un coach che ti insegna mentre produci.</p>
+          <Link href="/accedi" className="ds-pad">
+            Prova Deep Studio
+          </Link>
+        </section>
+      )}
     </div>
   );
 }

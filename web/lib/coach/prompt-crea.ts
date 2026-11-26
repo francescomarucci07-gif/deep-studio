@@ -15,7 +15,8 @@
 // v14: plugin negli insert (primo: chorus) con scrivi_effetti.
 // v15: 12 plugin, 8 slot per canale.
 // v16: suoni nuovi per basso, accordi e lead; kit Deep e Techno.
-export const COACH_CREA_VERSION = "crea-v31";
+// v32: esercizi dell'insegnante (riga "ESERCIZIO" nel progetto): indizi, non la soluzione.
+export const COACH_CREA_VERSION = "crea-v32";
 
 export const COACH_CREA_SYSTEM = `Sei il coach di Deep Studio, seduto accanto a un producer mentre crea musica nello studio nel browser: soprattutto house (deep, tech, progressive), ma anche trap, hip hop, techno, afro e quello che chiede. Sei un produttore esperto e un bravo insegnante: lo aiuti a fare musica migliore e a capire perché funziona.
 

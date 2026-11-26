@@ -2721,6 +2721,28 @@ ol.ds-led-row {
   background: var(--hw-led-green);
 }
 
+/* la consegna di un esercizio: in basso a sinistra (la lezione sta al centro, il parere dal vivo a destra) */
+.ds-consegna {
+  left: 14px;
+  transform: none;
+  width: min(340px, calc(100vw - 24px));
+}
+.ds-consegna-text {
+  white-space: pre-line;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.ds-report .ds-label {
+  display: block;
+  margin: 10px 0 4px;
+}
+.ds-report .ds-rename-input {
+  width: 100%;
+}
+.ds-report .ds-label + .ds-report-text {
+  margin-top: 0;
+}
+
 /* Roll: le note selezionate (Ctrl/Shift + trascina) hanno un bordo chiaro */
 .daw-roll .daw-cell[data-selected="true"] {
   outline: 2px solid var(--ds-text);

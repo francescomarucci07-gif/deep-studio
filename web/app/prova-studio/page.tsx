@@ -3,6 +3,7 @@ import { normalize, starterProject } from "@/lib/daw/project";
 import user from "@/tests/e2e/progetto-utente.json";
 import { TEMPLATES, isTemplate } from "@/lib/daw/templates";
 import { Player } from "../ascolta/[codice]/Player";
+import { EsercizioView } from "../esercizio/[codice]/EsercizioView";
 import { ProjectActions } from "../studio/ProjectActions";
 import { Daw } from "../studio/crea/[id]/Daw";
 
@@ -65,11 +66,23 @@ export default async function ProvaStudio({ searchParams }: { searchParams: Prom
   // il lettore del link di ascolto (/ascolta/<codice>) con la traccia di prova, senza database
   if (p === "ascolta")
     return <Player codice="codicediprova12345678" title="Prova ascolto" project={normalize({ ...starter, bpm: 140 })} updatedAt="2026-11-20T10:00:00Z" />;
+  // la pagina di un esercizio (/esercizio/<codice>), da fuori (senza login) o da dentro
+  if (p === "esercizio" || p === "esercizio-loggato")
+    return (
+      <EsercizioView
+        codice="codicediprova12345678"
+        row={{ title: "Bassline in levare", consegna: "Scrivi una bassline in levare nel pattern A.\nPoi mettila nella canzone.", data: starter, copie: 2, updated_at: "2026-11-26T10:00:00Z" }}
+        loggato={p === "esercizio-loggato"}
+        errore={false}
+      />
+    );
+  // il progetto di uno studente copiato da un esercizio: la consegna è dentro
+  const studente = p === "studente" ? normalize({ ...starter, esercizio: { titolo: "Bassline in levare", consegna: "Scrivi una bassline in levare nel pattern A." } }) : null;
   return (
     <Daw
       id={p === "segnala" ? "00000000-0000-0000-0000-000000000001" : "prova"}
       initialTitle={p === "export" ? "Prova export" : "Prova"}
-      initialProject={data}
+      initialProject={studente ?? data}
       coachMessages={[]}
       tourDone={p !== "tour"}
     />

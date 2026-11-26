@@ -304,8 +304,20 @@ export type Project = {
   buses: Record<BusId, Bus>;
   sidechain: boolean; // il kick abbassa il basso
   key?: Key; // la tonalità (scale.ts): illumina le note nel Roll e la usa il coach; manca = nessuna
+  // la consegna, se il progetto è un esercizio (scritto dall'insegnante o copiato da /esercizio/<codice>)
+  esercizio?: Esercizio;
   mixer: Record<ChannelId, Channel>;
 };
+
+export type Esercizio = { titolo: string; consegna: string };
+export const ESERCIZIO_TITOLO_MAX = 120;
+export const ESERCIZIO_CONSEGNA_MAX = 1500;
+export function normEsercizio(v: unknown): Esercizio | undefined {
+  const r = (v && typeof v === "object" ? v : {}) as Partial<Record<keyof Esercizio, unknown>>;
+  const titolo = typeof r.titolo === "string" ? r.titolo.trim().slice(0, ESERCIZIO_TITOLO_MAX) : "";
+  const consegna = typeof r.consegna === "string" ? r.consegna.trim().slice(0, ESERCIZIO_CONSEGNA_MAX) : "";
+  return titolo || consegna ? { titolo: titolo || "Esercizio", consegna } : undefined;
+}
 
 export const NOTE_NAMES = ["Do", "Do#", "Re", "Re#", "Mi", "Fa", "Fa#", "Sol", "Sol#", "La", "La#", "Si"];
 export const chordName = (c: Chord) => `${NOTE_NAMES[c.root]}${CHORD_SUFFIX[c.type]}`;
@@ -669,6 +681,7 @@ export function normalize(raw: unknown): Project {
     ) as Project["inserts"],
     sidechain: typeof r.sidechain === "boolean" ? r.sidechain : d.sidechain,
     ...(normKey(r.key) ? { key: normKey(r.key) } : {}),
+    ...(normEsercizio(r.esercizio) ? { esercizio: normEsercizio(r.esercizio) } : {}),
     mixer: Object.fromEntries(
       (Object.keys(d.mixer) as ChannelId[]).map((id) => [
         id,
@@ -755,6 +768,11 @@ export function describe(p: Project, title: string, editing: Slot) {
       ? `Tonalità: ${keyName(p.key)} (scelta dal producer: nel Roll le note della scala sono illuminate; scrivi melodie, bassline e accordi dentro la scala, a meno che non ti chieda altro).`
       : "Tonalità: non scelta (se scrivi note, sceglila tu con il campo tonalita e dillo).",
     routingLine(p),
+    ...(p.esercizio
+      ? [
+          `Questo progetto è un ESERCIZIO dell'insegnante: "${p.esercizio.titolo}". Consegna: ${p.esercizio.consegna || "(nessun testo)"}. Aiuta lo studente a farlo da solo: spiega e dai indizi, non scrivere tu la soluzione nello studio a meno che non te lo chieda esplicitamente.`,
+        ]
+      : []),
     "Suoni dei synth: quelli qui sotto sono i suoni di base; un pattern con un suono proprio lo dice nella sua scheda.",
     `Accordi: suono ${CHORD_STYLES[p.chordSound.style].label} (${CHORD_STYLES[p.chordSound.style].hint}), filtro ${Math.round(p.chordSound.cutoff)} Hz.`,
     ...LEADS.map((r) => {

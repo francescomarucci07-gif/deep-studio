@@ -9,11 +9,14 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Accedi · Deep Studio" };
 
-export default async function Accedi({ searchParams }: { searchParams: Promise<{ errore?: string }> }) {
+// next = dove tornare dopo il login (es. la pagina di un esercizio); solo percorsi del sito
+const safe = (n?: string) => (n && n.startsWith("/") && !n.startsWith("//") ? n : "/studio");
+
+export default async function Accedi({ searchParams }: { searchParams: Promise<{ errore?: string; next?: string }> }) {
   if (!hasSupabase()) return <SupabaseMissing />;
   const supabase = await createClient();
-  if ((await supabase.auth.getUser()).data.user) redirect("/studio");
-  const { errore } = await searchParams;
+  const { errore, next } = await searchParams;
+  if ((await supabase.auth.getUser()).data.user) redirect(safe(next));
 
   return (
     <section className="ds-module">
@@ -23,7 +26,7 @@ export default async function Accedi({ searchParams }: { searchParams: Promise<{
           Il link non è valido o è scaduto. Chiedine uno nuovo.
         </p>
       )}
-      <LoginForm />
+      <LoginForm next={safe(next)} />
     </section>
   );
 }

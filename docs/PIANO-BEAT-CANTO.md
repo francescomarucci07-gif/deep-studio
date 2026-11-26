@@ -19,7 +19,7 @@ progetti modello, coach Claude, voce ElevenLabs (solo lettura di testo). Motore 
 | Forma d'onda, taglio e loop | wavesurfer.js per audio caricato o registrato; serve prima l'ADR-0002 (sample propri) | BSD-3 |
 | Audio → MIDI | Basic Pitch (Spotify), versione JS nel browser, zero costi di server | Apache-2.0 |
 | Separazione stem | Demucs su Modal (già previsto per M2, serve Spencer) | MIT |
-| **Modalità lezione** | Ruolo insegnante; tabella `esercizi` con RLS (come `ascolti`); link all'esercizio; "Copia nel mio studio" crea un progetto dello studente | nessuna libreria |
+| **Modalità lezione** (**fatta il 26 nov**) | Ruolo insegnante; tabella `esercizi` con RLS (come `ascolti`); link all'esercizio; "Copia nel mio studio" crea un progetto dello studente | nessuna libreria |
 | Plugin VST | Solo una pagina di download consigliati: Vital, Surge XT (codice GPL3), Spitfire LABS, Valhalla Supermassive, TDR Nova (gratis, non open source). Non si incorporano | link esterni |
 
 Stima: modalità lezione ~2 giorni; forma d'onda e loop 2–3 giorni; audio → MIDI 1–2 giorni.
@@ -56,6 +56,7 @@ Stima: modalità lezione ~2 giorni; forma d'onda e loop 2–3 giorni; audio → 
 | Coach Claude | come oggi (/studio/consumi) |
 
 ## Da decidere alla ripresa
-1. Partire dalla modalità lezione (non dipende né da Spencer né da ElevenLabs)?
+1. ~~Partire dalla modalità lezione~~ fatta il 26 nov. Prossimo passo possibile: l'insegnante vede le copie degli studenti
+   (serve il loro consenso: con studenti minorenni anche quello dei genitori).
 2. Leggere i termini di ElevenLabs: permesso di scaricare le pagine da elevenlabs.io dal terminale, oppure Francesco
    incolla il testo. Poi aggiornare la Fase 2 e scrivere la bozza della mail.

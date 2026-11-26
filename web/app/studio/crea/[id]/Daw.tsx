@@ -5,6 +5,8 @@ import { VersionsPanel } from "@/components/hw/VersionsPanel";
 import { SLOTS, isEmptyPattern } from "@/lib/daw/project";
 import { Ascolto } from "./Ascolto";
 import { Condividi } from "./Condividi";
+import { Consegna } from "./Consegna";
+import { Esercizio } from "./Esercizio";
 import { Lezioni } from "./Lezioni";
 import { Segnala } from "./Segnala";
 import { Tour } from "./Tour";
@@ -63,17 +65,30 @@ export function Daw(props: StudioProps) {
     ascolto,
     sharing,
     setSharing,
+    exercising,
+    setExercising,
     touring,
     undo,
     versionsTick,
     view,
   } = studio;
   const closeShare = useCallback(() => setSharing(false), [setSharing]);
+  const closeExercise = useCallback(() => setExercising(false), [setExercising]);
   return (
     <div className="console" data-coach={coachOpen ? "on" : "off"}>
       {touring && <Tour onView={chooseView} onCoach={openCoach} onClose={endTour} />}
       {reporting && <Segnala projectId={id} view={view} onClose={closeReport} />}
       {sharing && <Condividi projectId={id} title={titleRef.current} getProject={() => projectRef.current} onClose={closeShare} />}
+      {exercising && <Esercizio projectId={id} title={titleRef.current} getProject={() => projectRef.current} onClose={closeExercise} />}
+      {project.esercizio && (
+        <Consegna
+          esercizio={project.esercizio}
+          onAsk={() => {
+            setCoachOpen(true);
+            setAsk({ id: Date.now(), text: `Aiutami con l'esercizio "${project.esercizio!.titolo}": da dove comincio?` });
+          }}
+        />
+      )}
       <Lezioni
         ctx={{ project, editing, playing, songMode, exported }}
         menu={learnMenu}

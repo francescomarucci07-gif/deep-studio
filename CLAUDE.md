@@ -276,6 +276,9 @@ ripristini sono sempre un passo a sé. Non si salva tra una visita e l'altra. ~~
 - Prodotto: ~~pagina delle segnalazioni nel sito~~ **fatta il 19 nov** (/studio/segnalazioni); ~~link di ascolto pubblico~~ **fatto il 20 nov**; ~~email di accesso con
   SMTP~~ **fatta il 25 nov** (Gmail dedicato deepstudio.app, password per le app solo in Supabase; guida in
   `docs/EMAIL-ACCESSO.md`; le prime email finiscono nello spam: "Non è spam"; più avanti dominio nostro + Resend); controllo generale dello studio (dal 14 nov).
+- **Area beat, lezioni e canto** (richiesta del 26 nov): piano in `docs/PIANO-BEAT-CANTO.md` (fase 1 modalità lezione,
+  forma d'onda, audio → MIDI; fase 2 canto con ElevenLabs Music solo dopo il loro sì scritto; fase 3 cambio voce dopo le
+  prove). Da decidere: partire dalla modalità lezione; leggere i termini di ElevenLabs (la rete della sessione non li apriva).
 - Codice: ~~dividere `Daw.tsx`~~ **fatto il 18 nov** (vedi "Studio nel browser"); ~~test nel repo~~ **fatti il 18 nov** (vedi "Cose da sapere"); M2 worker su Modal (serve Spencer).
 
 Fatti l'10–11 nov: marker di inizio della canzone, tastiera musicale (typing keyboard), Roll con Bass/Lead/Chord,
